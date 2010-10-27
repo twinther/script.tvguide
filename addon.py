@@ -5,6 +5,7 @@ import sys
 import os
 import datetime
 import time
+import math
 
 import xbmc
 import xbmcgui
@@ -21,11 +22,14 @@ CELL_WIDTH = 275
 
 HALF_HOUR = datetime.timedelta(minutes = 30)
 
-class TVGuide(xbmcgui.Window):
+class TVGuide(xbmcgui.WindowXML):
 
-	def __init__(self):
+	def __init__(self, xmlFilename, scriptPath):
 		self.channels = simplejson.loads(web.downloadAndCacheUrl('http://www.dr.dk/tjenester/programoversigt/dbservice.ashx/getChannels?type=tv', '/tmp/channels.json', 60))
 		self.controlToProgramMap = {}
+
+	def onInit(self):
+		print "onInit"
 
 		# nearest half hour
 #		self.date = datetime.datetime(2010, 10, 24, 18, 45)
@@ -33,14 +37,13 @@ class TVGuide(xbmcgui.Window):
 		self.date -= datetime.timedelta(minutes = self.date.minute % 30)
 		
 		self.startTime = self.date
-		self.setCoordinateResolution(1) # 720p
 
 #		xbmcgui.lock()
 
 		# date and time row
-		self.addControl(xbmcgui.ControlLabel(0, CELL_HEIGHT, 180, CELL_HEIGHT, self.date.strftime('%a, %d. %b')))
-		for col in range(0, 4):
-			self.addControl(xbmcgui.ControlLabel(180 + CELL_WIDTH * col, CELL_HEIGHT, CELL_WIDTH, CELL_HEIGHT, self.startTime.strftime('%H:%M')))
+		self.getControl(4000).setLabel(self.date.strftime('%a, %d. %b'))
+		for col in range(1, 5):
+			self.getControl(4000 + col).setLabel(self.startTime.strftime('%H:%M'))
 			self.startTime += HALF_HOUR
 
 		# channels
@@ -48,10 +51,9 @@ class TVGuide(xbmcgui.Window):
 			if(idx == 8):
 				break
 
-			self.addControl(xbmcgui.ControlLabel(0, CELL_HEIGHT * (idx + 2), 180, CELL_HEIGHT, channel['name']))
+			self.getControl(4010 + idx).setLabel(channel['name'])
 
 			programs = self._loadProgramJson(channel['source_url'])
-			print channel['source_url']
 			for program in programs['result']:
 				pgStart = self._parseDate(program['pg_start'])
 				pgStop = self._parseDate(program['pg_stop'])
@@ -71,28 +73,99 @@ class TVGuide(xbmcgui.Window):
 				if(cellWidth > 1):
 					control = xbmcgui.ControlButton(cellStart, CELL_HEIGHT * (2 + idx), cellWidth, CELL_HEIGHT, program['pro_title'])
 					self.addControl(control)
-					self.controlToProgramMap[str(control)] = program
+					self.controlToProgramMap[control.getId()] = program
 
-		self.titleControl = xbmcgui.ControlLabel(10, 500, 1260, CELL_HEIGHT, 'Title', 'font18')
-		self.addControl(self.titleControl)
-		self.descriptionControl = xbmcgui.ControlLabel(10, 550, 1280, 160, 'description')
-		self.addControl(self.descriptionControl)
+
+		self.numberOfControls = control.getId()
+
+		for i in range(1, self.numberOfControls + 1):
+			c = self.getControl(i)
+			if(i > 1):
+				c.controlLeft(self.getControl(i - 1))
+			if(i < control.getId()):
+				c.controlRight(self.getControl(i + 1))
+
+			below = self._findNearestControlBelow(c)
+			above = self._findNearestControlAbove(c)
+			if(not(below == None)):
+				c.controlDown(below)
+			if(not(above == None)):
+				c.controlUp(above)
+
 
 #		xbmcgui.unlock()
 
+	def _findNearestControlBelow(self, control):
+		(x, y) = control.getPosition()
+		nearestControl = None
+		minX = 10000
+		minY = None
+		for i in range(1, self.numberOfControls + 1):
+			c = self.getControl(i)
+			(cx, cy) = c.getPosition()
+			if(y >= cy):
+				continue
+
+			if(not(minY == None) and abs(cy - y) > minY):
+				break
+
+			minY = abs(cy - y)
+			deltaX = abs(cx - x)
+
+			if(deltaX < minX):
+				minX = deltaX
+				nearestControl = c
+
+		return nearestControl
+
+	def _findNearestControlAbove(self, control):
+		(x, y) = control.getPosition()
+		nearestControl = None
+		minX = 10000
+		minY = None
+		for i in range(self.numberOfControls, 0, -1):
+			c = self.getControl(i)
+			(cx, cy) = c.getPosition()
+			if(y <= cy):
+				continue
+
+			if(not(minY == None) and abs(cy - y) > minY):
+				break
+
+			minY = abs(cy - y)
+			deltaX = abs(cx - x)
+
+			if(deltaX < minX):
+				minX = deltaX
+				nearestControl = c
+
+		return nearestControl
+
+
 	def onAction(self, action):
-		if(action == 9):
+		print "onAction"
+		print action
+		if(action.getId() == 9):
 			self.close()
 
-	def onControl(self, control):
-		program = self.controlToProgramMap[str(control)]
+		pass
 
-		self.titleControl.setLabel(program['pro_title'])
+	def onClick(self, controlId):
+		print "onClick"
+		print controlId
+
+
+	def onFocus(self, controlId):
+		print "onFocus"
+		print controlId
+
+		program = self.controlToProgramMap[controlId]
+
+		self.getControl(4020).setLabel(program['pro_title'])
 		if(program.has_key('ppu_description')):
-			self.descriptionControl.setLabel(program['ppu_description'])
+			self.getControl(4021).setLabel(program['ppu_description'])
 		else:
-			self.descriptionControl.setLabel('Ingen beskrivelse')
-
+			self.getControl(4021).setLabel('Ingen beskrivelse')
 
 	def _parseDate(self, dateString):
 		t = time.strptime(dateString, '%Y-%m-%dT%H:%M:%S.0000000+02:00')
@@ -103,6 +176,6 @@ class TVGuide(xbmcgui.Window):
 		content = web.downloadAndCacheUrl(url, '/tmp/' + slug.replace('/', ''), 60)
 		return simplejson.loads(content)
 		
-w = TVGuide()
+w = TVGuide('script-tvguide-main.xml', os.getcwd())
 w.doModal()
 del w
