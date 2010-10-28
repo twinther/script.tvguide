@@ -8,146 +8,160 @@
 		<posy>0</posy>
 	</coordinates>
 	<controls>
+		<!-- Background -->
+		<control type="image">
+			<posx>0</posx>
+			<posy>0</posy>
+			<width>1280</width>
+			<height>720</height>
+			<texture>background.png</texture>
+		</control>
+
 		<!-- Date and time row -->
 		<control type="label" id="4000">
 			<description>Displays todays date</description>
 			<posx>0</posx>
-			<posy>50</posy>
+			<posy>25</posy>
 			<width>180</width>
 			<height>50</height>
 			<label>ons, 27. okt</label>
 			<textcolor>ffffffff</textcolor>
-			<shadowcolor>ff888888</shadowcolor>
+			<font>font13</font>
 			<align>center</align>
+			<aligny>center</aligny>
 		</control>
 		<control type="label" id="4001">
 			<description>1st half hour column</description>
 			<posx>180</posx>
-			<posy>50</posy>
+			<posy>25</posy>
 			<width>275</width>
 			<height>50</height>
 			<label>18:00</label>
 			<textcolor>ffffffff</textcolor>
-			<shadowcolor>ff888888</shadowcolor>
+			<font>font13</font>
+			<aligny>center</aligny>
 		</control>
 		<control type="label" id="4002">
 			<description>2nd half hour column</description>
 			<posx>455</posx>
-			<posy>50</posy>
+			<posy>25</posy>
 			<width>275</width>
 			<height>50</height>
 			<label>18:30</label>
 			<textcolor>ffffffff</textcolor>
-			<shadowcolor>ff888888</shadowcolor>
+			<font>font13</font>
+			<aligny>center</aligny>
 		</control>
 		<control type="label" id="4003">
 			<description>3rd half hour column</description>
 			<posx>730</posx>
-			<posy>50</posy>
+			<posy>25</posy>
 			<width>275</width>
 			<height>50</height>
 			<label>19:00</label>
 			<textcolor>ffffffff</textcolor>
-			<shadowcolor>ff888888</shadowcolor>
+			<font>font13</font>
+			<aligny>center</aligny>
 		</control>
 		<control type="label" id="4004">
 			<description>4th half hour column</description>
 			<posx>1005</posx>
-			<posy>50</posy>
+			<posy>25</posy>
 			<width>275</width>
 			<height>50</height>
 			<label>19:30</label>
 			<textcolor>ffffffff</textcolor>
-			<shadowcolor>ff888888</shadowcolor>
+			<font>font13</font>
+			<aligny>center</aligny>
 		</control>
 		
 		<!-- Channels column -->
 		<control type="label" id="4010">
 			<description>1st channel</description>
 			<posx>0</posx>
-			<posy>100</posy>
+			<posy>75</posy>
 			<width>180</width>
 			<height>50</height>
 			<label>Channel 1</label>
 			<textcolor>ffffffff</textcolor>
-			<shadowcolor>ff888888</shadowcolor>
+			<font>font13</font>
 			<align>center</align>
 		</control>
 		<control type="label" id="4011">
 			<description>2nd channel</description>
 			<posx>0</posx>
-			<posy>150</posy>
+			<posy>125</posy>
 			<width>180</width>
 			<height>50</height>
 			<label>Channel 2</label>
 			<textcolor>ffffffff</textcolor>
-			<shadowcolor>ff888888</shadowcolor>
+			<font>font13</font>
 			<align>center</align>
 		</control>
 		<control type="label" id="4012">
 			<description>3rd channel</description>
 			<posx>0</posx>
-			<posy>200</posy>
+			<posy>175</posy>
 			<width>180</width>
 			<height>50</height>
 			<label>Channel 3</label>
 			<textcolor>ffffffff</textcolor>
-			<shadowcolor>ff888888</shadowcolor>
+			<font>font13</font>
 			<align>center</align>
 		</control>
 		<control type="label" id="4013">
 			<description>4th channel</description>
 			<posx>0</posx>
-			<posy>250</posy>
+			<posy>225</posy>
 			<width>180</width>
 			<height>50</height>
 			<label>Channel 4</label>
 			<textcolor>ffffffff</textcolor>
-			<shadowcolor>ff888888</shadowcolor>
+			<font>font13</font>
 			<align>center</align>
 		</control>
 		<control type="label" id="4014">
 			<description>5th channel</description>
 			<posx>0</posx>
-			<posy>300</posy>
+			<posy>275</posy>
 			<width>180</width>
 			<height>50</height>
 			<label>Channel 5</label>
 			<textcolor>ffffffff</textcolor>
-			<shadowcolor>ff888888</shadowcolor>
+			<font>font13</font>
 			<align>center</align>
 		</control>
 		<control type="label" id="4015">
 			<description>6th channel</description>
 			<posx>0</posx>
-			<posy>350</posy>
+			<posy>325</posy>
 			<width>180</width>
 			<height>50</height>
 			<label>Channel 6</label>
 			<textcolor>ffffffff</textcolor>
-			<shadowcolor>ff888888</shadowcolor>
+			<font>font13</font>
 			<align>center</align>
 		</control>
 		<control type="label" id="4016">
 			<description>7th channel</description>
 			<posx>0</posx>
-			<posy>400</posy>
+			<posy>375</posy>
 			<width>180</width>
 			<height>50</height>
 			<label>Channel 7</label>
 			<textcolor>ffffffff</textcolor>
-			<shadowcolor>ff888888</shadowcolor>
+			<font>font13</font>
 			<align>center</align>
 		</control>
 		<control type="label" id="4017">
 			<description>8th channel</description>
 			<posx>0</posx>
-			<posy>450</posy>
+			<posy>425</posy>
 			<width>180</width>
 			<height>50</height>
 			<label>Channel 8</label>
 			<textcolor>ffffffff</textcolor>
-			<shadowcolor>ff888888</shadowcolor>
+			<font>font13</font>
 			<align>center</align>
 		</control>
 
@@ -156,12 +170,26 @@
 			<description>Program title</description>
 			<posx>10</posx>
 			<posy>500</posy>
-			<width>1260</width>
+			<width>1000</width>
 			<height>50</height>
 			<label>[B]Title[/B]</label>
 			<textcolor>ffffffff</textcolor>
+			<font>font13</font>
+			<aligny>center</aligny>
 		</control>
 		<control type="label" id="4021">
+			<description>Program time</description>
+			<posx>1270</posx>
+			<posy>500</posy>
+			<width>260</width>
+			<height>50</height>
+			<label>18:00 - 20:00</label>
+			<textcolor>ffffffff</textcolor>
+			<font>font13</font>
+			<align>right</align>
+			<aligny>center</aligny>
+		</control>
+		<control type="label" id="4022">
 			<description>Program description</description>
 			<posx>10</posx>
 			<posy>550</posy>
@@ -169,7 +197,16 @@
 			<height>160</height>
 			<label>Description</label>
 			<textcolor>ffffffff</textcolor>
+			<font>font13</font>
 			<wrapmultiline>true</wrapmultiline>
+		</control>
+
+		<control type="image" id="4100">
+			<posx>180</posx>
+			<posy>25</posy>
+			<width>2</width>
+			<height>475</height>
+			<texture>timebar.png</texture>
 		</control>
 			
 	</controls>

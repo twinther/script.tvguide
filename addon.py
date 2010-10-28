@@ -38,6 +38,12 @@ class TVGuide(xbmcgui.WindowXML):
 		
 		self.startTime = self.date
 
+		# move timebar to current timeA
+		timeDelta = datetime.datetime.today() - self.date
+		print timeDelta
+		c = self.getControl(4100)
+		c.setPosition(180 + (timeDelta.seconds * CELL_WIDTH / 1800), c.getPosition()[1])
+
 #		xbmcgui.lock()
 
 		# date and time row
@@ -71,7 +77,7 @@ class TVGuide(xbmcgui.WindowXML):
 					cellWidth = 1280 - cellStart
 
 				if(cellWidth > 1):
-					control = xbmcgui.ControlButton(cellStart, CELL_HEIGHT * (2 + idx), cellWidth, CELL_HEIGHT, program['pro_title'])
+					control = xbmcgui.ControlButton(cellStart, 25 + CELL_HEIGHT * (1 + idx), cellWidth, CELL_HEIGHT, program['pro_title'], noFocusTexture = os.getcwd() + '/resources/skins/Default/media/cell-bg.png', focusTexture = os.getcwd() + '/resources/skins/Default/media/cell-bg-selected.png')
 					self.addControl(control)
 					self.controlToProgramMap[control.getId()] = program
 
@@ -161,11 +167,15 @@ class TVGuide(xbmcgui.WindowXML):
 
 		program = self.controlToProgramMap[controlId]
 
-		self.getControl(4020).setLabel(program['pro_title'])
+		startTime = self._parseDate(program['pg_start'])
+		endTime = self._parseDate(program['pg_stop'])
+
+		self.getControl(4020).setLabel('[B]%s[/B]' % program['pro_title'])
+		self.getControl(4021).setLabel('%s - %s' % (startTime.strftime('%H:%M'), endTime.strftime('%H:%M')))
 		if(program.has_key('ppu_description')):
-			self.getControl(4021).setLabel(program['ppu_description'])
+			self.getControl(4022).setLabel(program['ppu_description'])
 		else:
-			self.getControl(4021).setLabel('Ingen beskrivelse')
+			self.getControl(4022).setLabel('Ingen beskrivelse')
 
 	def _parseDate(self, dateString):
 		t = time.strptime(dateString, '%Y-%m-%dT%H:%M:%S.0000000+02:00')
