@@ -1,6 +1,4 @@
 # coding=utf-8
-# http://www.dr.dk/tjenester/programoversigt/dbservice.ashx/getChannels?type=tv
-# http://www.dr.dk/tjenester/programoversigt/dbservice.ashx/getSchedule?channel_source_url=dr.dk/mas/whatson/channel/DR1&broadcastDate=2010-10-22T00:00:00
 import sys
 import os
 import datetime
@@ -11,103 +9,118 @@ import xbmc
 import xbmcgui
 import xbmcplugin
 
-from danishaddons import *
 
-import simplejson
+from danishaddons import *
+import drdk as source
 
 ACTION_PREVIOUS_MENU = 10
 
 CELL_HEIGHT = 50
 CELL_WIDTH = 275
+CELL_WIDTH_CHANNELS = 180
 
 HALF_HOUR = datetime.timedelta(minutes = 30)
+
+LABEL_TITLE = 4020
+LABEL_TIME = 4021
+LABEL_DESCRIPTION = 4022
+
+TEXTURE_BUTTON_NOFOCUS = os.path.join(os.getcwd(), 'resources', 'skins', 'Default', 'media', 'cell-bg.png')
+TEXTURE_BUTTON_FOCUS = os.path.join(os.getcwd(), 'resources', 'skins', 'Default', 'media', 'cell-bg-selected.png')
 
 class TVGuide(xbmcgui.WindowXML):
 
 	def __init__(self, xmlFilename, scriptPath):
-		self.channels = simplejson.loads(web.downloadAndCacheUrl('http://www.dr.dk/tjenester/programoversigt/dbservice.ashx/getChannels?type=tv', '/tmp/channels.json', 60))
+		self.source = source.Source()
 		self.controlToProgramMap = {}
+		self.focusControl = None
 
 	def onInit(self):
 		print "onInit"
 
 		# nearest half hour
-#		self.date = datetime.datetime(2010, 10, 24, 18, 45)
 		self.date = datetime.datetime.today()
 		self.date -= datetime.timedelta(minutes = self.date.minute % 30)
-		
-		self.startTime = self.date
 
-		# move timebar to current timeA
+		self.channel = 0
+	
+		self._redraw(self.channel, self.date)
+
+	def _redraw(self, startChannel, startTime):
+		for id in self.controlToProgramMap.keys():
+			self.removeControl(self.getControl(id))
+
+		self.controlToProgramMap.clear()
+
+		# move timebar to current time
 		timeDelta = datetime.datetime.today() - self.date
-		print timeDelta
 		c = self.getControl(4100)
-		c.setPosition(180 + (timeDelta.seconds * CELL_WIDTH / 1800), c.getPosition()[1])
+		(x, y) = c.getPosition()
+		c.setPosition(self._secondsToXposition(timeDelta.seconds), y)
 
-#		xbmcgui.lock()
+		try:
+			xbmcgui.lock()
 
-		# date and time row
-		self.getControl(4000).setLabel(self.date.strftime('%a, %d. %b'))
-		for col in range(1, 5):
-			self.getControl(4000 + col).setLabel(self.startTime.strftime('%H:%M'))
-			self.startTime += HALF_HOUR
+			# date and time row
+			self.getControl(4000).setLabel(self.date.strftime('%a, %d. %b'))
+			for col in range(1, 5):
+				self.getControl(4000 + col).setLabel(startTime.strftime('%H:%M'))
+				startTime += HALF_HOUR
 
-		# channels
-		for idx, channel in enumerate(self.channels['result']):
-			if(idx == 8):
-				break
+			# channels
+			for idx, channel in enumerate(self.source.getChannelList()[startChannel : startChannel + 8]):
+				self.getControl(4010 + idx).setLabel(channel['title'])
 
-			self.getControl(4010 + idx).setLabel(channel['name'])
+				previousControl = None
+				for program in self.source.getProgramList(channel['id']):
+					if(program['end_date'] <= self.date):
+						continue
 
-			programs = self._loadProgramJson(channel['source_url'])
-			for program in programs['result']:
-				pgStart = self._parseDate(program['pg_start'])
-				pgStop = self._parseDate(program['pg_stop'])
-				if(pgStop <= self.date):
-					continue
+					startDelta = program['start_date'] - self.date
+					stopDelta = program['end_date'] - self.date
 
-				startDelta = pgStart - self.date
-				stopDelta = pgStop - self.date
+					cellStart = self._secondsToXposition(startDelta.seconds)
+					if(startDelta.days < 0):
+						cellStart = CELL_WIDTH_CHANNELS
+					cellWidth = self._secondsToXposition(stopDelta.seconds) - cellStart
+					if(cellStart + cellWidth > 1280):
+						cellWidth = 1280 - cellStart
 
-				cellStart = 180 + (startDelta.seconds * CELL_WIDTH / 1800)
-				if(startDelta.days < 0):
-					cellStart = 180
-				cellWidth = 180 + (stopDelta.seconds * CELL_WIDTH / 1800) - cellStart
-				if(cellStart + cellWidth > 1280):
-					cellWidth = 1280 - cellStart
+					if(cellWidth > 1):
+						control = xbmcgui.ControlButton(cellStart, 25 + CELL_HEIGHT * (1 + idx), cellWidth, CELL_HEIGHT, program['title'], noFocusTexture = TEXTURE_BUTTON_NOFOCUS, focusTexture = TEXTURE_BUTTON_FOCUS)
+						self.addControl(control)
+						self.controlToProgramMap[control.getId()] = program
 
-				if(cellWidth > 1):
-					control = xbmcgui.ControlButton(cellStart, 25 + CELL_HEIGHT * (1 + idx), cellWidth, CELL_HEIGHT, program['pro_title'], noFocusTexture = os.getcwd() + '/resources/skins/Default/media/cell-bg.png', focusTexture = os.getcwd() + '/resources/skins/Default/media/cell-bg-selected.png')
-					self.addControl(control)
-					self.controlToProgramMap[control.getId()] = program
+						if(not(previousControl == None)):
+							control.controlLeft(previousControl)
+							previousControl.controlRight(control)
 
+						previousControl = control
 
-		self.numberOfControls = control.getId()
+			for idx, id in enumerate(self.controlToProgramMap.keys()):
+				c = self.getControl(id)
 
-		for i in range(1, self.numberOfControls + 1):
-			c = self.getControl(i)
-			if(i > 1):
-				c.controlLeft(self.getControl(i - 1))
-			if(i < control.getId()):
-				c.controlRight(self.getControl(i + 1))
+				below = self._findNearestControlBelow(c)
+				above = self._findNearestControlAbove(c)
+				if(not(below == None)):
+					c.controlDown(below)
+				if(not(above == None)):
+					c.controlUp(above)
 
-			below = self._findNearestControlBelow(c)
-			above = self._findNearestControlAbove(c)
-			if(not(below == None)):
-				c.controlDown(below)
-			if(not(above == None)):
-				c.controlUp(above)
+			self.setFocus(self.getControl(self.controlToProgramMap.keys()[0]))
 
+		finally:
+			xbmcgui.unlock()
 
-#		xbmcgui.unlock()
+	
 
 	def _findNearestControlBelow(self, control):
 		(x, y) = control.getPosition()
 		nearestControl = None
 		minX = 10000
 		minY = None
-		for i in range(1, self.numberOfControls + 1):
-			c = self.getControl(i)
+		for id in self.controlToProgramMap.keys():
+			c = self.getControl(id)
 			(cx, cy) = c.getPosition()
 			if(y >= cy):
 				continue
@@ -129,8 +142,10 @@ class TVGuide(xbmcgui.WindowXML):
 		nearestControl = None
 		minX = 10000
 		minY = None
-		for i in range(self.numberOfControls, 0, -1):
-			c = self.getControl(i)
+		keys = self.controlToProgramMap.keys()
+		keys.reverse()
+		for id in keys:
+			c = self.getControl(id)
 			(cx, cy) = c.getPosition()
 			if(y <= cy):
 				continue
@@ -150,15 +165,53 @@ class TVGuide(xbmcgui.WindowXML):
 
 	def onAction(self, action):
 		print "onAction"
-		print action
+		print "action.id = %d" % action.getId()
+		print action.getButtonCode()
+
+		control = self.getFocus()
+		print control
+		print self.focusControl
+
 		if(action.getId() == 9):
 			self.close()
+		elif(self.focusControl == control):
+			# focus didn't change, reload the grid
+			if(action.getId() == 1): # Left
+				self.date -= datetime.timedelta(hours = 2)
+				self._redraw(self.channel, self.date)
 
-		pass
+			elif(action.getId() == 2): # Right
+				self.date += datetime.timedelta(hours = 2)
+				self._redraw(self.channel, self.date)
+
+			elif(action.getId() == 3): # Up
+				self.channel -= 8
+				if(self.channel < 0):
+					self.channel = 0
+				self._redraw(self.channel, self.date)
+				
+			elif(action.getId() == 4): # Down
+				self.channel += 8
+				self._redraw(self.channel, self.date)
+
+		try:
+			self.focusControl = self.getFocus()
+		except TypeError:
+			pass
+
 
 	def onClick(self, controlId):
 		print "onClick"
 		print controlId
+
+		program = self.controlToProgramMap[controlId]
+		url = self.source.getStreamURL(program['channel_id'])
+		if(url == None):
+			xbmcgui.Dialog().ok('Ingen live stream tilgængelig', 'Kanalen kan ikke afspilles, da der ingen live stream', 'er tilgængelig.')
+		else:
+				item = xbmcgui.ListItem(program['title'])
+				item.setProperty("IsLive", "true")
+				xbmc.Player().play(url, item)
 
 
 	def onFocus(self, controlId):
@@ -167,24 +220,12 @@ class TVGuide(xbmcgui.WindowXML):
 
 		program = self.controlToProgramMap[controlId]
 
-		startTime = self._parseDate(program['pg_start'])
-		endTime = self._parseDate(program['pg_stop'])
+		self.getControl(LABEL_TITLE).setLabel('[B]%s[/B]' % program['title'])
+		self.getControl(LABEL_TIME).setLabel('%s - %s' % (program['start_date'].strftime('%H:%M'), program['end_date'].strftime('%H:%M')))
+		self.getControl(LABEL_DESCRIPTION).setLabel(program['description'])
 
-		self.getControl(4020).setLabel('[B]%s[/B]' % program['pro_title'])
-		self.getControl(4021).setLabel('%s - %s' % (startTime.strftime('%H:%M'), endTime.strftime('%H:%M')))
-		if(program.has_key('ppu_description')):
-			self.getControl(4022).setLabel(program['ppu_description'])
-		else:
-			self.getControl(4022).setLabel('Ingen beskrivelse')
-
-	def _parseDate(self, dateString):
-		t = time.strptime(dateString, '%Y-%m-%dT%H:%M:%S.0000000+02:00')
-		return datetime.datetime(t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec)
-		
-	def _loadProgramJson(self, slug):
-		url = 'http://www.dr.dk/tjenester/programoversigt/dbservice.ashx/getSchedule?channel_source_url=%s&broadcastDate=%s' % (slug, self.date.strftime('%Y-%m-%dT%H:%M:%S'))
-		content = web.downloadAndCacheUrl(url, '/tmp/' + slug.replace('/', ''), 60)
-		return simplejson.loads(content)
+	def _secondsToXposition(self, seconds):
+		return CELL_WIDTH_CHANNELS + (seconds * CELL_WIDTH / 1800)
 		
 w = TVGuide('script-tvguide-main.xml', os.getcwd())
 w.doModal()
