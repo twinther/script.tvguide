@@ -1,0 +1,9 @@
+[B]Version 0.1.0[/B]
+- First public release
+- Basic functionality is in place, but needs fine tuning
+
+[B]Version 0.0.2[/B]
+- Test version
+
+[B]Version 0.0.1[/B]
+- Proof of concept
