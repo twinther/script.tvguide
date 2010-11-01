@@ -11,7 +11,7 @@ import xbmcplugin
 
 
 from danishaddons import *
-import drdk as source
+import youseetv as source
 
 ACTION_PREVIOUS_MENU = 10
 
@@ -168,7 +168,10 @@ class TVGuide(xbmcgui.WindowXML):
 		print "action.id = %d" % action.getId()
 		print action.getButtonCode()
 
-		control = self.getFocus()
+		try:
+			control = self.getFocus()
+		except TypeError:
+			control = None
 		print control
 		print self.focusControl
 
