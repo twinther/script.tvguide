@@ -4,17 +4,23 @@ import time
 from elementtree import ElementTree
 
 from danishaddons import *
+import source
 
 CHANNELS_URL = 'http://yousee.tv'
 PROGRAMS_URL = 'http://yousee.tv/feeds/tvguide/getprogrammes/?channel=%s'
 
 STREAMS = {
-	'dr.dk/mas/whatson/channel/DR1' : 'rtmp://rtmplive.dr.dk/live/livedr01astream3'
+	'dr1' : source.STREAM_DR1,
+	'dr2' : source.STREAM_DR2,
+	'update' : source.STREAM_DRUPDATE,
+	'dr k' : source.STREAM_DRK,
+	'dr ram' : source.STREAM_DRRAMASJANG
 }
 
-class Source:
+class Source(source.Source):
 
 	def __init__(self):
+		super(Source, self).__init__(True)
 		self.date = datetime.datetime.today()
 
 	def getChannelList(self):
@@ -39,12 +45,16 @@ class Source:
 		doc = ElementTree.fromstring(xml)
 
 		for program in doc.findall('programme'):
+			description = program.find('description').text
+			if(description == None):
+				description = 'Ingen beskrivelse'
+
 			programs.append({
 				'channel_id' : channelId,
 				'title' : program.find('title').text,
 				'start_date' : self._parseDate(program.find('start').text),
 				'end_date' : self._parseDate(program.find('end').text),
-				'description' : program.find('description').text
+				'description' : description
 			})
 
 		return programs
@@ -54,6 +64,7 @@ class Source:
 			return STREAMS[channelId]
 		else:
 			return None
+
 
 	def _parseDate(self, dateString):
 		t = time.strptime(dateString, '%Y,%m,%d,%H,%M,%S')

@@ -1,5 +1,6 @@
-[B]Version 0.1.1[/B]
-- Fix cache dir creation
+[B]Version 0.2.0[/B]
+- Added multiple sources for EPG data; defaults is YouSee.tv with logo support
+- Refactored navigation logic
 
 [B]Version 0.1.0[/B]
 - First public release
