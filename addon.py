@@ -1,23 +1,15 @@
 # coding=utf-8
-import sys
-import os
 import datetime
-import time
-import math
+import os
+import sys
 
 import xbmc
 import xbmcgui
 import xbmcplugin
 
-
-from danishaddons import *
+import danishaddons
+import danishaddons.web
 import navigation
-
-# load source plugin based on settings
-if(ADDON.getSetting('source') == 'YouSee.tv'):
-	import youseetv as source
-elif(ADDON.getSetting('source') == 'DR.dk'):
-	import drdk as source
 
 CHANNELS_PER_PAGE = 8
 
@@ -77,33 +69,33 @@ class TVGuide(xbmcgui.WindowXML):
 
 			# channels
 			channels = self.source.getChannelList()
-			if(startChannel < 0):
+			if startChannel < 0:
 				startChannel = len(channels) - CHANNELS_PER_PAGE
-			elif(startChannel > len(channels) - CHANNELS_PER_PAGE):
+			elif startChannel > len(channels) - CHANNELS_PER_PAGE:
 				startChannel = 0	
 
 			for idx, channel in enumerate(channels[startChannel : startChannel + CHANNELS_PER_PAGE]):
-				if(self.source.hasChannelIcons()):
+				if self.source.hasChannelIcons():
 					self.getControl(4110 + idx).setImage(channel['logo'])
 					print channel['logo']
 				else:
 					self.getControl(4010 + idx).setLabel(channel['title'])
 
 				for program in self.source.getProgramList(channel['id']):
-					if(program['end_date'] <= self.date):
+					if program['end_date'] <= self.date:
 						continue
 
 					startDelta = program['start_date'] - self.date
 					stopDelta = program['end_date'] - self.date
 
 					cellStart = self._secondsToXposition(startDelta.seconds)
-					if(startDelta.days < 0):
+					if startDelta.days < 0:
 						cellStart = CELL_WIDTH_CHANNELS
 					cellWidth = self._secondsToXposition(stopDelta.seconds) - cellStart
-					if(cellStart + cellWidth > 1260):
+					if cellStart + cellWidth > 1260:
 						cellWidth = 1260 - cellStart
 
-					if(cellWidth > 1):
+					if cellWidth > 1:
 						control = xbmcgui.ControlButton(
 							cellStart,
 							25 + CELL_HEIGHT * (1 + idx),
@@ -119,7 +111,7 @@ class TVGuide(xbmcgui.WindowXML):
 			try:
 				self.getFocus()
 			except TypeError:
-				if(len(self.controlToProgramMap.keys()) > 0):
+				if len(self.controlToProgramMap.keys()) > 0:
 					self.setFocus(self.getControl(self.controlToProgramMap.keys()[0]))
 
 		finally:
@@ -137,7 +129,7 @@ class TVGuide(xbmcgui.WindowXML):
 
 		program = self.controlToProgramMap[controlId]
 		url = self.source.getStreamURL(program['channel_id'])
-		if(url == None):
+		if url is None:
 			xbmcgui.Dialog().ok('Ingen live stream tilgængelig', 'Kanalen kan ikke afspilles, da der ingen live stream', 'er tilgængelig.')
 		else:
 				item = xbmcgui.ListItem(program['title'])
@@ -159,7 +151,16 @@ class TVGuide(xbmcgui.WindowXML):
 
 	def _secondsToXposition(self, seconds):
 		return CELL_WIDTH_CHANNELS + (seconds * CELL_WIDTH / 1800)
-		
-w = TVGuide('script-tvguide-main.xml', os.getcwd())
-w.doModal()
-del w
+
+if __name__ == '__main__':
+    danishaddons.init(sys.argv)
+
+    # load source plugin based on settings
+    if danishaddons.ADDON.getSetting('source') == 'YouSee.tv':
+        import youseetv as source
+    elif danishaddons.ADDON.getSetting('source') == 'DR.dk':
+        import drdk as source   
+
+    w = TVGuide('script-tvguide-main.xml', os.getcwd())
+    w.doModal()
+    del w

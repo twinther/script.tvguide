@@ -1,9 +1,10 @@
 import re
 import datetime
 import time
+import os
 from elementtree import ElementTree
 
-from danishaddons import *
+import danishaddons
 import source
 
 CHANNELS_URL = 'http://yousee.tv'
@@ -24,7 +25,7 @@ class Source(source.Source):
 		self.date = datetime.datetime.today()
 
 	def getChannelList(self):
-		html = web.downloadAndCacheUrl(CHANNELS_URL, os.path.join(ADDON_DATA_PATH, 'youseetv-channels.json'), 60)
+		html = danishaddons.web.downloadAndCacheUrl(CHANNELS_URL, os.path.join(danishaddons.ADDON_DATA_PATH, 'youseetv-channels.json'), 60)
 		channels = []
 
 		for m in re.finditer('href="/livetv/([^"]+)".*?src="(http://cloud.yousee.tv/static/img/logos/large_[^"]+)" alt="(.*?)"', html):
@@ -38,15 +39,15 @@ class Source(source.Source):
 	
 	def getProgramList(self, channelId):
 		url = PROGRAMS_URL % channelId.replace(' ', '%20')
-		cachePath = os.path.join(ADDON_DATA_PATH, 'youseetv-' + channelId.replace(' ', '_')) 
-		xml = web.downloadAndCacheUrl(url, cachePath, 60)
+		cachePath = os.path.join(danishaddons.ADDON_DATA_PATH, 'youseetv-' + channelId.replace(' ', '_'))
+		xml = danishaddons.web.downloadAndCacheUrl(url, cachePath, 60)
 		programs = []
 
 		doc = ElementTree.fromstring(xml)
 
 		for program in doc.findall('programme'):
 			description = program.find('description').text
-			if(description == None):
+			if description is None:
 				description = 'Ingen beskrivelse'
 
 			programs.append({
@@ -60,7 +61,7 @@ class Source(source.Source):
 		return programs
 
 	def getStreamURL(self, channelId):
-		if(STREAMS.has_key(channelId)):
+		if STREAMS.has_key(channelId):
 			return STREAMS[channelId]
 		else:
 			return None

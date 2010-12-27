@@ -1,8 +1,9 @@
 import simplejson
 import datetime
 import time
+import os
 
-from danishaddons import *
+import danishaddons
 import source
 
 CHANNELS_URL = 'http://www.dr.dk/tjenester/programoversigt/dbservice.ashx/getChannels?type=tv'
@@ -23,7 +24,7 @@ class Source(source.Source):
 		self.date = datetime.datetime.today()
 
 	def getChannelList(self):
-		jsonChannels = simplejson.loads(web.downloadAndCacheUrl(CHANNELS_URL, os.path.join(ADDON_DATA_PATH, 'drdk-channels.json'), 60))
+		jsonChannels = simplejson.loads(danishaddons.web.downloadAndCacheUrl(CHANNELS_URL, os.path.join(danishaddons.ADDON_DATA_PATH, 'drdk-channels.json'), 60))
 		channels = []
 
 		for channel in jsonChannels['result']:
@@ -36,12 +37,12 @@ class Source(source.Source):
 	
 	def getProgramList(self, channelId):
 		url = PROGRAMS_URL % (channelId.replace('+', '%2b'), self.date.strftime('%Y-%m-%dT%H:%M:%S'))
-		cachePath = os.path.join(ADDON_DATA_PATH, 'drdk-' + channelId.replace('/', '')) 
-		jsonPrograms = simplejson.loads(web.downloadAndCacheUrl(url, cachePath, 60))
+		cachePath = os.path.join(danishaddons.ADDON_DATA_PATH, 'drdk-' + channelId.replace('/', ''))
+		jsonPrograms = simplejson.loads(danishaddons.web.downloadAndCacheUrl(url, cachePath, 60))
 		programs = []
 
 		for program in jsonPrograms['result']:
-			if(program.has_key('ppu_description')):
+			if program.has_key('ppu_description'):
 				description = program['ppu_description']
 			else:
 				description = 'Ingen beskrivelse'
@@ -57,7 +58,7 @@ class Source(source.Source):
 		return programs
 
 	def getStreamURL(self, channelId):
-		if(STREAMS.has_key(channelId)):
+		if STREAMS.has_key(channelId):
 			return STREAMS[channelId]
 		else:
 			return None

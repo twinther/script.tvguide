@@ -1,11 +1,11 @@
 # http://tvtid.tv2.dk/js/fetch.js.php/from-1291057200.js
 
-import re
 import datetime
 import time
 import simplejson
+import os
 
-from danishaddons import *
+import danishaddons
 import source
 
 BASE_URL = 'http://tvtid.tv2.dk%s'
@@ -29,7 +29,7 @@ class Source(source.Source):
 		self.time -= self.time % 3600
 
 	def getChannelList(self):
-		response = web.downloadAndCacheUrl(FETCH_URL % self.time, os.path.join(ADDON_DATA_PATH, 'tvtiddk-data.json'), 60)
+		response = danishaddons.web.downloadAndCacheUrl(FETCH_URL % self.time, os.path.join(danishaddons.ADDON_DATA_PATH, 'tvtiddk-data.json'), 60)
 		json = simplejson.loads(response)
 
 		channels = []
@@ -43,11 +43,11 @@ class Source(source.Source):
 		return channels
 	
 	def getProgramList(self, channelId):
-		response = web.downloadAndCacheUrl(FETCH_URL % self.time, os.path.join(ADDON_DATA_PATH, 'tvtiddk-data.json'), 60)
+		response = danishaddons.web.downloadAndCacheUrl(FETCH_URL % self.time, os.path.join(danishaddons.ADDON_DATA_PATH, 'tvtiddk-data.json'), 60)
 		json = simplejson.loads(response)
 
 		for channel in json['channels']:
-			if(channel['id'] == channelId):
+			if channel['id'] == channelId:
 				break
 
 		# assume we always find a channel
@@ -56,7 +56,7 @@ class Source(source.Source):
 
 		for program in channel['program']:
 			description = program['short_description']
-			if(description == None):
+			if description is None:
 				description = 'Ingen beskrivelse'
 
 			programs.append({
@@ -70,7 +70,7 @@ class Source(source.Source):
 		return programs
 
 	def getStreamURL(self, channelId):
-		if(STREAMS.has_key(channelId)):
+		if STREAMS.has_key(channelId):
 			return STREAMS[channelId]
 		else:
 			return None
