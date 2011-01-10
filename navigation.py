@@ -5,6 +5,7 @@ KEY_RIGHT = 2
 KEY_UP = 3
 KEY_DOWN = 4
 KEY_BACK = 9
+KEY_MENU = 10
 
 CHANNELS_PER_PAGE = 8
 
@@ -28,7 +29,7 @@ class Navigation:
 			print "action.id = %d" % action.getId()
 			print "self.focusX = %d" % self.focusX
 
-			if action.getId() == KEY_BACK:
+			if action.getId() == KEY_BACK or action.getId() == KEY_MENU:
 				window.close()
 				return
 
