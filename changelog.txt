@@ -1,4 +1,4 @@
-[B]Version 0.2."[/B]
+[B]Version 0.2.2[/B]
 - Added icon and fanart
 - Both back (backspace) and menu (esc) will exit the guide now
 
