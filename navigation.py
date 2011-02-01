@@ -11,143 +11,145 @@ CHANNELS_PER_PAGE = 8
 
 class Navigation:
 
-	def __init__(self):
-		self.controlInFocus = None
-		self.focusX = 0
+    def __init__(self):
+        self.controlInFocus = None
+        self.focusX = 0
 
-		self.channelIndex = 0
+        self.channelIndex = 0
 
-	def onFocus(self, currentControl):
-		self.controlInFocus = currentControl
+    def onFocus(self, currentControl):
+        self.controlInFocus = currentControl
 
-		(left, top) = currentControl.getPosition()
-		if left > self.focusX or left + currentControl.getWidth() < self.focusX:
-			self.focusX = left
+        (left, top) = currentControl.getPosition()
+        if left > self.focusX or left + currentControl.getWidth() < self.focusX:
+            self.focusX = left
 
-	def onAction(self, action, window, controlIds):
-			print "--- onAction ---"
-			print "action.id = %d" % action.getId()
-			print "self.focusX = %d" % self.focusX
+    def onAction(self, action, window, controlIds):
+            print "--- onAction ---"
+            print "action.id = %d" % action.getId()
+            print "self.focusX = %d" % self.focusX
 
-			if action.getId() == KEY_BACK or action.getId() == KEY_MENU:
-				window.close()
-				return
+            if action.getId() == KEY_BACK or action.getId() == KEY_MENU:
+                window.close()
+                return
 
-			(left, top) = self.controlInFocus.getPosition()
-			currentX = left + (self.controlInFocus.getWidth() / 2)
-			currentY = top + (self.controlInFocus.getHeight() / 2)
+            (left, top) = self.controlInFocus.getPosition()
+            currentX = left + (self.controlInFocus.getWidth() / 2)
+            currentY = top + (self.controlInFocus.getHeight() / 2)
 
-			print "currentX = %d, currentY = %d" % (currentX, currentY)
+            print "currentX = %d, currentY = %d" % (currentX, currentY)
 
-			if action.getId() == KEY_LEFT:
-				control = self.findControlOnLeft(window, controlIds, currentX, currentY)
-				if control is None:
-					window.date -= datetime.timedelta(hours = 2)
-					window._redraw(self.channelIndex, window.date)
-					control = self.findControlOnLeft(window, window.controlToProgramMap.keys(), 1280, currentY)
+            control = None
 
-				print "setFocus = %s" % control
-				(left, top) = control.getPosition()
-				self.focusX = left
+            if action.getId() == KEY_LEFT:
+                control = self.findControlOnLeft(window, controlIds, currentX, currentY)
+                if control is None:
+                    window.date -= datetime.timedelta(hours = 2)
+                    window._redraw(self.channelIndex, window.date)
+                    control = self.findControlOnLeft(window, window.controlToProgramMap.keys(), 1280, currentY)
 
-			elif action.getId() == KEY_RIGHT:
-				control = self.findControlOnRight(window, controlIds, currentX, currentY)
-				if control is None:
-					window.date += datetime.timedelta(hours = 2)
-					window._redraw(self.channelIndex, window.date)
-					control = self.findControlOnRight(window, window.controlToProgramMap.keys(), 0, currentY)
+                print "setFocus = %s" % control
+                (left, top) = control.getPosition()
+                self.focusX = left
 
-				print "setFocus = %s" % control
-				(left, top) = control.getPosition()
-				self.focusX = left
+            elif action.getId() == KEY_RIGHT:
+                control = self.findControlOnRight(window, controlIds, currentX, currentY)
+                if control is None:
+                    window.date += datetime.timedelta(hours = 2)
+                    window._redraw(self.channelIndex, window.date)
+                    control = self.findControlOnRight(window, window.controlToProgramMap.keys(), 0, currentY)
 
-			elif action.getId() == KEY_UP:
-				control = self.findControlAbove(window, controlIds, currentX, currentY)
-				if control is None:
-					self.channelIndex = window._redraw(self.channelIndex - CHANNELS_PER_PAGE, window.date)
-					control = self.findControlAbove(window, window.controlToProgramMap.keys(), currentX, 720)
+                print "setFocus = %s" % control
+                (left, top) = control.getPosition()
+                self.focusX = left
 
-			elif action.getId() == KEY_DOWN:
-				control = self.findControlBelow(window, controlIds, currentX, currentY)
-				if control is None:
-					self.channelIndex = window._redraw(self.channelIndex + CHANNELS_PER_PAGE, window.date)
-					control = self.findControlBelow(window, window.controlToProgramMap.keys(), currentX, 0)
+            elif action.getId() == KEY_UP:
+                control = self.findControlAbove(window, controlIds, currentX, currentY)
+                if control is None:
+                    self.channelIndex = window._redraw(self.channelIndex - CHANNELS_PER_PAGE, window.date)
+                    control = self.findControlAbove(window, window.controlToProgramMap.keys(), currentX, 720)
 
-			if control is not None:
-				window.setFocus(control)
+            elif action.getId() == KEY_DOWN:
+                control = self.findControlBelow(window, controlIds, currentX, currentY)
+                if control is None:
+                    self.channelIndex = window._redraw(self.channelIndex + CHANNELS_PER_PAGE, window.date)
+                    control = self.findControlBelow(window, window.controlToProgramMap.keys(), currentX, 0)
 
-
-	def findControlOnRight(self, window, controlIds, currentX, currentY):
-		distanceToNearest = 10000
-		nearestControl = None
-
-		for controlId in controlIds:
-			control = window.getControl(controlId)
-			(left, top) = control.getPosition()
-			x = left + (control.getWidth() / 2)
-			y = top + (control.getHeight() / 2)
-
-			print "x = %d, y = %d" % (x, y)
-
-			if currentX < x and currentY == y:
-				distance = abs(currentX - x)
-				print "distance = %d" % distance
-				if distance < distanceToNearest:
-					distanceToNearest = distance
-					nearestControl = control
-
-		print "nearestControl = %s" % nearestControl
-		return nearestControl
+            if control is not None:
+                window.setFocus(control)
 
 
-	def findControlOnLeft(self, window, controlIds, currentX, currentY):
-		distanceToNearest = 10000
-		nearestControl = None
+    def findControlOnRight(self, window, controlIds, currentX, currentY):
+        distanceToNearest = 10000
+        nearestControl = None
 
-		for controlId in controlIds:
-			control = window.getControl(controlId)
-			(left, top) = control.getPosition()
-			x = left + (control.getWidth() / 2)
-			y = top + (control.getHeight() / 2)
+        for controlId in controlIds:
+            control = window.getControl(controlId)
+            (left, top) = control.getPosition()
+            x = left + (control.getWidth() / 2)
+            y = top + (control.getHeight() / 2)
 
-			if currentX > x and currentY == y:
-				distance = abs(currentX - x)
-				if distance < distanceToNearest:
-					distanceToNearest = distance
-					nearestControl = control
+            print "x = %d, y = %d" % (x, y)
 
-		return nearestControl
+            if currentX < x and currentY == y:
+                distance = abs(currentX - x)
+                print "distance = %d" % distance
+                if distance < distanceToNearest:
+                    distanceToNearest = distance
+                    nearestControl = control
 
-	def findControlBelow(self, window, controlIds, currentX, currentY):
-		nearestControl = None
+        print "nearestControl = %s" % nearestControl
+        return nearestControl
 
-		for controlId in controlIds:
-			control = window.getControl(controlId)
-			(left, top) = control.getPosition()
-			x = left + (control.getWidth() / 2)
-			y = top + (control.getHeight() / 2)
 
-			if currentY < y:
-				if(left <= self.focusX and left + control.getWidth() > self.focusX
-					and (nearestControl is None or nearestControl.getPosition()[1] > top)):
-					nearestControl = control
-					print "nearestControl = %s" % nearestControl
+    def findControlOnLeft(self, window, controlIds, currentX, currentY):
+        distanceToNearest = 10000
+        nearestControl = None
 
-		return nearestControl
+        for controlId in controlIds:
+            control = window.getControl(controlId)
+            (left, top) = control.getPosition()
+            x = left + (control.getWidth() / 2)
+            y = top + (control.getHeight() / 2)
 
-	def findControlAbove(self, window, controlIds, currentX, currentY):
-		nearestControl = None
+            if currentX > x and currentY == y:
+                distance = abs(currentX - x)
+                if distance < distanceToNearest:
+                    distanceToNearest = distance
+                    nearestControl = control
 
-		for controlId in controlIds:
-			control = window.getControl(controlId)
-			(left, top) = control.getPosition()
-			x = left + (control.getWidth() / 2)
-			y = top + (control.getHeight() / 2)
+        return nearestControl
 
-			if currentY > y:
-				if(left <= self.focusX and left + control.getWidth() > self.focusX
-					and (nearestControl is None or nearestControl.getPosition()[1] < top)):
-					nearestControl = control
-					print "nearestControl = %s" % nearestControl
+    def findControlBelow(self, window, controlIds, currentX, currentY):
+        nearestControl = None
 
-		return nearestControl
+        for controlId in controlIds:
+            control = window.getControl(controlId)
+            (left, top) = control.getPosition()
+            x = left + (control.getWidth() / 2)
+            y = top + (control.getHeight() / 2)
+
+            if currentY < y:
+                if(left <= self.focusX and left + control.getWidth() > self.focusX
+                    and (nearestControl is None or nearestControl.getPosition()[1] > top)):
+                    nearestControl = control
+                    print "nearestControl = %s" % nearestControl
+
+        return nearestControl
+
+    def findControlAbove(self, window, controlIds, currentX, currentY):
+        nearestControl = None
+
+        for controlId in controlIds:
+            control = window.getControl(controlId)
+            (left, top) = control.getPosition()
+            x = left + (control.getWidth() / 2)
+            y = top + (control.getHeight() / 2)
+
+            if currentY > y:
+                if(left <= self.focusX and left + control.getWidth() > self.focusX
+                    and (nearestControl is None or nearestControl.getPosition()[1] < top)):
+                    nearestControl = control
+                    print "nearestControl = %s" % nearestControl
+
+        return nearestControl

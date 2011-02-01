@@ -1,5 +1,9 @@
+[B]Version 0.2.3[/B]
+- Added loading screen
+- Renamed background image to avoid conflict with skin (fx. Alaska Revisited)
+
 [B]Version 0.2.2[/B]
-- Added icon and fanart
+- Added icon and fanart based on http://downloadpsd.com/icons/old-style-retro-tv-free-icon-psd-2.html
 - Both back (backspace) and menu (esc) will exit the guide now
 
 [B]Version 0.2.1[/B]

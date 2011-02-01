@@ -14,7 +14,7 @@
 			<posy>0</posy>
 			<width>1280</width>
 			<height>720</height>
-			<texture>background.png</texture>
+			<texture>tvguide-background.png</texture>
 		</control>
 
 		<!-- Date and time row -->
@@ -276,7 +276,7 @@
 			<font>font13</font>
 			<wrapmultiline>true</wrapmultiline>
 
-      <autoscroll time="3600" delay="6000" repeat="6000">true</autoscroll>
+            <autoscroll time="3600" delay="6000" repeat="6000">true</autoscroll>
 		</control>
 
 		<control type="image" id="4100">
@@ -286,6 +286,16 @@
 			<height>488</height>
 			<texture>timebar.png</texture>
 		</control>
+
+        <!-- loading splash -->
+        <control type="image" id ="4200">
+            <posx>0</posx>
+            <posy>0</posy>
+            <width>1280</width>
+            <height>720</height>
+            <texture>loading.png</texture>
+        </control>
+
 
 	</controls>
 </window>
