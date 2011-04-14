@@ -1,14 +1,20 @@
-import datetime
+# coding=utf-8
+
 import os
-import sys
-import threading
+import datetime
 
 import xbmc
+import xbmcaddon
 import xbmcgui
-import xbmcplugin
 
-
-import navigation
+KEY_LEFT = 1
+KEY_RIGHT = 2
+KEY_UP = 3
+KEY_DOWN = 4
+KEY_PAGE_UP = 5
+KEY_PAGE_DOWN = 6
+KEY_BACK = 9
+KEY_MENU = 10
 
 CHANNELS_PER_PAGE = 8
 
@@ -22,14 +28,21 @@ LABEL_TITLE = 4020
 LABEL_TIME = 4021
 LABEL_DESCRIPTION = 4022
 
+ADDON = xbmcaddon.Addon(id = 'script.tvguide')
+TEXTURE_BUTTON_NOFOCUS = os.path.join(xbmc.translatePath(ADDON.getAddonInfo('path')), 'resources', 'skins', 'Default', 'media', 'cell-bg.png')
+TEXTURE_BUTTON_FOCUS = os.path.join(xbmc.translatePath(ADDON.getAddonInfo('path')), 'resources', 'skins', 'Default', 'media', 'cell-bg-selected.png')
 
 
 class TVGuide(xbmcgui.WindowXML):
-
-    def __init__(self, xmlFilename, scriptPath):
-        self.source = source.Source()
-        self.navigation = navigation.Navigation()
+    def __init__(self, xmlFilename, scriptPath, source):
+        xbmcgui.WindowXML.__init__(self, xmlFilename, scriptPath)
+        
+        self.source = source
         self.controlToProgramMap = {}
+        self.controlInFocus = None
+        self.focusX = 0
+        self.channelIndex = 0
+
 
     def onInit(self):
         print "onInit"
@@ -40,6 +53,112 @@ class TVGuide(xbmcgui.WindowXML):
 
         self._redraw(0, self.date)
 
+    def onAction(self, action):
+        print "--- onAction ---"
+        print "action.id = %d" % action.getId()
+        print "self.focusX = %d" % self.focusX
+
+        if action.getId() == KEY_BACK or action.getId() == KEY_MENU:
+            self.close()
+            return
+
+        (left, top) = self.controlInFocus.getPosition()
+        currentX = left + (self.controlInFocus.getWidth() / 2)
+        currentY = top + (self.controlInFocus.getHeight() / 2)
+
+        print "currentX = %d, currentY = %d" % (currentX, currentY)
+
+        control = None
+
+        if action.getId() == KEY_LEFT:
+            control = self._left(currentX, currentY)
+        elif action.getId() == KEY_RIGHT:
+            control = self._right(currentX, currentY)
+        elif action.getId() == KEY_UP:
+            control = self._up(currentY)
+        elif action.getId() == KEY_DOWN:
+            control = self._down(currentY)
+        elif action.getId() == KEY_PAGE_UP:
+            control = self._pageUp()
+        elif action.getId() == KEY_PAGE_DOWN:
+            control = self._pageDown()
+
+        if control is not None:
+            self.setFocus(control)
+
+
+    def onClick(self, controlId):
+        print "--- onClick ---"
+        print controlId
+
+        program = self.controlToProgramMap[controlId]
+        url = self.source.getStreamURL(program['channel_id'])
+        if url is None:
+            xbmcgui.Dialog().ok('Ingen live stream tilgængelig', 'Kanalen kan ikke afspilles, da der ingen live stream', 'er tilgængelig.')
+        else:
+                item = xbmcgui.ListItem(program['title'])
+                item.setProperty("IsLive", "true")
+                xbmc.Player().play(url, item)
+
+
+    def onFocus(self, controlId):
+        print "--- onFocus ---"
+        print controlId
+
+        self.controlInFocus = self.getControl(controlId)
+        (left, top) = self.controlInFocus.getPosition()
+        if left > self.focusX or left + self.controlInFocus.getWidth() < self.focusX:
+            self.focusX = left
+
+
+        program = self.controlToProgramMap[controlId]
+        self.getControl(LABEL_TITLE).setLabel('[B]%s[/B]' % program['title'])
+        self.getControl(LABEL_TIME).setLabel('[B]%s - %s[/B]' % (program['start_date'].strftime('%H:%M'), program['end_date'].strftime('%H:%M')))
+        self.getControl(LABEL_DESCRIPTION).setText(program['description'])
+
+    def _left(self, currentX, currentY):
+        control = self._findControlOnLeft(currentX, currentY)
+        if control is None:
+            self.date -= datetime.timedelta(hours = 2)
+            self._redraw(self.channelIndex, self.date)
+            control = self._findControlOnLeft(1280, currentY)
+
+        (left, top) = control.getPosition()
+        self.focusX = left
+        return control
+
+    def _right(self, currentX, currentY):
+        control = self._findControlOnRight(currentX, currentY)
+        if control is None:
+            self.date += datetime.timedelta(hours = 2)
+            self._redraw(self.channelIndex, self.date)
+            control = self._findControlOnRight(0, currentY)
+
+        (left, top) = control.getPosition()
+        self.focusX = left
+        return control
+
+    def _up(self, currentY):
+        control = self._findControlAbove(currentY)
+        if control is None:
+            self.channelIndex = self._redraw(self.channelIndex - CHANNELS_PER_PAGE, self.date)
+            control = self._findControlAbove(720)
+        return control
+
+    def _down(self, currentY):
+        control = self._findControlBelow(currentY)
+        if control is None:
+            self.channelIndex = self._redraw(self.channelIndex + CHANNELS_PER_PAGE, self.date)
+            control = self._findControlBelow(0)
+        return control
+
+    def _pageUp(self):
+        self.channelIndex = self._redraw(self.channelIndex - CHANNELS_PER_PAGE, self.date)
+        return self._findControlAbove(720)
+
+    def _pageDown(self):
+        self.channelIndex = self._redraw(self.channelIndex + CHANNELS_PER_PAGE, self.date)
+        return self._findControlBelow(0)
 
     def _redraw(self, startChannel, startTime):
         print "--- redrawing ---"
@@ -123,35 +242,78 @@ class TVGuide(xbmcgui.WindowXML):
         return startChannel
 
 
-    def onAction(self, action):
-        self.navigation.onAction(action, self, self.controlToProgramMap.keys())
-
-    def onClick(self, controlId):
-        print "--- onClick ---"
-        print controlId
-
-        program = self.controlToProgramMap[controlId]
-        url = self.source.getStreamURL(program['channel_id'])
-        if url is None:
-            xbmcgui.Dialog().ok('Ingen live stream tilgængelig', 'Kanalen kan ikke afspilles, da der ingen live stream', 'er tilgængelig.')
-        else:
-                item = xbmcgui.ListItem(program['title'])
-                item.setProperty("IsLive", "true")
-                xbmc.Player().play(url, item)
-
-
-    def onFocus(self, controlId):
-        print "--- onFocus ---"
-        print controlId
-
-        self.navigation.onFocus(self.getControl(controlId))
-
-        program = self.controlToProgramMap[controlId]
-        self.getControl(LABEL_TITLE).setLabel('[B]%s[/B]' % program['title'])
-        self.getControl(LABEL_TIME).setLabel('[B]%s - %s[/B]' % (program['start_date'].strftime('%H:%M'), program['end_date'].strftime('%H:%M')))
-        self.getControl(LABEL_DESCRIPTION).setText(program['description'])
-
-
     def _secondsToXposition(self, seconds):
         return CELL_WIDTH_CHANNELS + (seconds * CELL_WIDTH / 1800)
 
+    def _findControlOnRight(self, currentX, currentY):
+        distanceToNearest = 10000
+        nearestControl = None
+
+        for controlId in self.controlToProgramMap.keys():
+            control = self.getControl(controlId)
+            (left, top) = control.getPosition()
+            x = left + (control.getWidth() / 2)
+            y = top + (control.getHeight() / 2)
+
+            print "x = %d, y = %d" % (x, y)
+
+            if currentX < x and currentY == y:
+                distance = abs(currentX - x)
+                print "distance = %d" % distance
+                if distance < distanceToNearest:
+                    distanceToNearest = distance
+                    nearestControl = control
+
+        print "nearestControl = %s" % nearestControl
+        return nearestControl
+
+
+    def _findControlOnLeft(self, currentX, currentY):
+        distanceToNearest = 10000
+        nearestControl = None
+
+        for controlId in self.controlToProgramMap.keys():
+            control = self.getControl(controlId)
+            (left, top) = control.getPosition()
+            x = left + (control.getWidth() / 2)
+            y = top + (control.getHeight() / 2)
+
+            if currentX > x and currentY == y:
+                distance = abs(currentX - x)
+                if distance < distanceToNearest:
+                    distanceToNearest = distance
+                    nearestControl = control
+
+        return nearestControl
+
+    def _findControlBelow(self, currentY):
+        nearestControl = None
+
+        for controlId in self.controlToProgramMap.keys():
+            control = self.getControl(controlId)
+            (left, top) = control.getPosition()
+            y = top + (control.getHeight() / 2)
+
+            if currentY < y:
+                if(left <= self.focusX and left + control.getWidth() > self.focusX
+                    and (nearestControl is None or nearestControl.getPosition()[1] > top)):
+                    nearestControl = control
+                    print "nearestControl = %s" % nearestControl
+
+        return nearestControl
+
+    def _findControlAbove(self, currentY):
+        nearestControl = None
+
+        for controlId in self.controlToProgramMap.keys():
+            control = self.getControl(controlId)
+            (left, top) = control.getPosition()
+            y = top + (control.getHeight() / 2)
+
+            if currentY > y:
+                if(left <= self.focusX and left + control.getWidth() > self.focusX
+                    and (nearestControl is None or nearestControl.getPosition()[1] < top)):
+                    nearestControl = control
+                    print "nearestControl = %s" % nearestControl
+
+        return nearestControl
