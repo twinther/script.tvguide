@@ -1,6 +1,7 @@
 [B]Version 0.3.0[/B]
 - Major restructuring
 - Added TVTID.dk as source
+- Added support for XMLTV as source
 
 [B]Version 0.2.3[/B]
 - Added loading screen

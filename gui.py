@@ -1,11 +1,10 @@
-# coding=utf-8
-
 import os
 import datetime
 
 import xbmc
-import xbmcaddon
 import xbmcgui
+
+from strings import *
 
 KEY_LEFT = 1
 KEY_RIGHT = 2
@@ -92,7 +91,7 @@ class TVGuide(xbmcgui.WindowXML):
         program = self.controlToProgramMap[controlId]
         url = program.streamUrl
         if url is None:
-            xbmcgui.Dialog().ok('Ingen live stream tilgængelig', 'Kanalen kan ikke afspilles, da der ingen live stream', 'er tilgængelig.')
+            xbmcgui.Dialog().ok(strings(NO_STREAM_AVAILABLE_TITLE), strings(NO_STREAM_AVAILABLE_LINE1), strings(NO_STREAM_AVAILABLE_LINE2))
         else:
             item = xbmcgui.ListItem(program.title)
             item.setProperty("IsLive", "true")
