@@ -21,7 +21,7 @@ class Channel(object):
         self.logoUrl = logoUrl
 
     def __str__(self):
-        return 'Channel(id=%s, title=%s)' % (self.id, self.title)
+        return 'Channel(id=%s, title=%s, logoUrl=%s)' % (self.id, self.title, self.logoUrl)
 
 class Program(object):
     def __init__(self, channel, title, startTime, endTime, description, streamUrl = None):
@@ -33,7 +33,8 @@ class Program(object):
         self.streamUrl = streamUrl
 
     def __str__(self):
-        return 'Program(channel=%s, title=%s)' % (self.channel, self.title)
+        return 'Program(channel=%s, title=%s, startTime=%s, endTime=%s, description=%s, streamUrl=%s)' % \
+            (self.channel, self.title, self.startTime, self.endTime, self.description, self.streamUrl)
 
 
 class Source(object):
@@ -227,8 +228,51 @@ class TvTidSource(Source):
 
         return programs
 
-    def _parseDate(self, dateString):
-        t = time.strptime(dateString, '%Y,%m,%d,%H,%M,%S')
-        return datetime.datetime(t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec)
 
+
+class XMLTVSource(Source):
+    def __init__(self, xmlTvFile):
+        Source.__init__(self, None, True)
+        self.xmlTvFile = xmlTvFile
+        self.time = time.time()
+
+        # calculate nearest hour
+        self.time -= self.time % 3600
+
+    def getChannelList(self):
+        doc = self._loadXml()
+        channels = list()
+        for channel in doc.findall('channel'):
+            channels.append(Channel(id = channel.get('id'), title = channel.findtext('display-name'), logoUrl = channel.find('icon').get('src')))
+
+        return channels
+
+    def getProgramList(self, channel):
+        doc = self._loadXml()
+        programs = list()
+        for program in doc.findall('programme'):
+            if program.get('channel') != channel.id:
+                continue
+
+            description = program.findtext('desc')
+            if description is None:
+                description = 'Ingen beskrivelse'
+
+            p = Program(channel, program.findtext('title'), self._parseDate(program.get('start')), self._parseDate(program.get('stop')), description)
+            programs.append(p)
+
+        return programs
+
+    def _loadXml(self):
+        f = open(self.xmlTvFile)
+        xml = f.read()
+        f.close()
+
+        return ElementTree.fromstring(xml)
+
+
+    def _parseDate(self, dateString):
+        dateStringWithoutTimeZone = dateString[:-6]
+        t = time.strptime(dateStringWithoutTimeZone, '%Y%m%d%H%M%S')
+        return datetime.datetime(t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec)
 
