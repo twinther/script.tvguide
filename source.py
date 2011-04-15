@@ -6,8 +6,6 @@ import re
 import urllib2
 from elementtree import ElementTree
 
-import xbmcaddon
-
 STREAM_DR1 = 'rtmp://rtmplive.dr.dk/live/livedr01astream3'
 STREAM_DR2 = 'rtmp://rtmplive.dr.dk/live/livedr02astream3'
 STREAM_DRUPDATE = 'rtmp://rtmplive.dr.dk/live/livedr03astream3'
@@ -16,31 +14,40 @@ STREAM_DRRAMASJANG = 'rtmp://rtmplive.dr.dk/live/livedr05astream3'
 STREAM_24NORDJYSKE = 'mms://stream.nordjyske.dk/24nordjyske - Full Broadcast Quality'
 STREAM_FOLKETINGET = 'rtmp://chip.arkena.com/webtvftfl/hi1'
 
+class Channel(object):
+    def __init__(self, id, title, logoUrl = None):
+        self.id = id
+        self.title = title
+        self.logoUrl = logoUrl
+
+    def __str__(self):
+        return 'Channel(id=%s, title=%s)' % (self.id, self.title)
+
 class Program(object):
-    def __init__(self):
-        self.channelId = None
-        self.title = None
-        self.startTime = None
-        self.endTime = None
-        self.description = None
+    def __init__(self, channel, title, startTime, endTime, description, streamUrl = None):
+        self.channel = channel
+        self.title = title
+        self.startTime = startTime
+        self.endTime = endTime
+        self.description = description
+        self.streamUrl = streamUrl
+
+    def __str__(self):
+        return 'Program(channel=%s, title=%s)' % (self.channel, self.title)
 
 
 class Source(object):
-    ADDON = xbmcaddon.Addon(id = 'script.tvguide')
-    CACHE_PATH = ADDON.getAddonInfo('profile')
     CACHE_MINUTES = 10
 
-    def __init__(self, hasChannelIcons):
+    def __init__(self, cachePath, hasChannelIcons):
         self.channelIcons = hasChannelIcons
+        self.cachePath = cachePath
 
     def hasChannelIcons(self):
         return self.channelIcons
 
-    def getStreamURL(self, channelId):
-        return None
-    
     def _downloadAndCacheUrl(self, url, cacheName):
-        cacheFile = os.path.join(self.CACHE_PATH, cacheName)
+        cacheFile = os.path.join(self.cachePath, cacheName)
         try:
             cachedOn = os.path.getmtime(cacheFile)
         except:
@@ -76,26 +83,23 @@ class DrDkSource(Source):
         'dr.dk/external/ritzau/channel/dru' : STREAM_DRUPDATE
     }
 
-    def __init__(self):
-        Source.__init__(self, False)
+    def __init__(self, cachePath):
+        Source.__init__(self, cachePath, False)
         self.date = datetime.datetime.today()
 
     def getChannelList(self):
         jsonChannels = simplejson.loads(self._downloadAndCacheUrl(self.CHANNELS_URL, 'drdk-channels.json'))
-        channels = []
+        channels = list()
 
         for channel in jsonChannels['result']:
-            channels.append({
-                'id' : channel['source_url'],
-                'title' : channel['name']
-            })
+            channels.append(Channel(id = channel['source_url'], title = channel['name']))
 
         return channels
 
-    def getProgramList(self, channelId):
-        url = self.PROGRAMS_URL % (channelId.replace('+', '%2b'), self.date.strftime('%Y-%m-%dT%H:%M:%S'))
-        jsonPrograms = simplejson.loads(self._downloadAndCacheUrl(url, 'drdk-' + channelId.replace('/', '')))
-        programs = []
+    def getProgramList(self, channel):
+        url = self.PROGRAMS_URL % (channel.id.replace('+', '%2b'), self.date.strftime('%Y-%m-%dT%H:%M:%S'))
+        jsonPrograms = simplejson.loads(self._downloadAndCacheUrl(url, 'drdk-' + channel.id.replace('/', '')))
+        programs = list()
 
         for program in jsonPrograms['result']:
             if program.has_key('ppu_description'):
@@ -103,21 +107,13 @@ class DrDkSource(Source):
             else:
                 description = 'Ingen beskrivelse'
 
-            programs.append({
-                'channel_id' : channelId,
-                'title' : program['pro_title'],
-                'start_date' : self._parseDate(program['pg_start']),
-                'end_date' : self._parseDate(program['pg_stop']),
-                'description' : description
-            })
+            p = Program(channel, program['pro_title'], self._parseDate(program['pg_start']), self._parseDate(program['pg_stop']), description)
+            if self.STREAMS.has_key(channelId):
+                p.streamUrl = self.STREAMS[channelId]
+
+            programs.append(p)
 
         return programs
-
-    def getStreamURL(self, channelId):
-        if self.STREAMS.has_key(channelId):
-            return self.STREAMS[channelId]
-        else:
-            return None
 
     def _parseDate(self, dateString):
         t = time.strptime(dateString[:19], '%Y-%m-%dT%H:%M:%S')
@@ -135,27 +131,23 @@ class YouSeeTvSource(Source):
         'dr ram' : STREAM_DRRAMASJANG
     }
 
-    def __init__(self):
-        Source.__init__(self, True)
+    def __init__(self, cachePath):
+        Source.__init__(self, cachePath, True)
         self.date = datetime.datetime.today()
 
     def getChannelList(self):
         html = self._downloadAndCacheUrl(self.CHANNELS_URL, 'youseetv-channels.json')
-        channels = []
+        channels = list()
 
         for m in re.finditer('href="/livetv/([^"]+)".*?src="(http://cloud.yousee.tv/static/img/logos/large_[^"]+)" alt="(.*?)"', html):
-            channels.append({
-                'id' : m.group(1),
-                'title' : m.group(3),
-                'logo' : m.group(2)
-            })
+            channels.append(Channel(id = m.group(1), title = m.group(3), logoUrl = m.group(2)))
 
         return channels
 
-    def getProgramList(self, channelId):
-        url = self.PROGRAMS_URL % channelId.replace(' ', '%20')
-        xml = self._downloadAndCacheUrl(url, 'youseetv-' + channelId.replace(' ', '_'))
-        programs = []
+    def getProgramList(self, channel):
+        url = self.PROGRAMS_URL % channel.id.replace(' ', '%20')
+        xml = self._downloadAndCacheUrl(url, 'youseetv-' + channel.id.replace(' ', '_'))
+        programs = list()
 
         doc = ElementTree.fromstring(xml)
 
@@ -164,21 +156,14 @@ class YouSeeTvSource(Source):
             if description is None:
                 description = 'Ingen beskrivelse'
 
-            programs.append({
-                'channel_id' : channelId,
-                'title' : program.find('title').text,
-                'start_date' : self._parseDate(program.find('start').text),
-                'end_date' : self._parseDate(program.find('end').text),
-                'description' : description
-            })
+            p = Program(channel, program.find('title').text, self._parseDate(program.find('start').text), self._parseDate(program.find('end').text), description)
+            if self.STREAMS.has_key(channel.id):
+                p.streamUrl = self.STREAMS[channel.id]
+
+            programs.append(p)
+
 
         return programs
-
-    def getStreamURL(self, channelId):
-        if self.STREAMS.has_key(channelId):
-            return self.STREAMS[channelId]
-        else:
-            return None
 
 
     def _parseDate(self, dateString):
@@ -201,8 +186,8 @@ class TvTidSource(Source):
         'dr ram' : STREAM_DRRAMASJANG
     }
 
-    def __init__(self):
-        Source.__init__(self, True)
+    def __init__(self, cachePath):
+        Source.__init__(self, cachePath, True)
         self.time = time.time()
 
         # calculate nearest hour
@@ -212,54 +197,38 @@ class TvTidSource(Source):
         response = self._downloadAndCacheUrl(self.FETCH_URL % self.time, 'tvtiddk-data.json')
         json = simplejson.loads(response)
 
-        channels = []
+        channels = list()
         for channel in json['channels']:
-            channels.append({
-                'id' : channel['id'],
-                'title' : channel['name'],
-                'logo' : self.BASE_URL % channel['logo']
-            })
+            channels.append(Channel(id = channel['id'], title = channel['name'], logoUrl = self.BASE_URL % channel['logo']))
 
         return channels
 
-    def getProgramList(self, channelId):
+    def getProgramList(self, channel):
         response = self._downloadAndCacheUrl(self.FETCH_URL % self.time, 'tvtiddk-data.json')
         json = simplejson.loads(response)
 
         channel = None
         for channel in json['channels']:
-            if channel['id'] == channelId:
+            if channel['id'] == channel.id:
                 break
 
         # assume we always find a channel
-        programs = []
+        programs = list()
 
         for program in channel['program']:
             description = program['short_description']
             if description is None:
                 description = 'Ingen beskrivelse'
 
-            programs.append({
-                'channel_id' : channelId,
-                'title' : program['title'],
-                'start_date' : datetime.datetime.fromtimestamp(program['start_timestamp']),
-                'end_date' : datetime.datetime.fromtimestamp(program['end_timestamp']),
-                'description' : description
-            })
+            p = Program(channel, program['title'], datetime.datetime.fromtimestamp(program['start_timestamp']), datetime.datetime.fromtimestamp(program['end_timestamp']), description)
+            if self.STREAMS.has_key(channel.id):
+                p.streamUrl = self.STREAMS[channel.id]
+            programs.append(p)
 
         return programs
-
-    def getStreamURL(self, channelId):
-        if self.STREAMS.has_key(channelId):
-            return self.STREAMS[channelId]
-        else:
-            return None
-
 
     def _parseDate(self, dateString):
         t = time.strptime(dateString, '%Y,%m,%d,%H,%M,%S')
         return datetime.datetime(t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec)
-
-
 
 

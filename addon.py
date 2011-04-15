@@ -5,14 +5,15 @@ import gui
 
 ADDON = xbmcaddon.Addon(id = 'script.tvguide')
 
-s = None
-if ADDON.getSetting('source') == 'YouSee.tv':
-    s = source.YouSeeTvSource()
-elif ADDON.getSetting('source') == 'DR.dk':
-    s = source.DrDkSource()
-elif ADDON.getSetting('source') == 'TVTID.dk':
-    s = source.TvTidSource()
+SOURCES = {
+    'YouSee.tv' : source.YouSeeTvSource,
+    'DR.dk' : source.DrDkSource,
+    'TVTID.dk' : source.TvTidSource
+    }
 
-w = gui.TVGuide('script-tvguide-main.xml', ADDON.getAddonInfo('path'), source = s)
+sourceRef = SOURCES[ADDON.getSetting('source')]
+
+cachePath = ADDON.getAddonInfo('profile')
+w = gui.TVGuide('script-tvguide-main.xml', ADDON.getAddonInfo('path'), source = sourceRef(cachePath))
 w.doModal()
 del w

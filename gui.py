@@ -92,13 +92,13 @@ class TVGuide(xbmcgui.WindowXML):
         print controlId
 
         program = self.controlToProgramMap[controlId]
-        url = self.source.getStreamURL(program['channel_id'])
+        url = program.streamUrl
         if url is None:
             xbmcgui.Dialog().ok('Ingen live stream tilgængelig', 'Kanalen kan ikke afspilles, da der ingen live stream', 'er tilgængelig.')
         else:
-                item = xbmcgui.ListItem(program['title'])
-                item.setProperty("IsLive", "true")
-                xbmc.Player().play(url, item)
+            item = xbmcgui.ListItem(program.title)
+            item.setProperty("IsLive", "true")
+            xbmc.Player().play(url, item)
 
 
     def onFocus(self, controlId):
@@ -112,9 +112,9 @@ class TVGuide(xbmcgui.WindowXML):
 
 
         program = self.controlToProgramMap[controlId]
-        self.getControl(LABEL_TITLE).setLabel('[B]%s[/B]' % program['title'])
-        self.getControl(LABEL_TIME).setLabel('[B]%s - %s[/B]' % (program['start_date'].strftime('%H:%M'), program['end_date'].strftime('%H:%M')))
-        self.getControl(LABEL_DESCRIPTION).setText(program['description'])
+        self.getControl(LABEL_TITLE).setLabel('[B]%s[/B]' % program.title)
+        self.getControl(LABEL_TIME).setLabel('[B]%s - %s[/B]' % (program.startDate.strftime('%H:%M'), program.endDate.strftime('%H:%M')))
+        self.getControl(LABEL_DESCRIPTION).setText(program.description)
 
     def _left(self, currentX, currentY):
         control = self._findControlOnLeft(currentX, currentY)
@@ -196,17 +196,17 @@ class TVGuide(xbmcgui.WindowXML):
 
             for idx, channel in enumerate(channels[startChannel : startChannel + CHANNELS_PER_PAGE]):
                 if self.source.hasChannelIcons():
-                    self.getControl(4110 + idx).setImage(channel['logo'])
-                    print channel['logo']
+                    self.getControl(4110 + idx).setImage(channel.logoUrl)
+                    print channel.logoUrl
                 else:
-                    self.getControl(4010 + idx).setLabel(channel['title'])
+                    self.getControl(4010 + idx).setLabel(channel.title)
 
-                for program in self.source.getProgramList(channel['id']):
-                    if program['end_date'] <= self.date:
+                for program in self.source.getProgramList(channel):
+                    if program.endDate <= self.date:
                         continue
 
-                    startDelta = program['start_date'] - self.date
-                    stopDelta = program['end_date'] - self.date
+                    startDelta = program.startDate - self.date
+                    stopDelta = program.endDate - self.date
 
                     cellStart = self._secondsToXposition(startDelta.seconds)
                     if startDelta.days < 0:
@@ -221,7 +221,7 @@ class TVGuide(xbmcgui.WindowXML):
                             25 + CELL_HEIGHT * (1 + idx),
                             cellWidth,
                             CELL_HEIGHT,
-                            program['title'],
+                            program.title,
                             noFocusTexture = TEXTURE_BUTTON_NOFOCUS,
                             focusTexture = TEXTURE_BUTTON_FOCUS
                         )
