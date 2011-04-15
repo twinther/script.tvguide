@@ -39,18 +39,15 @@ class TVGuide(xbmcgui.WindowXML):
         
         self.source = source
         self.controlToProgramMap = {}
-        self.controlInFocus = None
         self.focusX = 0
         self.channelIndex = 0
-
-
-    def onInit(self):
-        print "onInit"
 
         # find nearest half hour
         self.date = datetime.datetime.today()
         self.date -= datetime.timedelta(minutes = self.date.minute % 30)
 
+    def onInit(self):
+        print "onInit"
         self._redraw(0, self.date)
 
     def onAction(self, action):
@@ -62,9 +59,10 @@ class TVGuide(xbmcgui.WindowXML):
             self.close()
             return
 
-        (left, top) = self.controlInFocus.getPosition()
-        currentX = left + (self.controlInFocus.getWidth() / 2)
-        currentY = top + (self.controlInFocus.getHeight() / 2)
+        controlInFocus = self.getFocus()
+        (left, top) = controlInFocus.getPosition()
+        currentX = left + (controlInFocus.getWidth() / 2)
+        currentY = top + (controlInFocus.getHeight() / 2)
 
         print "currentX = %d, currentY = %d" % (currentX, currentY)
 
@@ -105,9 +103,9 @@ class TVGuide(xbmcgui.WindowXML):
         print "--- onFocus ---"
         print controlId
 
-        self.controlInFocus = self.getControl(controlId)
-        (left, top) = self.controlInFocus.getPosition()
-        if left > self.focusX or left + self.controlInFocus.getWidth() < self.focusX:
+        controlInFocus = self.getControl(controlId)
+        (left, top) = controlInFocus.getPosition()
+        if left > self.focusX or left + controlInFocus.getWidth() < self.focusX:
             self.focusX = left
 
 
