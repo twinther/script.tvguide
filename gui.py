@@ -186,6 +186,7 @@ class TVGuide(xbmcgui.WindowXML):
 
             # channels
             channels = self.source.getChannelList()
+            print channels
             if startChannel < 0:
                 startChannel = len(channels) - CHANNELS_PER_PAGE
             elif startChannel > len(channels) - CHANNELS_PER_PAGE:

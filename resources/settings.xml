@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <settings>
 	<category label="Generelt">
-		<setting id="source" label="Kilde" type="labelenum" default="YouSee.tv" values="YouSee.tv|DR.dk|TVTID.dk" />
+		<setting id="source" label="Kilde" type="labelenum" default="YouSee.tv" values="YouSee.tv|DR.dk|TVTID.dk|XMLTV" />
+        <setting id="xmltv.file" label="XMLTV File" type="file" visible="eq(-1,3)" />
 	</category>
 </settings>
 

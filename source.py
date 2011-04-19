@@ -264,7 +264,7 @@ class XMLTVSource(Source):
             for channel in doc.findall('channel'):
                 self.cachedChannelList.append(Channel(id = channel.get('id'), title = channel.findtext('display-name'), logoUrl = channel.find('icon').get('src')))
 
-            return self.cachedChannelList
+        return self.cachedChannelList
 
     def getProgramList(self, channel):
         if not self.cachedProgramList.has_key(channel):
