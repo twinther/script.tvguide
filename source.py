@@ -16,26 +16,26 @@ STREAM_24NORDJYSKE = 'mms://stream.nordjyske.dk/24nordjyske - Full Broadcast Qua
 STREAM_FOLKETINGET = 'rtmp://chip.arkena.com/webtvftfl/hi1'
 
 class Channel(object):
-    def __init__(self, id, title, logoUrl = None):
+    def __init__(self, id, title, logoUrl = None, streamUrl = None):
         self.id = id
         self.title = title
         self.logoUrl = logoUrl
+        self.streamUrl = streamUrl
 
     def __str__(self):
-        return 'Channel(id=%s, title=%s, logoUrl=%s)' % (self.id, self.title, self.logoUrl)
+        return 'Channel(id=%s, title=%s, logoUrl=%s, streamUrl=%s)' % (self.id, self.title, self.logoUrl, self.streamUrl)
 
 class Program(object):
-    def __init__(self, channel, title, startDate, endDate, description, streamUrl = None):
+    def __init__(self, channel, title, startDate, endDate, description):
         self.channel = channel
         self.title = title
         self.startDate = startDate
         self.endDate = endDate
         self.description = description
-        self.streamUrl = streamUrl
 
     def __str__(self):
-        return 'Program(channel=%s, title=%s, startDate=%s, endDate=%s, description=%s, streamUrl=%s)' % \
-            (self.channel, self.title, self.startDate, self.endDate, self.description, self.streamUrl)
+        return 'Program(channel=%s, title=%s, startDate=%s, endDate=%s, description=%s)' % \
+            (self.channel, self.title, self.startDate, self.endDate, self.description)
 
 
 class Source(object):
@@ -101,7 +101,12 @@ class DrDkSource(Source):
             self.cachedChannelList = list()
 
             for channel in jsonChannels['result']:
-                self.cachedChannelList.append(Channel(id = channel['source_url'], title = channel['name']))
+                c = Channel(id = channel['source_url'], title = channel['name'])
+                if self.STREAMS.has_key(c.id):
+                    c.streamUrl = self.STREAMS[c.id]
+
+                self.cachedChannelList.append(c)
+
 
         return self.cachedChannelList
 
@@ -118,11 +123,7 @@ class DrDkSource(Source):
                 else:
                     description = strings(NO_DESCRIPTION)
 
-                p = Program(channel, program['pro_title'], self._parseDate(program['pg_start']), self._parseDate(program['pg_stop']), description)
-                if self.STREAMS.has_key(channel.id):
-                    p.streamUrl = self.STREAMS[channel.id]
-
-                programs.append(p)
+                programs.append(Program(channel, program['pro_title'], self._parseDate(program['pg_start']), self._parseDate(program['pg_stop']), description))
 
             self.cachedProgramList[channel] = programs
 
@@ -153,7 +154,11 @@ class YouSeeTvSource(Source):
             html = self._downloadAndCacheUrl(self.CHANNELS_URL, 'youseetv-channels.json')
             self.cachedChannelList = list()
             for m in re.finditer('href="/livetv/([^"]+)".*?src="(http://cloud.yousee.tv/static/img/logos/large_[^"]+)" alt="(.*?)"', html):
-                self.cachedChannelList.append(Channel(id = m.group(1), title = m.group(3), logoUrl = m.group(2)))
+                c = Channel(id = m.group(1), title = m.group(3), logoUrl = m.group(2))
+                if self.STREAMS.has_key(c.id):
+                    c.streamUrl = self.STREAMS[c.id]
+
+                self.cachedChannelList.append(c)
 
         return self.cachedChannelList
 
@@ -170,11 +175,7 @@ class YouSeeTvSource(Source):
                 if description is None:
                     description = strings(NO_DESCRIPTION)
 
-                p = Program(channel, program.find('title').text, self._parseDate(program.find('start').text), self._parseDate(program.find('end').text), description)
-                if self.STREAMS.has_key(channel.id):
-                    p.streamUrl = self.STREAMS[channel.id]
-
-                programs.append(p)
+                programs.append(Program(channel, program.find('title').text, self._parseDate(program.find('start').text), self._parseDate(program.find('end').text), description))
 
             self.cachedProgramList[channel] = programs
 
@@ -215,7 +216,10 @@ class TvTidSource(Source):
 
             self.cachedChannelList = list()
             for channel in json['channels']:
-                self.cachedChannelList.append(Channel(id = channel['id'], title = channel['name'], logoUrl = self.BASE_URL % channel['logo']))
+                c = Channel(id = channel['id'], title = channel['name'], logoUrl = self.BASE_URL % channel['logo'])
+                if self.STREAMS.has_key(c.id):
+                    c.streamUrl = self.STREAMS[c.id]
+                self.cachedChannelList.append(c)
 
         return self.cachedChannelList
 
@@ -237,10 +241,7 @@ class TvTidSource(Source):
                 if description is None:
                     description = strings(NO_DESCRIPTION)
 
-                p = Program(channel, program['title'], datetime.datetime.fromtimestamp(program['start_timestamp']), datetime.datetime.fromtimestamp(program['end_timestamp']), description)
-                if self.STREAMS.has_key(channel.id):
-                    p.streamUrl = self.STREAMS[channel.id]
-                programs.append(p)
+                programs.append(Program(channel, program['title'], datetime.datetime.fromtimestamp(program['start_timestamp']), datetime.datetime.fromtimestamp(program['end_timestamp']), description))
 
             self.cachedProgramList[channel] = programs
 
@@ -262,7 +263,8 @@ class XMLTVSource(Source):
             doc = self._loadXml()
             self.cachedChannelList = list()
             for channel in doc.findall('channel'):
-                self.cachedChannelList.append(Channel(id = channel.get('id'), title = channel.findtext('display-name'), logoUrl = channel.find('icon').get('src')))
+                c = Channel(id = channel.get('id'), title = channel.findtext('display-name'), logoUrl = channel.find('icon').get('src'))
+                self.cachedChannelList.append(c)
 
         return self.cachedChannelList
 
@@ -278,8 +280,7 @@ class XMLTVSource(Source):
                 if description is None:
                     description = strings(NO_DESCRIPTION)
 
-                p = Program(channel, program.findtext('title'), self._parseDate(program.get('start')), self._parseDate(program.get('stop')), description)
-                programs.append(p)
+                programs.append(Program(channel, program.findtext('title'), self._parseDate(program.get('start')), self._parseDate(program.get('stop')), description))
 
             self.cachedProgramList[channel] = programs
 

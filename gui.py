@@ -6,6 +6,9 @@ import xbmcgui
 
 from strings import *
 
+MODE_EPG = 1
+MODE_TV = 2
+
 KEY_LEFT = 1
 KEY_RIGHT = 2
 KEY_UP = 3
@@ -14,6 +17,8 @@ KEY_PAGE_UP = 5
 KEY_PAGE_DOWN = 6
 KEY_BACK = 9
 KEY_MENU = 10
+
+KEY_CONTEXT_MENU = 117
 
 CHANNELS_PER_PAGE = 8
 
@@ -35,7 +40,11 @@ TEXTURE_BUTTON_FOCUS = os.path.join(xbmc.translatePath(ADDON.getAddonInfo('path'
 class TVGuide(xbmcgui.WindowXML):
     def __init__(self, xmlFilename, scriptPath, source):
         xbmcgui.WindowXML.__init__(self, xmlFilename, scriptPath)
-        
+
+        self.mode = MODE_EPG
+        self.currentChannel = None
+
+        self.player = xbmc.Player()
         self.source = source
         self.controlToProgramMap = {}
         self.focusX = 0
@@ -47,7 +56,7 @@ class TVGuide(xbmcgui.WindowXML):
 
     def onInit(self):
         print "onInit"
-        self._redraw(0, self.date)
+        self._redrawEpg(0, self.date)
 
     def onAction(self, action):
         print "--- onAction ---"
@@ -58,30 +67,49 @@ class TVGuide(xbmcgui.WindowXML):
             self.close()
             return
 
-        controlInFocus = self.getFocus()
-        (left, top) = controlInFocus.getPosition()
-        currentX = left + (controlInFocus.getWidth() / 2)
-        currentY = top + (controlInFocus.getHeight() / 2)
+        if self.mode == MODE_TV:
+            if action.getId() == KEY_CONTEXT_MENU:
+                self._redrawEpg(self.channelIndex, self.date)
 
-        print "currentX = %d, currentY = %d" % (currentX, currentY)
+            elif action.getId() == KEY_PAGE_UP:
+                self._channelUp()
 
-        control = None
+            elif action.getId() == KEY_PAGE_DOWN:
+                self._channelDown()
 
-        if action.getId() == KEY_LEFT:
-            control = self._left(currentX, currentY)
-        elif action.getId() == KEY_RIGHT:
-            control = self._right(currentX, currentY)
-        elif action.getId() == KEY_UP:
-            control = self._up(currentY)
-        elif action.getId() == KEY_DOWN:
-            control = self._down(currentY)
-        elif action.getId() == KEY_PAGE_UP:
-            control = self._pageUp()
-        elif action.getId() == KEY_PAGE_DOWN:
-            control = self._pageDown()
+        elif self.mode == MODE_EPG:
+            if action.getId() == KEY_CONTEXT_MENU:
+                if self.player.isPlaying():
+                    self._hideEpg()
 
-        if control is not None:
-            self.setFocus(control)
+            try:
+                controlInFocus = self.getFocus()
+                (left, top) = controlInFocus.getPosition()
+                currentX = left + (controlInFocus.getWidth() / 2)
+                currentY = top + (controlInFocus.getHeight() / 2)
+            except TypeError, ex:
+                print ex
+                return # ignore for now
+
+            print "currentX = %d, currentY = %d" % (currentX, currentY)
+
+            control = None
+
+            if action.getId() == KEY_LEFT:
+                control = self._left(currentX, currentY)
+            elif action.getId() == KEY_RIGHT:
+                control = self._right(currentX, currentY)
+            elif action.getId() == KEY_UP:
+                control = self._up(currentY)
+            elif action.getId() == KEY_DOWN:
+                control = self._down(currentY)
+            elif action.getId() == KEY_PAGE_UP:
+                control = self._pageUp()
+            elif action.getId() == KEY_PAGE_DOWN:
+                control = self._pageDown()
+
+            if control is not None:
+                self.setFocus(control)
 
 
     def onClick(self, controlId):
@@ -89,14 +117,10 @@ class TVGuide(xbmcgui.WindowXML):
         print controlId
 
         program = self.controlToProgramMap[controlId]
-        url = program.streamUrl
-        if url is None:
+        if program.channel.streamUrl is None:
             xbmcgui.Dialog().ok(strings(NO_STREAM_AVAILABLE_TITLE), strings(NO_STREAM_AVAILABLE_LINE1), strings(NO_STREAM_AVAILABLE_LINE2))
         else:
-            item = xbmcgui.ListItem(program.title)
-            item.setProperty("IsLive", "true")
-            xbmc.Player().play(url, item)
-
+            self._playChannel(program.channel)
 
     def onFocus(self, controlId):
         print "--- onFocus ---"
@@ -117,7 +141,7 @@ class TVGuide(xbmcgui.WindowXML):
         control = self._findControlOnLeft(currentX, currentY)
         if control is None:
             self.date -= datetime.timedelta(hours = 2)
-            self._redraw(self.channelIndex, self.date)
+            self._redrawEpg(self.channelIndex, self.date)
             control = self._findControlOnLeft(1280, currentY)
 
         (left, top) = control.getPosition()
@@ -128,7 +152,7 @@ class TVGuide(xbmcgui.WindowXML):
         control = self._findControlOnRight(currentX, currentY)
         if control is None:
             self.date += datetime.timedelta(hours = 2)
-            self._redraw(self.channelIndex, self.date)
+            self._redrawEpg(self.channelIndex, self.date)
             control = self._findControlOnRight(0, currentY)
 
         (left, top) = control.getPosition()
@@ -138,30 +162,72 @@ class TVGuide(xbmcgui.WindowXML):
     def _up(self, currentY):
         control = self._findControlAbove(currentY)
         if control is None:
-            self.channelIndex = self._redraw(self.channelIndex - CHANNELS_PER_PAGE, self.date)
+            self.channelIndex = self._redrawEpg(self.channelIndex - CHANNELS_PER_PAGE, self.date)
             control = self._findControlAbove(720)
         return control
 
     def _down(self, currentY):
         control = self._findControlBelow(currentY)
         if control is None:
-            self.channelIndex = self._redraw(self.channelIndex + CHANNELS_PER_PAGE, self.date)
+            self.channelIndex = self._redrawEpg(self.channelIndex + CHANNELS_PER_PAGE, self.date)
             control = self._findControlBelow(0)
         return control
 
     def _pageUp(self):
-        self.channelIndex = self._redraw(self.channelIndex - CHANNELS_PER_PAGE, self.date)
+        self.channelIndex = self._redrawEpg(self.channelIndex - CHANNELS_PER_PAGE, self.date)
         return self._findControlAbove(720)
 
     def _pageDown(self):
-        self.channelIndex = self._redraw(self.channelIndex + CHANNELS_PER_PAGE, self.date)
+        self.channelIndex = self._redrawEpg(self.channelIndex + CHANNELS_PER_PAGE, self.date)
         return self._findControlBelow(0)
 
-    def _redraw(self, startChannel, startTime):
-        print "--- redrawing ---"
+    def _channelUp(self):
+        channels = self.source.getChannelList()
+        idx = channels.index(self.currentChannel)
+        idx += 1
 
+        if idx > len(channels):
+            idx = 0
+        if channels[idx].streamUrl is not None:
+            self._playChannel(channels[idx])
+
+    def _channelDown(self):
+        channels = self.source.getChannelList()
+        idx = channels.index(self.currentChannel)
+        idx -= 1
+
+        if idx < 0:
+            idx = len(channels) - 1
+        if channels[idx].streamUrl is not None:
+            self._playChannel(channels[idx])
+
+    def _playChannel(self, channel):
+        self.currentChannel = channel
+
+        wasPlaying = self.player.isPlaying()
+
+        item = xbmcgui.ListItem(channel.title)
+        item.setProperty("IsLive", "true")
+        self.player.play(channel.streamUrl, item, windowed = True)
+
+        if not wasPlaying:
+            self._hideEpg()
+
+    def _hideEpg(self):
+        self.mode = MODE_TV
+        self.getControl(5000).setVisible(False)
         for id in self.controlToProgramMap.keys():
             self.removeControl(self.getControl(id))
+
+
+    def _redrawEpg(self, startChannel, startTime):
+        print "--- redrawing ---"
+
+        if self.mode == MODE_EPG:
+            self._hideEpg()
+
+        self.mode = MODE_EPG
+        self.getControl(5000).setVisible(True)
 
         self.controlToProgramMap.clear()
         self.getControl(4200).setVisible(True)
