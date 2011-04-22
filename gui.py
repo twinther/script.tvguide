@@ -8,6 +8,7 @@ from strings import *
 
 MODE_EPG = 1
 MODE_TV = 2
+MODE_OSD = 3
 
 KEY_LEFT = 1
 KEY_RIGHT = 2
@@ -17,7 +18,7 @@ KEY_PAGE_UP = 5
 KEY_PAGE_DOWN = 6
 KEY_BACK = 9
 KEY_MENU = 10
-
+KEY_INFO = 11
 KEY_CONTEXT_MENU = 117
 
 CHANNELS_PER_PAGE = 8
@@ -57,6 +58,8 @@ class TVGuide(xbmcgui.WindowXML):
     def onInit(self):
         print "onInit"
         self._redrawEpg(0, self.date)
+        self.getControl(6000).setVisible(False)
+        self.getControl(4023).setImage('tvguide-logo-%s.png' % self.source.KEY)
 
     def onAction(self, action):
         print "--- onAction ---"
@@ -76,6 +79,21 @@ class TVGuide(xbmcgui.WindowXML):
 
             elif action.getId() == KEY_PAGE_DOWN:
                 self._channelDown()
+
+            elif action.getId() == KEY_INFO:
+                self._showOsd()
+
+        elif self.mode == MODE_OSD:
+            if  action.getId() == KEY_INFO:
+                self._hideOsd()
+
+            elif action.getId() == KEY_PAGE_UP:
+                self._channelUp()
+                self._showOsd()
+
+            elif action.getId() == KEY_PAGE_DOWN:
+                self._channelDown()
+                self._showOsd()
 
         elif self.mode == MODE_EPG:
             if action.getId() == KEY_CONTEXT_MENU:
@@ -213,12 +231,34 @@ class TVGuide(xbmcgui.WindowXML):
         if not wasPlaying:
             self._hideEpg()
 
+    def _showOsd(self):
+        self.mode = MODE_OSD
+
+        programs = self.source.getProgramList(self.currentChannel)
+        now = datetime.datetime.today()
+        program = None
+        for p in programs:
+            if p.startDate < now and p.endDate > now:
+                program = p
+                break
+
+        if program is not None:
+            self.getControl(6001).setLabel('[B]%s[/B]' % program.title)
+            self.getControl(6002).setLabel('[B]%s - %s[/B]' % (program.startDate.strftime('%H:%M'), program.endDate.strftime('%H:%M')))
+            self.getControl(6003).setText(program.description)
+            self.getControl(6004).setImage(program.channel.logo)
+
+        self.getControl(6000).setVisible(True)
+
+    def _hideOsd(self):
+        self.mode = MODE_TV
+        self.getControl(6000).setVisible(False)
+
     def _hideEpg(self):
         self.mode = MODE_TV
         self.getControl(5000).setVisible(False)
         for id in self.controlToProgramMap.keys():
             self.removeControl(self.getControl(id))
-
 
     def _redrawEpg(self, startChannel, startTime):
         print "--- redrawing ---"
@@ -260,8 +300,7 @@ class TVGuide(xbmcgui.WindowXML):
 
             for idx, channel in enumerate(channels[startChannel : startChannel + CHANNELS_PER_PAGE]):
                 if self.source.hasChannelIcons():
-                    self.getControl(4110 + idx).setImage(channel.logoUrl)
-                    print channel.logoUrl
+                    self.getControl(4110 + idx).setImage(channel.logo)
                 else:
                     self.getControl(4010 + idx).setLabel(channel.title)
 

@@ -16,14 +16,14 @@ STREAM_24NORDJYSKE = 'mms://stream.nordjyske.dk/24nordjyske - Full Broadcast Qua
 STREAM_FOLKETINGET = 'rtmp://chip.arkena.com/webtvftfl/hi1'
 
 class Channel(object):
-    def __init__(self, id, title, logoUrl = None, streamUrl = None):
+    def __init__(self, id, title, logo = None, streamUrl = None):
         self.id = id
         self.title = title
-        self.logoUrl = logoUrl
+        self.logo = logo
         self.streamUrl = streamUrl
 
     def __str__(self):
-        return 'Channel(id=%s, title=%s, logoUrl=%s, streamUrl=%s)' % (self.id, self.title, self.logoUrl, self.streamUrl)
+        return 'Channel(id=%s, title=%s, logo=%s, streamUrl=%s)' % (self.id, self.title, self.logo, self.streamUrl)
 
 class Program(object):
     def __init__(self, channel, title, startDate, endDate, description):
@@ -77,6 +77,25 @@ class Source(object):
             f.close()
 
         return content
+
+    def _cacheLogo(self, url, cacheName):
+        cacheFile = os.path.join(self.cachePath, cacheName)
+        if not os.path.exists(cacheFile):
+            try:
+                u = urllib2.urlopen(url)
+                content = u.read()
+                u.close()
+            except urllib2.HTTPError:
+                return None
+
+            if not os.path.exists(self.cachePath):
+                os.mkdir(self.cachePath)
+
+            f = open(cacheFile, 'w')
+            f.write(content)
+            f.close()
+
+        return cacheFile
 
 
 class DrDkSource(Source):
@@ -134,6 +153,8 @@ class DrDkSource(Source):
         return datetime.datetime(t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec)
 
 class YouSeeTvSource(Source):
+    KEY = 'youseetv'
+
     CHANNELS_URL = 'http://yousee.tv'
     PROGRAMS_URL = 'http://yousee.tv/feeds/tvguide/getprogrammes/?channel=%s'
 
@@ -154,7 +175,9 @@ class YouSeeTvSource(Source):
             html = self._downloadAndCacheUrl(self.CHANNELS_URL, 'youseetv-channels.json')
             self.cachedChannelList = list()
             for m in re.finditer('href="/livetv/([^"]+)".*?src="(http://cloud.yousee.tv/static/img/logos/large_[^"]+)" alt="(.*?)"', html):
-                c = Channel(id = m.group(1), title = m.group(3), logoUrl = m.group(2))
+                logoFile = self._cacheLogo(m.group(2), self.KEY + '-' + m.group(1) + '.jpg')
+
+                c = Channel(id = m.group(1), title = m.group(3), logo = logoFile)
                 if self.STREAMS.has_key(c.id):
                     c.streamUrl = self.STREAMS[c.id]
 
@@ -191,6 +214,8 @@ class YouSeeTvSource(Source):
 
 class TvTidSource(Source):
     # http://tvtid.tv2.dk/js/fetch.js.php/from-1291057200.js
+    KEY = 'tvtiddk'
+
     BASE_URL = 'http://tvtid.tv2.dk%s'
     FETCH_URL = BASE_URL % '/js/fetch.js.php/from-%d.js'
 
@@ -211,12 +236,14 @@ class TvTidSource(Source):
 
     def getChannelList(self):
         if self.cachedChannelList is None:
-            response = self._downloadAndCacheUrl(self.FETCH_URL % self.time, 'tvtiddk-data.json')
+            response = self._downloadAndCacheUrl(self.FETCH_URL % self.time, self.KEY + '-data.json')
             json = simplejson.loads(response)
 
             self.cachedChannelList = list()
             for channel in json['channels']:
-                c = Channel(id = channel['id'], title = channel['name'], logoUrl = self.BASE_URL % channel['logo'])
+                logoFile = self._cacheLogo(self.BASE_URL % channel['logo'], self.KEY + '-' + str(channel['id']) + '.jpg')
+
+                c = Channel(id = channel['id'], title = channel['name'], logo = logoFile)
                 if self.STREAMS.has_key(c.id):
                     c.streamUrl = self.STREAMS[c.id]
                 self.cachedChannelList.append(c)
@@ -263,7 +290,7 @@ class XMLTVSource(Source):
             doc = self._loadXml()
             self.cachedChannelList = list()
             for channel in doc.findall('channel'):
-                c = Channel(id = channel.get('id'), title = channel.findtext('display-name'), logoUrl = channel.find('icon').get('src'))
+                c = Channel(id = channel.get('id'), title = channel.findtext('display-name'), logo = channel.find('icon').get('src'))
                 self.cachedChannelList.append(c)
 
         return self.cachedChannelList
