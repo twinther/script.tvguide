@@ -3,6 +3,7 @@
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$/../Danish-XBMC-addons">
       <sourceFolder url="file://$MODULE_DIR$/../Danish-XBMC-addons/script.module.danishaddons/xbmcstubs" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/../Danish-XBMC-addons/plugin.video.yousee.tv" isTestSource="false" />
     </content>
     <content url="file://$MODULE_DIR$" />
     <orderEntry type="inheritedJdk" />

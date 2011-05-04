@@ -1,6 +1,8 @@
 import xbmc
 import xbmcaddon
 
+import sys
+
 import source
 import gui
 
@@ -20,6 +22,13 @@ if ADDON.getSetting('source') == 'XMLTV':
 else:
     path = xbmc.translatePath(ADDON.getAddonInfo('profile'))
 
-w = gui.TVGuide('script-tvguide-main.xml', ADDON.getAddonInfo('path'), source = sourceRef(path))
+
+providerAddon = xbmcaddon.Addon(id = 'plugin.video.yousee.tv')
+sys.path.append(providerAddon.getAddonInfo('path'))
+
+import webtv_integration
+provider = webtv_integration.YouSeeWebTvProvider()
+
+w = gui.TVGuide('script-tvguide-main.xml', ADDON.getAddonInfo('path'), source = sourceRef(path, webTvProvider = provider))
 w.doModal()
 del w

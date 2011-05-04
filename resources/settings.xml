@@ -4,5 +4,9 @@
 		<setting id="source" label="Kilde" type="labelenum" default="YouSee.tv" values="YouSee.tv|DR.dk|TVTID.dk|XMLTV" />
         <setting id="xmltv.file" label="XMLTV File" type="file" visible="eq(-1,3)" />
 	</category>
+    <category label="Web TV">
+        <setting id="webtv.enabled" label="Web TV integration" type="boolean" default="false"/>
+        <setting id="webtv.provider" label="Provider" type="labelenum" default="YouSee Web-tv" values="YouSee Web-tv" />
+    </category>
 </settings>
 

@@ -16,6 +16,7 @@ KEY_UP = 3
 KEY_DOWN = 4
 KEY_PAGE_UP = 5
 KEY_PAGE_DOWN = 6
+KEY_SELECT = 7
 KEY_BACK = 9
 KEY_MENU = 10
 KEY_INFO = 11
@@ -44,6 +45,9 @@ class TVGuide(xbmcgui.WindowXML):
 
         self.mode = MODE_EPG
         self.currentChannel = None
+
+        self.osdChannel = None
+        self.osdProgram = None
 
         self.player = xbmc.Player()
         self.source = source
@@ -84,7 +88,11 @@ class TVGuide(xbmcgui.WindowXML):
                 self._showOsd()
 
         elif self.mode == MODE_OSD:
-            if  action.getId() == KEY_INFO:
+            if action.getId() == KEY_INFO:
+                self._hideOsd()
+
+            elif action.getId() == KEY_SELECT:
+                self._playChannel(self.osdChannel)
                 self._hideOsd()
 
             elif action.getId() == KEY_PAGE_UP:
@@ -94,6 +102,25 @@ class TVGuide(xbmcgui.WindowXML):
             elif action.getId() == KEY_PAGE_DOWN:
                 self._channelDown()
                 self._showOsd()
+
+            elif action.getId() == KEY_UP:
+                self.osdChannel = self.osdChannel.nextChannel
+                self.osdProgram = self.source.getCurrentProgram(self.osdChannel)
+                self._showOsd()
+
+            elif action.getId() == KEY_DOWN:
+                self.osdChannel = self.osdChannel.previousChannel
+                self.osdProgram = self.source.getCurrentProgram(self.osdChannel)
+                self._showOsd()
+
+            elif action.getId() == KEY_LEFT:
+                self.osdProgram = self.osdProgram.previousProgram
+                self._showOsd()
+
+            elif action.getId() == KEY_RIGHT:
+                self.osdProgram = self.osdProgram.nextProgram
+                self._showOsd()
+
 
         elif self.mode == MODE_EPG:
             if action.getId() == KEY_CONTEXT_MENU:
@@ -135,7 +162,7 @@ class TVGuide(xbmcgui.WindowXML):
         print controlId
 
         program = self.controlToProgramMap[controlId]
-        if program.channel.streamUrl is None:
+        if program.channel.webTvChannel is None:
             xbmcgui.Dialog().ok(strings(NO_STREAM_AVAILABLE_TITLE), strings(NO_STREAM_AVAILABLE_LINE1), strings(NO_STREAM_AVAILABLE_LINE2))
         else:
             self._playChannel(program.channel)
@@ -206,7 +233,7 @@ class TVGuide(xbmcgui.WindowXML):
 
         if idx > len(channels):
             idx = 0
-        if channels[idx].streamUrl is not None:
+        if channels[idx].webTvChannel is not None:
             self._playChannel(channels[idx])
 
     def _channelDown(self):
@@ -216,7 +243,7 @@ class TVGuide(xbmcgui.WindowXML):
 
         if idx < 0:
             idx = len(channels) - 1
-        if channels[idx].streamUrl is not None:
+        if channels[idx].webTvChannel is not None:
             self._playChannel(channels[idx])
 
     def _playChannel(self, channel):
@@ -224,30 +251,25 @@ class TVGuide(xbmcgui.WindowXML):
 
         wasPlaying = self.player.isPlaying()
 
-        item = xbmcgui.ListItem(channel.title)
-        item.setProperty("IsLive", "true")
-        self.player.play(channel.streamUrl, item, windowed = True)
+        self.source.provider.playChannel(channel.webTvChannel)
 
         if not wasPlaying:
             self._hideEpg()
 
     def _showOsd(self):
+        if self.mode != MODE_OSD:
+            self.osdChannel = self.currentChannel
+            self.osdProgram = self.source.getCurrentProgram(self.currentChannel)
+
+        if self.osdProgram is not None:
+            self.getControl(6001).setLabel('[B]%s[/B]' % self.osdProgram.title)
+            self.getControl(6002).setLabel('[B]%s - %s[/B]' % (self.osdProgram.startDate.strftime('%H:%M'), self.osdProgram.endDate.strftime('%H:%M')))
+            self.getControl(6003).setText(self.osdProgram.description)
+            if self.osdProgram.channel.logo is not None:
+                self.getControl(6004).setImage(self.osdProgram.channel.logo)
+
+
         self.mode = MODE_OSD
-
-        programs = self.source.getProgramList(self.currentChannel)
-        now = datetime.datetime.today()
-        program = None
-        for p in programs:
-            if p.startDate < now and p.endDate > now:
-                program = p
-                break
-
-        if program is not None:
-            self.getControl(6001).setLabel('[B]%s[/B]' % program.title)
-            self.getControl(6002).setLabel('[B]%s - %s[/B]' % (program.startDate.strftime('%H:%M'), program.endDate.strftime('%H:%M')))
-            self.getControl(6003).setText(program.description)
-            self.getControl(6004).setImage(program.channel.logo)
-
         self.getControl(6000).setVisible(True)
 
     def _hideOsd(self):
