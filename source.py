@@ -5,29 +5,17 @@ import time
 import urllib2
 from elementtree import ElementTree
 from strings import *
-import api
-
-STREAM_DR1 = 'rtmp://rtmplive.dr.dk/live/livedr01astream3'
-STREAM_DR2 = 'rtmp://rtmplive.dr.dk/live/livedr02astream3'
-STREAM_DRUPDATE = 'rtmp://rtmplive.dr.dk/live/livedr03astream3'
-STREAM_DRK = 'rtmp://rtmplive.dr.dk/live/livedr04astream3'
-STREAM_DRRAMASJANG = 'rtmp://rtmplive.dr.dk/live/livedr05astream3'
-STREAM_24NORDJYSKE = 'mms://stream.nordjyske.dk/24nordjyske - Full Broadcast Quality'
-STREAM_FOLKETINGET = 'rtmp://chip.arkena.com/webtvftfl/hi1'
+import ysapi
 
 class Channel(object):
-    def __init__(self, id, title, logo = None, webTvChannel = None):
+    def __init__(self, id, title, logo = None):
         self.id = id
         self.title = title
         self.logo = logo
-        self.webTvChannel = webTvChannel
-
-        self.previousChannel = None
-        self.nextChannel = None
 
     def __str__(self):
-        return 'Channel(id=%s, title=%s, logo=%s, nextChannel=%s, previousChannel=%s)' \
-               % (self.id, self.title, self.logo, self.nextChannel.id, self.previousChannel.id)
+        return 'Channel(id=%s, title=%s, logo=%s)' \
+               % (self.id, self.title, self.logo)
 
 class Program(object):
     def __init__(self, channel, title, startDate, endDate, description):
@@ -45,15 +33,9 @@ class Program(object):
 class Source(object):
     CACHE_MINUTES = 10
 
-    def __init__(self, cachePath, hasChannelIcons, provider = None):
+    def __init__(self, settings, hasChannelIcons):
         self.channelIcons = hasChannelIcons
-        self.cachePath = cachePath
-        self.provider = provider
-
-        self.webTvAvailableChannels = None
-        if self.provider is not None:
-            self.webTvAvailableChannels = self.provider.getAvailableChannels()
-        print self.webTvAvailableChannels
+        self.cachePath = settings['cache.path']
 
         self.cachedChannelList = None
         self.cachedProgramList = dict()
@@ -74,17 +56,6 @@ class Source(object):
         if self.cachedChannelList is None:
             self.cachedChannelList = self._getChannelList()
 
-            for idx, channel in enumerate(self.cachedChannelList):
-                if idx >= len(self.cachedChannelList) - 1:
-                    channel.nextChannel = self.cachedChannelList[0]
-                else:
-                    channel.nextChannel = self.cachedChannelList[idx + 1]
-                    
-                if idx == 0:
-                    channel.previousChannel = self.cachedChannelList[len(self.cachedChannelList) - 1]
-                else:
-                    channel.previousChannel = self.cachedChannelList[idx - 1]
-
         return self.cachedChannelList
 
     def _getChannelList(self):
@@ -94,17 +65,6 @@ class Source(object):
         if not self.cachedProgramList.has_key(channel):
             programList = self._getProgramList(channel)
             self.cachedProgramList[channel] = programList
-
-            for idx, program in enumerate(programList):
-                if idx >= len(programList) - 1:
-                    program.nextProgram = programList[0]
-                else:
-                    program.nextProgram = programList[idx + 1]
-
-                if idx == 0:
-                    program.previousProgram = programList[len(programList) - 1]
-                else:
-                    program.previousProgram = programList[idx - 1]
 
         return self.cachedProgramList[channel]
     
@@ -164,16 +124,8 @@ class DrDkSource(Source):
     CHANNELS_URL = 'http://www.dr.dk/tjenester/programoversigt/dbservice.ashx/getChannels?type=tv'
     PROGRAMS_URL = 'http://www.dr.dk/tjenester/programoversigt/dbservice.ashx/getSchedule?channel_source_url=%s&broadcastDate=%s'
 
-    STREAMS = {
-        'dr.dk/mas/whatson/channel/DR1' : STREAM_DR1,
-        'dr.dk/mas/whatson/channel/DR2' : STREAM_DR2,
-        'dr.dk/mas/whatson/channel/TVR' : STREAM_DRRAMASJANG,
-        'dr.dk/mas/whatson/channel/TVK' : STREAM_DRK,
-        'dr.dk/external/ritzau/channel/dru' : STREAM_DRUPDATE
-    }
-
-    def __init__(self, cachePath):
-        Source.__init__(self, cachePath, False)
+    def __init__(self, setings):
+        Source.__init__(self, settings, False)
         self.date = datetime.datetime.today()
 
     def _getChannelList(self):
@@ -182,9 +134,6 @@ class DrDkSource(Source):
 
         for channel in jsonChannels['result']:
             c = Channel(id = channel['source_url'], title = channel['name'])
-            if self.STREAMS.has_key(c.id):
-                c.streamUrl = self.STREAMS[c.id]
-
             channelList.append(c)
 
         return channelList
@@ -209,87 +158,41 @@ class DrDkSource(Source):
         t = time.strptime(dateString[:19], '%Y-%m-%dT%H:%M:%S')
         return datetime.datetime(t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec)
 
+
 class YouSeeTvSource(Source):
     KEY = 'youseetv'
 
     CHANNELS_URL = 'http://yousee.tv'
     PROGRAMS_URL = 'http://yousee.tv/feeds/tvguide/getprogrammes/?channel=%s'
 
-    CHANNELS = api.WebTvLookup({
-        'dr1' : api.CHANNEL_DK_DR1,
-        'tv 2' : api.CHANNEL_DK_TV2,
-        'dr2' : api.CHANNEL_DK_DR2,
-        'zulu' : api.CHANNEL_DK_TV2ZULU,
-        'charli' : api.CHANNEL_DK_TV2CHARLIE,
-        'tv3' : api.CHANNEL_DK_TV3,
-        'dr hd' : api.CHANNEL_DK_DRHD,
-        'dr k' : api.CHANNEL_DK_DRK,
-        'dr ram' :api.CHANNEL_DK_DR_RAMASJANG,
-        'tv3plus' : api.CHANNEL_DK_TV3PLUS,
-        '3puls' : api.CHANNEL_DK_TV3PULS,
-        'kanal4': api.CHANNEL_DK_KANAL4,
-        'kanal5': api.CHANNEL_DK_KANAL5,
-        'k5 hd': api.CHANNEL_DK_KANAL5HD,
-        '6eren': api.CHANNEL_DK_6EREN,
-        'canal9' : api.CHANNEL_DK_CANAL9,
-        '2news' : api.CHANNEL_DK_TV2NEWS,
-        'dk4': api.CHANNEL_DK_DK4,
-        'update' :api.CHANNEL_DK_DR_UPDATE,
-        'svt1': api.CHANNEL_SV_SVT1,
-        'svt2': api.CHANNEL_SV_SVT2,
-        'tv4': api.CHANNEL_SV_TV4,
-        'nrk1': api.CHANNEL_NO_NRK1,
-        'ard': api.CHANNEL_DE_ARD,
-        'zdf': api.CHANNEL_DE_ZDF,
-        'rtl': api.CHANNEL_DE_RTL,
-        'ndr': api.CHANNEL_DE_NDR,
-        'tinget': api.CHANNEL_DK_FOLKETINGET
-    })
-
-
-    def __init__(self, cachePath, webTvProvider = None):
-        Source.__init__(self, cachePath, False, webTvProvider)
+    def __init__(self, settings):
+        Source.__init__(self, settings, False)
         self.date = datetime.datetime.today()
+        self.channelCategory = settings['youseetv.category']
+        self.ysApi = ysapi.YouSeeTVGuideApi()
 
     def _getChannelList(self):
         channelList = list()
-#        for m in re.finditer('href="/livetv/([^"]+)".*?src="(http://cloud.yousee.tv/static/img/logos/large_[^"]+)" alt="(.*?)"', html):
-        for id in self.CHANNELS.keys():
-            title = id
-#            logoFile = self._cacheLogo(m.group(2), self.KEY + '-' + m.group(1) + '.jpg')
-            c = Channel(id = id, title = title)
-            #c = Channel(id = id, title = m.group(3), logo = logoFile)
-
-            print id
-            if self.webTvAvailableChannels is None:
-                channelList.append(c)
-            elif self.CHANNELS.has_value(id) and self.CHANNELS.get_value(id) in self.webTvAvailableChannels:
-                c.webTvChannel = self.CHANNELS.get_value(id)
-                channelList.append(c)
+        for channel in self.ysApi.channelsInCategory(self.channelCategory):
+            c = Channel(id = channel['id'], title = channel['name'], logo = channel['logo'])
+            channelList.append(c)
 
         return channelList
 
     def _getProgramList(self, channel):
-        url = self.PROGRAMS_URL % channel.id.replace(' ', '%20')
-        xml = self._downloadAndCacheUrl(url, 'youseetv-' + channel.id.replace(' ', '_'))
         programs = list()
-
-        doc = ElementTree.fromstring(xml)
-
-        for program in doc.findall('programme'):
-            description = program.find('description').text
+        for program in self.ysApi.programs(channel.id):
+            description = program['description']
             if description is None:
                 description = strings(NO_DESCRIPTION)
 
-            programs.append(Program(channel, program.find('title').text, self._parseDate(program.find('start').text), self._parseDate(program.find('end').text), description))
+            p = Program(channel, program['title'], self._parseDate(program['begin']), self._parseDate(program['end']), description)
+            programs.append(p)
 
         return programs
 
     def _parseDate(self, dateString):
-        t = time.strptime(dateString, '%Y,%m,%d,%H,%M,%S')
-        return datetime.datetime(t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec)
-
-
+        return datetime.datetime.fromtimestamp(dateString)
 
 
 class TvTidSource(Source):
@@ -299,16 +202,8 @@ class TvTidSource(Source):
     BASE_URL = 'http://tvtid.tv2.dk%s'
     FETCH_URL = BASE_URL % '/js/fetch.js.php/from-%d.js'
 
-    STREAMS = {
-        'dr1' : STREAM_DR1,
-        'dr2' : STREAM_DR2,
-        'update' : STREAM_DRUPDATE,
-        'dr k' : STREAM_DRK,
-        'dr ram' : STREAM_DRRAMASJANG
-    }
-
-    def __init__(self, cachePath):
-        Source.__init__(self, cachePath, True)
+    def __init__(self, settings):
+        Source.__init__(self, settings, True)
         self.time = time.time()
 
         # calculate nearest hour
@@ -323,14 +218,12 @@ class TvTidSource(Source):
             logoFile = self._cacheLogo(self.BASE_URL % channel['logo'], self.KEY + '-' + str(channel['id']) + '.jpg')
 
             c = Channel(id = channel['id'], title = channel['name'], logo = logoFile)
-            if self.STREAMS.has_key(c.id):
-                c.streamUrl = self.STREAMS[c.id]
             channelList.append(c)
 
         return channelList
 
     def _getProgramList(self, channel):
-        response = self._downloadAndCacheUrl(self.FETCH_URL % self.time, 'tvtiddk-data.json')
+        response = self._downloadAndCacheUrl(self.FETCH_URL % self.time, self.KEY + '-data.json')
         json = simplejson.loads(response)
 
         c = None
@@ -353,9 +246,9 @@ class TvTidSource(Source):
 class XMLTVSource(Source):
     KEY = 'xmltv'
 
-    def __init__(self, xmlTvFile):
-        Source.__init__(self, None, True)
-        self.xmlTvFile = xmlTvFile
+    def __init__(self, settings):
+        Source.__init__(self, settings, True)
+        self.xmlTvFile = settings['xmltv.file']
         self.time = time.time()
 
         # calculate nearest hour

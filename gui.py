@@ -6,10 +6,6 @@ import xbmcgui
 
 from strings import *
 
-MODE_EPG = 1
-MODE_TV = 2
-MODE_OSD = 3
-
 KEY_LEFT = 1
 KEY_RIGHT = 2
 KEY_UP = 3
@@ -40,14 +36,11 @@ TEXTURE_BUTTON_FOCUS = os.path.join(xbmc.translatePath(ADDON.getAddonInfo('path'
 
 
 class TVGuide(xbmcgui.WindowXML):
-    def __init__(self, xmlFilename, scriptPath, source):
-        xbmcgui.WindowXML.__init__(self, xmlFilename, scriptPath)
+    def __new__(cls, source):
+        return super(TVGuide, cls).__new__(cls, 'script-tvguide-main.xml', ADDON.getAddonInfo('path'))
 
-        self.mode = MODE_EPG
-        self.currentChannel = None
-
-        self.osdChannel = None
-        self.osdProgram = None
+    def __init__(self,  source):
+        super(TVGuide, self).__init__()
 
         self.player = xbmc.Player()
         self.source = source
@@ -74,98 +67,45 @@ class TVGuide(xbmcgui.WindowXML):
             self.close()
             return
 
-        if self.mode == MODE_TV:
-            if action.getId() == KEY_CONTEXT_MENU:
-                self._redrawEpg(self.channelIndex, self.date)
+        try:
+            controlInFocus = self.getFocus()
+            (left, top) = controlInFocus.getPosition()
+            currentX = left + (controlInFocus.getWidth() / 2)
+            currentY = top + (controlInFocus.getHeight() / 2)
+        except TypeError, ex:
+            print ex
+            return # ignore for now
 
-            elif action.getId() == KEY_PAGE_UP:
-                self._channelUp()
+        print "currentX = %d, currentY = %d" % (currentX, currentY)
 
-            elif action.getId() == KEY_PAGE_DOWN:
-                self._channelDown()
+        control = None
 
-            elif action.getId() == KEY_INFO:
-                self._showOsd()
+        if action.getId() == KEY_LEFT:
+            control = self._left(currentX, currentY)
+        elif action.getId() == KEY_RIGHT:
+            control = self._right(currentX, currentY)
+        elif action.getId() == KEY_UP:
+            control = self._up(currentY)
+        elif action.getId() == KEY_DOWN:
+            control = self._down(currentY)
+        elif action.getId() == KEY_PAGE_UP:
+            control = self._pageUp()
+        elif action.getId() == KEY_PAGE_DOWN:
+            control = self._pageDown()
 
-        elif self.mode == MODE_OSD:
-            if action.getId() == KEY_INFO:
-                self._hideOsd()
-
-            elif action.getId() == KEY_SELECT:
-                self._playChannel(self.osdChannel)
-                self._hideOsd()
-
-            elif action.getId() == KEY_PAGE_UP:
-                self._channelUp()
-                self._showOsd()
-
-            elif action.getId() == KEY_PAGE_DOWN:
-                self._channelDown()
-                self._showOsd()
-
-            elif action.getId() == KEY_UP:
-                self.osdChannel = self.osdChannel.nextChannel
-                self.osdProgram = self.source.getCurrentProgram(self.osdChannel)
-                self._showOsd()
-
-            elif action.getId() == KEY_DOWN:
-                self.osdChannel = self.osdChannel.previousChannel
-                self.osdProgram = self.source.getCurrentProgram(self.osdChannel)
-                self._showOsd()
-
-            elif action.getId() == KEY_LEFT:
-                self.osdProgram = self.osdProgram.previousProgram
-                self._showOsd()
-
-            elif action.getId() == KEY_RIGHT:
-                self.osdProgram = self.osdProgram.nextProgram
-                self._showOsd()
-
-
-        elif self.mode == MODE_EPG:
-            if action.getId() == KEY_CONTEXT_MENU:
-                if self.player.isPlaying():
-                    self._hideEpg()
-
-            try:
-                controlInFocus = self.getFocus()
-                (left, top) = controlInFocus.getPosition()
-                currentX = left + (controlInFocus.getWidth() / 2)
-                currentY = top + (controlInFocus.getHeight() / 2)
-            except TypeError, ex:
-                print ex
-                return # ignore for now
-
-            print "currentX = %d, currentY = %d" % (currentX, currentY)
-
-            control = None
-
-            if action.getId() == KEY_LEFT:
-                control = self._left(currentX, currentY)
-            elif action.getId() == KEY_RIGHT:
-                control = self._right(currentX, currentY)
-            elif action.getId() == KEY_UP:
-                control = self._up(currentY)
-            elif action.getId() == KEY_DOWN:
-                control = self._down(currentY)
-            elif action.getId() == KEY_PAGE_UP:
-                control = self._pageUp()
-            elif action.getId() == KEY_PAGE_DOWN:
-                control = self._pageDown()
-
-            if control is not None:
-                self.setFocus(control)
+        if control is not None:
+            self.setFocus(control)
 
 
     def onClick(self, controlId):
         print "--- onClick ---"
         print controlId
 
-        program = self.controlToProgramMap[controlId]
-        if program.channel.webTvChannel is None:
-            xbmcgui.Dialog().ok(strings(NO_STREAM_AVAILABLE_TITLE), strings(NO_STREAM_AVAILABLE_LINE1), strings(NO_STREAM_AVAILABLE_LINE2))
-        else:
-            self._playChannel(program.channel)
+        #program = self.controlToProgramMap[controlId]
+        #if program.channel.webTvChannel is None:
+        #    xbmcgui.Dialog().ok(strings(NO_STREAM_AVAILABLE_TITLE), strings(NO_STREAM_AVAILABLE_LINE1), strings(NO_STREAM_AVAILABLE_LINE2))
+        #else:
+        #    self._playChannel(program.channel)
 
     def onFocus(self, controlId):
         print "--- onFocus ---"
@@ -226,69 +166,9 @@ class TVGuide(xbmcgui.WindowXML):
         self.channelIndex = self._redrawEpg(self.channelIndex + CHANNELS_PER_PAGE, self.date)
         return self._findControlBelow(0)
 
-    def _channelUp(self):
-        channels = self.source.getChannelList()
-        idx = channels.index(self.currentChannel)
-        idx += 1
-
-        if idx > len(channels):
-            idx = 0
-        if channels[idx].webTvChannel is not None:
-            self._playChannel(channels[idx])
-
-    def _channelDown(self):
-        channels = self.source.getChannelList()
-        idx = channels.index(self.currentChannel)
-        idx -= 1
-
-        if idx < 0:
-            idx = len(channels) - 1
-        if channels[idx].webTvChannel is not None:
-            self._playChannel(channels[idx])
-
-    def _playChannel(self, channel):
-        self.currentChannel = channel
-
-        wasPlaying = self.player.isPlaying()
-
-        self.source.provider.playChannel(channel.webTvChannel)
-
-        if not wasPlaying:
-            self._hideEpg()
-
-    def _showOsd(self):
-        if self.mode != MODE_OSD:
-            self.osdChannel = self.currentChannel
-            self.osdProgram = self.source.getCurrentProgram(self.currentChannel)
-
-        if self.osdProgram is not None:
-            self.getControl(6001).setLabel('[B]%s[/B]' % self.osdProgram.title)
-            self.getControl(6002).setLabel('[B]%s - %s[/B]' % (self.osdProgram.startDate.strftime('%H:%M'), self.osdProgram.endDate.strftime('%H:%M')))
-            self.getControl(6003).setText(self.osdProgram.description)
-            if self.osdProgram.channel.logo is not None:
-                self.getControl(6004).setImage(self.osdProgram.channel.logo)
-
-
-        self.mode = MODE_OSD
-        self.getControl(6000).setVisible(True)
-
-    def _hideOsd(self):
-        self.mode = MODE_TV
-        self.getControl(6000).setVisible(False)
-
-    def _hideEpg(self):
-        self.mode = MODE_TV
-        self.getControl(5000).setVisible(False)
-        for id in self.controlToProgramMap.keys():
-            self.removeControl(self.getControl(id))
-
     def _redrawEpg(self, startChannel, startTime):
         print "--- redrawing ---"
 
-        if self.mode == MODE_EPG:
-            self._hideEpg()
-
-        self.mode = MODE_EPG
         self.getControl(5000).setVisible(True)
 
         self.controlToProgramMap.clear()
@@ -321,7 +201,7 @@ class TVGuide(xbmcgui.WindowXML):
                 startChannel = 0
 
             for idx, channel in enumerate(channels[startChannel : startChannel + CHANNELS_PER_PAGE]):
-                if self.source.hasChannelIcons():
+                if self.source.hasChannelIcons() and channel.logo is not None:
                     self.getControl(4110 + idx).setImage(channel.logo)
                 else:
                     self.getControl(4010 + idx).setLabel(channel.title)

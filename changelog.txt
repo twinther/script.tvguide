@@ -1,7 +1,9 @@
 [B]Version 0.3.0[/B]
 - Major restructuring
+- Updated YouSee source to use official API
 - Added TVTID.dk as source
 - Added support for XMLTV as source
+- Dropped support for streaming channels
 
 [B]Version 0.2.3[/B]
 - Added loading screen
