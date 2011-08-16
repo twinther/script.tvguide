@@ -15,13 +15,9 @@
 			<width>1280</width>
 			<height>720</height>
 			<texture>tvguide-background.png</texture>
-            <!--<visible>Control.IsVisible(5000)</visible>-->
-            <animation type="Conditional" condition="!Control.IsVisible(5000)">
-                <effect type="fade" start="100" end="0" time="500" />
-            </animation>
 		</control>
 
-        <control type="group" id="5000">
+        <control type="group">
             <description>TV Guide group</description>
             <posx>0</posx>
             <posy>0</posy>
@@ -250,8 +246,6 @@
                 </control>
             </control><!-- end group -->
 
-
-
             <!-- Program description -->
             <control type="label" id="4020">
                 <description>Program title</description>
@@ -263,6 +257,7 @@
                 <textcolor>ffffffff</textcolor>
                 <font>font13</font>
                 <aligny>center</aligny>
+                <visible>!Control.IsVisible(4200)</visible>
             </control>
             <control type="label" id="4021">
                 <description>Program time</description>
@@ -275,6 +270,7 @@
                 <font>font13</font>
                 <align>right</align>
                 <aligny>center</aligny>
+                <visible>!Control.IsVisible(4200)</visible>
             </control>
             <control type="textbox" id="4022">
                 <description>Program description</description>
@@ -286,16 +282,18 @@
                 <textcolor>ffffffff</textcolor>
                 <font>font13</font>
                 <wrapmultiline>true</wrapmultiline>
-
                 <autoscroll time="3600" delay="6000" repeat="6000">true</autoscroll>
+                <visible>!Control.IsVisible(4200)</visible>
             </control>
             <control type="image" id="4023">
-                <description>Source logo</description>
+                <description>Program logo / Source logo</description>
                 <posx>930</posx>
-                <posy>510</posy>
+                <posy>530</posy>
                 <width>320</width>
-                <height>180</height>
+                <height>160</height>
                 <aspectratio>keep</aspectratio>
+                <fadetime>250</fadetime>
+                <visible>!Control.IsVisible(4200)</visible>
             </control>
 
             <control type="image" id="4100">
@@ -307,85 +305,18 @@
             </control>
 
             <!-- loading splash -->
-            <control type="image" id ="4200">
+            <control type="label" id ="4200">
                 <posx>0</posx>
-                <posy>0</posy>
-                <width>1280</width>
-                <height>720</height>
-                <texture>loading.png</texture>
-            </control>
-        </control><!-- id="5000" -->
-
-        <control type="videowindow">
-            <posx>0</posx>
-            <posy>0</posy>
-            <width>1280</width>
-            <height>720</height>
-            <animation type="Conditional" condition="!Control.IsVisible(5000)">
-                <effect type="zoom" start="25" center="1250,690" time="500" />
-            </animation>
-        </control>
-
-        <control type="group" id="6000">
-            <description>OSD Info bar</description>
-            <posx>0</posx>
-            <posy>500</posy>
-            <width>1280</width>
-            <height>220</height>
-
-            <control type="image">
-                <posx>0</posx>
-                <posy>0</posy>
+                <posy>500</posy>
                 <width>1280</width>
                 <height>220</height>
-                <texture>tvguide-glasspane.png</texture>
-            </control>
-
-            <!-- Program description -->
-            <control type="label" id="6001">
-                <description>Program title</description>
-                <posx>30</posx>
-                <posy>10</posy>
-                <width>850</width>
-                <height>50</height>
-                <label>[B]Title[/B]</label>
+                <label>$ADDON[script.tvguide 30001]</label>
                 <textcolor>ffffffff</textcolor>
-                <font>font13</font>
+                <font>font30</font>
+                <align>center</align>
                 <aligny>center</aligny>
             </control>
-            <control type="label" id="6002">
-                <description>Program time</description>
-                <posx>1230</posx>
-                <posy>10</posy>
-                <width>240</width>
-                <height>50</height>
-                <label>[B]18:00 - 20:00[/B]</label>
-                <textcolor>ffffffff</textcolor>
-                <font>font13</font>
-                <align>right</align>
-                <aligny>center</aligny>
-            </control>
-            <control type="textbox" id="6003">
-                <description>Program description</description>
-                <posx>30</posx>
-                <posy>50</posy>
-                <width>1230</width>
-                <height>149</height>
-                <label>Description</label>
-                <textcolor>ffffffff</textcolor>
-                <font>font13</font>
-                <wrapmultiline>true</wrapmultiline>
-
-                <autoscroll time="3600" delay="6000" repeat="6000">true</autoscroll>
-            </control>
-            <control type="image" id="6004">
-                <description>Program channel logo</description>
-                <posx>1100</posx>
-                <posy>155</posy>
-                <width>160</width>
-                <height>45</height>
-            </control>
-        </control>
+        </control><!-- id="5000" -->
 
 	</controls>
 </window>

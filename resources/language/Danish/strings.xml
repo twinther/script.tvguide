@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <strings>
     <string id="30000">Ingen beskrivelse</string>
-
-    <string id="30100">Ingen live stream tilgængelig</string>
-    <string id="30101">Kanalen kan ikke afspilles, da der ingen live stream</string>
-    <string id="30102">er tilgængelig.</string>
+    <string id="30001">[B]Indlæser...[/B]</string>
 </strings>
  

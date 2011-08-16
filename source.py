@@ -7,6 +7,8 @@ from elementtree import ElementTree
 from strings import *
 import ysapi
 
+import pickle
+
 class Channel(object):
     def __init__(self, id, title, logo = None):
         self.id = id
@@ -18,16 +20,18 @@ class Channel(object):
                % (self.id, self.title, self.logo)
 
 class Program(object):
-    def __init__(self, channel, title, startDate, endDate, description):
+    def __init__(self, channel, title, startDate, endDate, description, imageLarge = None, imageSmall=None):
         self.channel = channel
         self.title = title
         self.startDate = startDate
         self.endDate = endDate
         self.description = description
+        self.imageLarge = imageLarge
+        self.imageSmall = imageSmall
 
     def __str__(self):
-        return 'Program(channel=%s, title=%s, startDate=%s, endDate=%s, description=%s)' % \
-            (self.channel, self.title, self.startDate, self.endDate, self.description)
+        return 'Program(channel=%s, title=%s, startDate=%s, endDate=%s, description=%s, imageLarge=%s, imageSmall=%s)' % \
+            (self.channel, self.title, self.startDate, self.endDate, self.description, self.imageLarge, self.imageSmall)
 
 
 class Source(object):
@@ -37,86 +41,54 @@ class Source(object):
         self.channelIcons = hasChannelIcons
         self.cachePath = settings['cache.path']
 
-        self.cachedChannelList = None
-        self.cachedProgramList = dict()
-
     def hasChannelIcons(self):
         return self.channelIcons
 
-    def getCurrentProgram(self, channel):
-        programs = self.cachedProgramList.get(channel)
-        now = datetime.datetime.today()
-        for program in programs:
-            if program.startDate < now and program.endDate > now:
-                return program
-
-        return None
-
     def getChannelList(self):
-        if self.cachedChannelList is None:
-            self.cachedChannelList = self._getChannelList()
+        cacheFile = os.path.join(self.cachePath, self.KEY + '.channellist')
 
-        return self.cachedChannelList
-
-    def _getChannelList(self):
-        return None
-
-    def getProgramList(self, channel):
-        if not self.cachedProgramList.has_key(channel):
-            programList = self._getProgramList(channel)
-            self.cachedProgramList[channel] = programList
-
-        return self.cachedProgramList[channel]
-    
-    def _getProgramList(self, channel):
-        return None
-
-    def _downloadAndCacheUrl(self, url, cacheName):
-        cacheFile = os.path.join(self.cachePath, cacheName)
         try:
             cachedOn = os.path.getmtime(cacheFile)
         except OSError:
             cachedOn = 0
 
         if time.time() - self.CACHE_MINUTES * 60 >= cachedOn:
-            # Cache expired or miss
-            u = urllib2.urlopen(url)
-            content = u.read()
-            u.close()
-            
-            if not os.path.exists(self.cachePath):
-                os.mkdir(self.cachePath)
-
-            f = open(cacheFile, 'w')
-            f.write(content)
-            f.close()
-
+            channelList = self._getChannelList()
+            pickle.dump(channelList, open(cacheFile, 'w'))
         else:
-            f = open(cacheFile)
-            content = f.read()
-            f.close()
+            channelList = pickle.load(open(cacheFile))
 
+        return channelList
+
+    def _getChannelList(self):
+        return None
+
+    def getProgramList(self, channel):
+        id = str(channel.id).replace('/', '')
+        cacheFile = os.path.join(self.cachePath, self.KEY + '-' + id + '.programlist')
+
+        try:
+            cachedOn = os.path.getmtime(cacheFile)
+        except OSError:
+            cachedOn = 0
+
+        if time.time() - self.CACHE_MINUTES * 60 >= cachedOn:
+            programList = self._getProgramList(channel)
+            pickle.dump(programList, open(cacheFile, 'w'))
+        else:
+            programList = pickle.load(open(cacheFile))
+
+        return programList
+    
+    def _getProgramList(self, channel):
+        return None
+
+    def _downloadUrl(self, url):
+        u = urllib2.urlopen(url)
+        content = u.read()
+        u.close()
+            
         return content
-
-    def _cacheLogo(self, url, cacheName):
-        cacheFile = os.path.join(self.cachePath, cacheName)
-        if not os.path.exists(cacheFile):
-            try:
-                u = urllib2.urlopen(url)
-                content = u.read()
-                u.close()
-            except urllib2.HTTPError:
-                return None
-
-            if not os.path.exists(self.cachePath):
-                os.mkdir(self.cachePath)
-
-            f = open(cacheFile, 'w')
-            f.write(content)
-            f.close()
-
-        return cacheFile
-
 
 class DrDkSource(Source):
     KEY = 'drdk'
@@ -124,12 +96,12 @@ class DrDkSource(Source):
     CHANNELS_URL = 'http://www.dr.dk/tjenester/programoversigt/dbservice.ashx/getChannels?type=tv'
     PROGRAMS_URL = 'http://www.dr.dk/tjenester/programoversigt/dbservice.ashx/getSchedule?channel_source_url=%s&broadcastDate=%s'
 
-    def __init__(self, setings):
+    def __init__(self, settings):
         Source.__init__(self, settings, False)
         self.date = datetime.datetime.today()
 
     def _getChannelList(self):
-        jsonChannels = simplejson.loads(self._downloadAndCacheUrl(self.CHANNELS_URL, self.KEY + '-channels.json'))
+        jsonChannels = simplejson.loads(self._downloadUrl(self.CHANNELS_URL))
         channelList = list()
 
         for channel in jsonChannels['result']:
@@ -138,10 +110,9 @@ class DrDkSource(Source):
 
         return channelList
 
-
     def _getProgramList(self, channel):
         url = self.PROGRAMS_URL % (channel.id.replace('+', '%2b'), self.date.strftime('%Y-%m-%dT%H:%M:%S'))
-        jsonPrograms = simplejson.loads(self._downloadAndCacheUrl(url, self.KEY + '-' + channel.id.replace('/', '')))
+        jsonPrograms = simplejson.loads(self._downloadUrl(url))
         programs = list()
 
         for program in jsonPrograms['result']:
@@ -186,7 +157,17 @@ class YouSeeTvSource(Source):
             if description is None:
                 description = strings(NO_DESCRIPTION)
 
-            p = Program(channel, program['title'], self._parseDate(program['begin']), self._parseDate(program['end']), description)
+            imagePrefix = program['imageprefix']
+
+            p = Program(
+                channel,
+                program['title'],
+                self._parseDate(program['begin']),
+                self._parseDate(program['end']),
+                description,
+                imagePrefix + program['images_sixteenbynine']['large'],
+                imagePrefix + program['images_sixteenbynine']['small'],
+            )
             programs.append(p)
 
         return programs
@@ -210,12 +191,12 @@ class TvTidSource(Source):
         self.time -= self.time % 3600
 
     def _getChannelList(self):
-        response = self._downloadAndCacheUrl(self.FETCH_URL % self.time, self.KEY + '-data.json')
+        response = self._downloadUrl(self.FETCH_URL % self.time)
         json = simplejson.loads(response)
 
         channelList = list()
         for channel in json['channels']:
-            logoFile = self._cacheLogo(self.BASE_URL % channel['logo'], self.KEY + '-' + str(channel['id']) + '.jpg')
+            logoFile = self.BASE_URL % channel['logo']
 
             c = Channel(id = channel['id'], title = channel['name'], logo = logoFile)
             channelList.append(c)
@@ -223,7 +204,7 @@ class TvTidSource(Source):
         return channelList
 
     def _getProgramList(self, channel):
-        response = self._downloadAndCacheUrl(self.FETCH_URL % self.time, self.KEY + '-data.json')
+        response = self._downloadUrl(self.FETCH_URL % self.time)
         json = simplejson.loads(response)
 
         c = None
