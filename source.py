@@ -139,7 +139,7 @@ class YouSeeTvSource(Source):
     PROGRAMS_URL = 'http://yousee.tv/feeds/tvguide/getprogrammes/?channel=%s'
 
     def __init__(self, settings):
-        Source.__init__(self, settings, False)
+        Source.__init__(self, settings, True)
         self.date = datetime.datetime.today()
         self.channelCategory = settings['youseetv.category']
         self.ysApi = ysapi.YouSeeTVGuideApi()

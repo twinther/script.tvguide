@@ -73,7 +73,7 @@ class YouSeeTVGuideApi(YouSeeApi):
 
 if __name__ == '__main__':
     api = YouSeeTVGuideApi()
-    json = api.programs(1)
+    json = api.channels()
 
     #api = YouSeeMovieApi()
     #print api.moviesInGenre('action')['movies'][0]

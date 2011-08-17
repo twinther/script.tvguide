@@ -181,6 +181,7 @@
                     <posy>0</posy>
                     <width>160</width>
                     <height>45</height>
+                    <aspectratio>keep</aspectratio>
                 </control>
                 <control type="image" id="4111">
                     <description>2nd channel</description>
@@ -188,6 +189,7 @@
                     <posy>50</posy>
                     <width>160</width>
                     <height>45</height>
+                    <aspectratio>keep</aspectratio>
                 </control>
                 <control type="image" id="4112">
                     <description>3rd channel</description>
@@ -195,6 +197,7 @@
                     <posy>100</posy>
                     <width>160</width>
                     <height>45</height>
+                    <aspectratio>keep</aspectratio>
                 </control>
                 <control type="image" id="4113">
                     <description>4th channel</description>
@@ -202,6 +205,7 @@
                     <posy>150</posy>
                     <width>160</width>
                     <height>45</height>
+                    <aspectratio>keep</aspectratio>
                 </control>
                 <control type="image" id="4114">
                     <description>5th channel</description>
@@ -209,6 +213,7 @@
                     <posy>200</posy>
                     <width>160</width>
                     <height>45</height>
+                    <aspectratio>keep</aspectratio>
                 </control>
                 <control type="image" id="4115">
                     <description>6th channel</description>
@@ -216,6 +221,7 @@
                     <posy>250</posy>
                     <width>160</width>
                     <height>45</height>
+                    <aspectratio>keep</aspectratio>
                 </control>
                 <control type="image" id="4116">
                     <description>7th channel</description>
@@ -223,6 +229,7 @@
                     <posy>300</posy>
                     <width>160</width>
                     <height>45</height>
+                    <aspectratio>keep</aspectratio>
                 </control>
                 <control type="image" id="4117">
                     <description>8th channel</description>
@@ -230,6 +237,7 @@
                     <posy>350</posy>
                     <width>160</width>
                     <height>45</height>
+                    <aspectratio>keep</aspectratio>
                 </control>
             </control><!-- end group -->
 
