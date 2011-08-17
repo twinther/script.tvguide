@@ -1,10 +1,13 @@
+[B]Version 1.0.0 - 2011-08-17[/B]
+- Background loading of EPG data on XBMC startup (Only available in Eden)
+- Otherwise same as v. 0.3.0.
+
 [B]Version 0.3.0 - 2011-08-17[/B]
 - Major restructuring
 - Updated YouSee source to use official API
 - Added TVTID.dk as source
 - Added support for XMLTV as source
 - Dropped support for streaming channels
-- Background loading of EPG data on XBMC startup (Only available in Eden)
 
 [B]Version 0.2.3[/B]
 - Added loading screen
