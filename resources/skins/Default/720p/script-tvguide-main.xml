@@ -31,7 +31,6 @@
                 <posy>25</posy>
                 <width>180</width>
                 <height>50</height>
-                <label>ons, 27. okt</label>
                 <textcolor>ffffffff</textcolor>
                 <font>font13</font>
                 <align>center</align>
@@ -43,7 +42,6 @@
                 <posy>25</posy>
                 <width>270</width>
                 <height>50</height>
-                <label>18:00</label>
                 <textcolor>ffffffff</textcolor>
                 <font>font13</font>
                 <aligny>center</aligny>
@@ -54,7 +52,6 @@
                 <posy>25</posy>
                 <width>270</width>
                 <height>50</height>
-                <label>18:30</label>
                 <textcolor>ffffffff</textcolor>
                 <font>font13</font>
                 <aligny>center</aligny>
@@ -65,7 +62,6 @@
                 <posy>25</posy>
                 <width>270</width>
                 <height>50</height>
-                <label>19:00</label>
                 <textcolor>ffffffff</textcolor>
                 <font>font13</font>
                 <aligny>center</aligny>
@@ -76,7 +72,6 @@
                 <posy>25</posy>
                 <width>270</width>
                 <height>50</height>
-                <label>19:30</label>
                 <textcolor>ffffffff</textcolor>
                 <font>font13</font>
                 <aligny>center</aligny>
@@ -96,7 +91,6 @@
                     <posy>0</posy>
                     <width>180</width>
                     <height>50</height>
-                    <label>Channel 1</label>
                     <textcolor>ffffffff</textcolor>
                     <font>font13</font>
                     <align>center</align>
@@ -107,7 +101,6 @@
                     <posy>50</posy>
                     <width>180</width>
                     <height>50</height>
-                    <label>Channel 2</label>
                     <textcolor>ffffffff</textcolor>
                     <font>font13</font>
                     <align>center</align>
@@ -118,7 +111,6 @@
                     <posy>100</posy>
                     <width>180</width>
                     <height>50</height>
-                    <label>Channel 3</label>
                     <textcolor>ffffffff</textcolor>
                     <font>font13</font>
                     <align>center</align>
@@ -129,7 +121,6 @@
                     <posy>150</posy>
                     <width>180</width>
                     <height>50</height>
-                    <label>Channel 4</label>
                     <textcolor>ffffffff</textcolor>
                     <font>font13</font>
                     <align>center</align>
@@ -140,7 +131,6 @@
                     <posy>200</posy>
                     <width>180</width>
                     <height>50</height>
-                    <label>Channel 5</label>
                     <textcolor>ffffffff</textcolor>
                     <font>font13</font>
                     <align>center</align>
@@ -151,7 +141,6 @@
                     <posy>250</posy>
                     <width>180</width>
                     <height>50</height>
-                    <label>Channel 6</label>
                     <textcolor>ffffffff</textcolor>
                     <font>font13</font>
                     <align>center</align>
@@ -162,7 +151,6 @@
                     <posy>300</posy>
                     <width>180</width>
                     <height>50</height>
-                    <label>Channel 7</label>
                     <textcolor>ffffffff</textcolor>
                     <font>font13</font>
                     <align>center</align>
@@ -173,7 +161,6 @@
                     <posy>350</posy>
                     <width>180</width>
                     <height>50</height>
-                    <label>Channel 8</label>
                     <textcolor>ffffffff</textcolor>
                     <font>font13</font>
                     <align>center</align>
@@ -253,7 +240,6 @@
                 <posy>510</posy>
                 <width>630</width>
                 <height>50</height>
-                <label>[B]Title[/B]</label>
                 <textcolor>ffffffff</textcolor>
                 <font>font13</font>
                 <aligny>center</aligny>
@@ -265,7 +251,6 @@
                 <posy>510</posy>
                 <width>240</width>
                 <height>50</height>
-                <label>[B]18:00 - 20:00[/B]</label>
                 <textcolor>ffffffff</textcolor>
                 <font>font13</font>
                 <align>right</align>
@@ -278,7 +263,6 @@
                 <posy>550</posy>
                 <width>850</width>
                 <height>149</height>
-                <label>Description</label>
                 <textcolor>ffffffff</textcolor>
                 <font>font13</font>
                 <wrapmultiline>true</wrapmultiline>

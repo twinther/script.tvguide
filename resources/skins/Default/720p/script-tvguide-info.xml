@@ -28,7 +28,7 @@
             <aligny>center</aligny>
         </control>
 
-        <control type="image" id="4023">
+        <control type="image" id="4000">
             <posx>160</posx>
             <posy>92</posy>
             <width>960</width>

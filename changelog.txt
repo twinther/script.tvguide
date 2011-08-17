@@ -1,4 +1,4 @@
-[B]Version 0.3.0[/B]
+[B]Version 0.3.0 - 2011-08-17[/B]
 - Major restructuring
 - Updated YouSee source to use official API
 - Added TVTID.dk as source

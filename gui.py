@@ -16,7 +16,7 @@ KEY_SELECT = 7
 KEY_BACK = 9
 KEY_MENU = 10
 KEY_INFO = 11
-KEY_92 = 92
+KEY_NAV_BACK = 92
 KEY_CONTEXT_MENU = 117
 
 CHANNELS_PER_PAGE = 8
@@ -54,16 +54,11 @@ class TVGuide(xbmcgui.WindowXML):
         self.date -= datetime.timedelta(minutes = self.date.minute % 30)
 
     def onInit(self):
-        print "onInit"
         self._redrawEpg(0, self.date)
         self.getControl(self.C_MAIN_IMAGE).setImage('tvguide-logo-%s.png' % self.source.KEY)
 
     def onAction(self, action):
-        print "--- onAction ---"
-        print "action.id = %d" % action.getId()
-        print "self.focusX = %d" % self.focusX
-
-        if action.getId() == KEY_BACK or action.getId() == KEY_MENU or action.getId() == KEY_92:
+        if action.getId() == KEY_BACK or action.getId() == KEY_MENU or action.getId() == KEY_NAV_BACK:
             self.close()
             return
 
@@ -73,10 +68,7 @@ class TVGuide(xbmcgui.WindowXML):
             currentX = left + (controlInFocus.getWidth() / 2)
             currentY = top + (controlInFocus.getHeight() / 2)
         except TypeError, ex:
-            print ex
-            return # ignore for now
-
-        print "currentX = %d, currentY = %d" % (currentX, currentY)
+            return # ignore
 
         control = None
 
@@ -98,9 +90,6 @@ class TVGuide(xbmcgui.WindowXML):
 
 
     def onClick(self, controlId):
-        print "--- onClick ---"
-        print controlId
-
         program = self.controlToProgramMap[controlId]
         if program.imageLarge is not None:
             d = TVGuideInfo(program)
@@ -108,9 +97,6 @@ class TVGuide(xbmcgui.WindowXML):
             del d
 
     def onFocus(self, controlId):
-        print "--- onFocus ---"
-        print controlId
-
         controlInFocus = self.getControl(controlId)
         (left, top) = controlInFocus.getPosition()
         if left > self.focusX or left + controlInFocus.getWidth() < self.focusX:
@@ -118,6 +104,7 @@ class TVGuide(xbmcgui.WindowXML):
 
 
         program = self.controlToProgramMap[controlId]
+
         self.getControl(self.C_MAIN_TITLE).setLabel('[B]%s[/B]' % program.title)
         self.getControl(self.C_MAIN_TIME).setLabel('[B]%s - %s[/B]' % (program.startDate.strftime('%H:%M'), program.endDate.strftime('%H:%M')))
         self.getControl(self.C_MAIN_DESCRIPTION).setText(program.description)
@@ -170,8 +157,6 @@ class TVGuide(xbmcgui.WindowXML):
         return self._findControlBelow(0)
 
     def _redrawEpg(self, startChannel, startTime):
-        print "--- redrawing ---"
-
         for controlId in self.controlToProgramMap.keys():
             self.removeControl(self.getControl(controlId))
 
@@ -263,16 +248,12 @@ class TVGuide(xbmcgui.WindowXML):
             x = left + (control.getWidth() / 2)
             y = top + (control.getHeight() / 2)
 
-            print "x = %d, y = %d" % (x, y)
-
             if currentX < x and currentY == y:
                 distance = abs(currentX - x)
-                print "distance = %d" % distance
                 if distance < distanceToNearest:
                     distanceToNearest = distance
                     nearestControl = control
 
-        print "nearestControl = %s" % nearestControl
         return nearestControl
 
 
@@ -306,7 +287,6 @@ class TVGuide(xbmcgui.WindowXML):
                 if(left <= self.focusX and left + control.getWidth() > self.focusX
                     and (nearestControl is None or nearestControl.getPosition()[1] > top)):
                     nearestControl = control
-                    print "nearestControl = %s" % nearestControl
 
         return nearestControl
 
@@ -322,14 +302,13 @@ class TVGuide(xbmcgui.WindowXML):
                 if(left <= self.focusX and left + control.getWidth() > self.focusX
                     and (nearestControl is None or nearestControl.getPosition()[1] < top)):
                     nearestControl = control
-                    print "nearestControl = %s" % nearestControl
 
         return nearestControl
 
 
 
 class TVGuideInfo(xbmcgui.WindowXMLDialog):
-    C_INFO_IMAGE = 4023
+    C_INFO_IMAGE = 4000
 
     def __new__(cls, program):
         return super(TVGuideInfo, cls).__new__(cls, 'script-tvguide-info.xml', ADDON.getAddonInfo('path'))
@@ -339,21 +318,13 @@ class TVGuideInfo(xbmcgui.WindowXMLDialog):
         self.program = program
             
     def onInit(self):
-        print "onInit"
-
         self.getControl(self.C_INFO_IMAGE).setImage(self.program.imageLarge)
 
     def onAction(self, action):
-        print "--- onAction ---"
-        print "action.id = %d" % action.getId()
-
         self.close()
 
     def onClick(self, controlId):
-        print "--- onClick ---"
-        print controlId
-
+        pass
 
     def onFocus(self, controlId):
-        print "--- onFocus ---"
-        print controlId
+        pass

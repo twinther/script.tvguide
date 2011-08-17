@@ -35,8 +35,8 @@ class Program(object):
 
 
 class Source(object):
-    CACHE_MINUTES = 10
-
+    KEY = "undefiend"
+    
     def __init__(self, settings, hasChannelIcons):
         self.channelIcons = hasChannelIcons
         self.cachePath = settings['cache.path']
@@ -48,11 +48,12 @@ class Source(object):
         cacheFile = os.path.join(self.cachePath, self.KEY + '.channellist')
 
         try:
-            cachedOn = os.path.getmtime(cacheFile)
+            cachedOn = datetime.datetime.fromtimestamp(os.path.getmtime(cacheFile))
+            cacheHit = cachedOn.day == datetime.datetime.now().day
         except OSError:
-            cachedOn = 0
+            cacheHit = False
 
-        if time.time() - self.CACHE_MINUTES * 60 >= cachedOn:
+        if not cacheHit:
             channelList = self._getChannelList()
             pickle.dump(channelList, open(cacheFile, 'w'))
         else:
@@ -68,11 +69,12 @@ class Source(object):
         cacheFile = os.path.join(self.cachePath, self.KEY + '-' + id + '.programlist')
 
         try:
-            cachedOn = os.path.getmtime(cacheFile)
+            cachedOn = datetime.datetime.fromtimestamp(os.path.getmtime(cacheFile))
+            cacheHit = cachedOn.day == datetime.datetime.now().day
         except OSError:
-            cachedOn = 0
+            cacheHit = False
 
-        if time.time() - self.CACHE_MINUTES * 60 >= cachedOn:
+        if not cacheHit:
             programList = self._getProgramList(channel)
             pickle.dump(programList, open(cacheFile, 'w'))
         else:
