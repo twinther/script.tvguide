@@ -23,6 +23,7 @@
             <width>960</width>
             <height>535</height>
             <label>$ADDON[script.tvguide 30001]</label>
+            <textcolor>ffffffff</textcolor>
             <font>font30</font>
             <align>center</align>
             <aligny>center</aligny>
