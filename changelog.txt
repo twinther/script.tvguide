@@ -4,7 +4,6 @@
 - Added TVTID.dk as source
 - Added support for XMLTV as source
 - Dropped support for streaming channels
-- Background loading of EPG data on XBMC startup (Only available in Eden)
 
 [B]Version 0.2.3[/B]
 - Added loading screen
