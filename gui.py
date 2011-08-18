@@ -47,7 +47,7 @@ class TVGuide(xbmcgui.WindowXML):
         self.source = source
         self.controlToProgramMap = {}
         self.focusX = 0
-        self.channelIndex = 0
+        self.page = 0
 
         # find nearest half hour
         self.date = datetime.datetime.today()
@@ -97,6 +97,7 @@ class TVGuide(xbmcgui.WindowXML):
             del d
 
     def onFocus(self, controlId):
+        print controlId
         controlInFocus = self.getControl(controlId)
         (left, top) = controlInFocus.getPosition()
         if left > self.focusX or left + controlInFocus.getWidth() < self.focusX:
@@ -116,7 +117,7 @@ class TVGuide(xbmcgui.WindowXML):
         control = self._findControlOnLeft(currentX, currentY)
         if control is None:
             self.date -= datetime.timedelta(hours = 2)
-            self._redrawEpg(self.channelIndex, self.date)
+            self._redrawEpg(self.page, self.date)
             control = self._findControlOnLeft(1280, currentY)
 
         (left, top) = control.getPosition()
@@ -127,7 +128,7 @@ class TVGuide(xbmcgui.WindowXML):
         control = self._findControlOnRight(currentX, currentY)
         if control is None:
             self.date += datetime.timedelta(hours = 2)
-            self._redrawEpg(self.channelIndex, self.date)
+            self._redrawEpg(self.page, self.date)
             control = self._findControlOnRight(0, currentY)
 
         (left, top) = control.getPosition()
@@ -137,32 +138,34 @@ class TVGuide(xbmcgui.WindowXML):
     def _up(self, currentY):
         control = self._findControlAbove(currentY)
         if control is None:
-            self.channelIndex = self._redrawEpg(self.channelIndex - CHANNELS_PER_PAGE, self.date)
+            self.page = self._redrawEpg(self.page - 1, self.date)
             control = self._findControlAbove(720)
         return control
 
     def _down(self, currentY):
         control = self._findControlBelow(currentY)
         if control is None:
-            self.channelIndex = self._redrawEpg(self.channelIndex + CHANNELS_PER_PAGE, self.date)
+            self.page = self._redrawEpg(self.page + 1, self.date)
             control = self._findControlBelow(0)
         return control
 
     def _pageUp(self):
-        self.channelIndex = self._redrawEpg(self.channelIndex - CHANNELS_PER_PAGE, self.date)
+        self.page = self._redrawEpg(self.page - 1, self.date)
         return self._findControlAbove(720)
 
     def _pageDown(self):
-        self.channelIndex = self._redrawEpg(self.channelIndex + CHANNELS_PER_PAGE, self.date)
+        self.page = self._redrawEpg(self.page+ 1, self.date)
         return self._findControlBelow(0)
 
-    def _redrawEpg(self, startChannel, startTime):
+    def _redrawEpg(self, page, startTime):
         for controlId in self.controlToProgramMap.keys():
             self.removeControl(self.getControl(controlId))
+        for i in range(0, 8):
+            self.getControl(4010 + i).setLabel('')
+            self.getControl(4110 + i).setImage('')
 
         self.controlToProgramMap.clear()
         self.getControl(self.C_MAIN_LOADING).setVisible(True)
-        xbmc.sleep(250)
 
         # move timebar to current time
         timeDelta = datetime.datetime.today() - self.date
@@ -181,13 +184,20 @@ class TVGuide(xbmcgui.WindowXML):
 
         # channels
         channels = self.source.getChannelList()
-        if startChannel < 0:
-            startChannel = len(channels) - CHANNELS_PER_PAGE
-        elif startChannel > len(channels) - CHANNELS_PER_PAGE:
-            startChannel = 0
+        totalPages = len(channels) / CHANNELS_PER_PAGE
+        if len(channels) % CHANNELS_PER_PAGE == 0:
+            totalPages -= 1
+
+        if page < 0:
+            page = totalPages
+        elif page > totalPages:
+            page = 0
+
+        channelStart = page * CHANNELS_PER_PAGE
+        channelEnd = page * CHANNELS_PER_PAGE + CHANNELS_PER_PAGE
 
         controlsToAdd = list()
-        for idx, channel in enumerate(channels[startChannel : startChannel + CHANNELS_PER_PAGE]):
+        for idx, channel in enumerate(channels[channelStart : channelEnd]):
             if self.source.hasChannelIcons() and channel.logo is not None:
                 self.getControl(4110 + idx).setImage(channel.logo)
             else:
@@ -232,7 +242,7 @@ class TVGuide(xbmcgui.WindowXML):
 
         self.getControl(self.C_MAIN_LOADING).setVisible(False)
 
-        return startChannel
+        return page
 
 
     def _secondsToXposition(self, seconds):

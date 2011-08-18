@@ -1,3 +1,6 @@
+[B]Version 1.0.1 - 2011-08-xx[/B]
+- Made paging of channels more logical to navigate
+
 [B]Version 1.0.0 - 2011-08-17[/B]
 - Background loading of EPG data on XBMC startup (Only available in Eden)
 - Otherwise same as v. 0.3.0.
