@@ -15,7 +15,7 @@ class Channel(object):
         self.title = title
         self.logo = logo
 
-    def __str__(self):
+    def __repr__(self):
         return 'Channel(id=%s, title=%s, logo=%s)' \
                % (self.id, self.title, self.logo)
 
@@ -29,7 +29,7 @@ class Program(object):
         self.imageLarge = imageLarge
         self.imageSmall = imageSmall
 
-    def __str__(self):
+    def __repr__(self):
         return 'Program(channel=%s, title=%s, startDate=%s, endDate=%s, description=%s, imageLarge=%s, imageSmall=%s)' % \
             (self.channel, self.title, self.startDate, self.endDate, self.description, self.imageLarge, self.imageSmall)
 
@@ -241,7 +241,8 @@ class XMLTVSource(Source):
         doc = self._loadXml()
         channelList = list()
         for channel in doc.findall('channel'):
-            c = Channel(id = channel.get('id'), title = channel.findtext('display-name'), logo = channel.find('icon').get('src'))
+            logo = channel.find('icon').get('src') if channel.find('icon') else None
+            c = Channel(id = channel.get('id'), title = channel.findtext('display-name'), logo = logo)
             channelList.append(c)
 
         return channelList
