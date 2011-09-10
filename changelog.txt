@@ -1,4 +1,4 @@
-[B]Version 1.0.1 - 2011-09-xx[/B]
+[B]Version 1.0.1 - 2011-09-10[/B]
 - Made paging of channels more logical to navigate
 - Better handling of errors if EPG data is unavailable
 - Improved visual feedback while loading
