@@ -37,6 +37,7 @@ class TVGuide(xbmcgui.WindowXML):
     C_MAIN_DESCRIPTION = 4022
     C_MAIN_IMAGE = 4023
     C_MAIN_LOADING = 4200
+    C_MAIN_LOADING_PROGRESS = 4201
 
     def __new__(cls, source):
         return super(TVGuide, cls).__new__(cls, 'script-tvguide-main.xml', ADDON.getAddonInfo('path'))
@@ -54,11 +55,11 @@ class TVGuide(xbmcgui.WindowXML):
         self.date -= datetime.timedelta(minutes = self.date.minute % 30)
 
     def onInit(self):
-        self._redrawEpg(0, self.date)
+        self.onRedrawEPG(0, self.date)
         self.getControl(self.C_MAIN_IMAGE).setImage('tvguide-logo-%s.png' % self.source.KEY)
 
     def onAction(self, action):
-        if action.getId() == KEY_BACK or action.getId() == KEY_MENU or action.getId() == KEY_NAV_BACK:
+        if action.getId() in [KEY_BACK, KEY_MENU, KEY_NAV_BACK]:
             self.close()
             return
 
@@ -67,8 +68,9 @@ class TVGuide(xbmcgui.WindowXML):
             (left, top) = controlInFocus.getPosition()
             currentX = left + (controlInFocus.getWidth() / 2)
             currentY = top + (controlInFocus.getHeight() / 2)
-        except TypeError, ex:
-            return # ignore
+        except TypeError:
+            currentX = None
+            currentY = None
 
         control = None
 
@@ -97,7 +99,6 @@ class TVGuide(xbmcgui.WindowXML):
             del d
 
     def onFocus(self, controlId):
-        print controlId
         controlInFocus = self.getControl(controlId)
         (left, top) = controlInFocus.getPosition()
         if left > self.focusX or left + controlInFocus.getWidth() < self.focusX:
@@ -117,7 +118,7 @@ class TVGuide(xbmcgui.WindowXML):
         control = self._findControlOnLeft(currentX, currentY)
         if control is None:
             self.date -= datetime.timedelta(hours = 2)
-            self._redrawEpg(self.page, self.date)
+            self.onRedrawEPG(self.page, self.date)
             control = self._findControlOnLeft(1280, currentY)
 
         (left, top) = control.getPosition()
@@ -128,7 +129,7 @@ class TVGuide(xbmcgui.WindowXML):
         control = self._findControlOnRight(currentX, currentY)
         if control is None:
             self.date += datetime.timedelta(hours = 2)
-            self._redrawEpg(self.page, self.date)
+            self.onRedrawEPG(self.page, self.date)
             control = self._findControlOnRight(0, currentY)
 
         (left, top) = control.getPosition()
@@ -138,33 +139,31 @@ class TVGuide(xbmcgui.WindowXML):
     def _up(self, currentY):
         control = self._findControlAbove(currentY)
         if control is None:
-            self.page = self._redrawEpg(self.page - 1, self.date)
+            self.page = self.onRedrawEPG(self.page - 1, self.date)
             control = self._findControlAbove(720)
         return control
 
     def _down(self, currentY):
         control = self._findControlBelow(currentY)
         if control is None:
-            self.page = self._redrawEpg(self.page + 1, self.date)
+            self.page = self.onRedrawEPG(self.page + 1, self.date)
             control = self._findControlBelow(0)
         return control
 
     def _pageUp(self):
-        self.page = self._redrawEpg(self.page - 1, self.date)
+        self.page = self.onRedrawEPG(self.page - 1, self.date)
         return self._findControlAbove(720)
 
     def _pageDown(self):
-        self.page = self._redrawEpg(self.page+ 1, self.date)
+        self.page = self.onRedrawEPG(self.page+ 1, self.date)
         return self._findControlBelow(0)
 
-    def _redrawEpg(self, page, startTime):
-        for controlId in self.controlToProgramMap.keys():
-            self.removeControl(self.getControl(controlId))
-        for i in range(0, 8):
-            self.getControl(4010 + i).setLabel('')
-            self.getControl(4110 + i).setImage('')
-
+    def onRedrawEPG(self, page, startTime):
+        oldControltoProgramMap = self.controlToProgramMap.copy()
         self.controlToProgramMap.clear()
+
+        progressControl = self.getControl(self.C_MAIN_LOADING_PROGRESS)
+        progressControl.setPercent(0)
         self.getControl(self.C_MAIN_LOADING).setVisible(True)
 
         # move timebar to current time
@@ -184,6 +183,9 @@ class TVGuide(xbmcgui.WindowXML):
 
         # channels
         channels = self.source.getChannelList()
+        if channels is None:
+            self.onEPGLoadError()
+            return
         totalPages = len(channels) / CHANNELS_PER_PAGE
         if len(channels) % CHANNELS_PER_PAGE == 0:
             totalPages -= 1
@@ -198,12 +200,13 @@ class TVGuide(xbmcgui.WindowXML):
 
         controlsToAdd = list()
         for idx, channel in enumerate(channels[channelStart : channelEnd]):
-            if self.source.hasChannelIcons() and channel.logo is not None:
-                self.getControl(4110 + idx).setImage(channel.logo)
-            else:
-                self.getControl(4010 + idx).setLabel(channel.title)
+            progressControl.setPercent(idx * 100 / CHANNELS_PER_PAGE)
+            programs = self.source.getProgramList(channel)
+            if programs is None:
+                self.onEPGLoadError()
+                return
 
-            for program in self.source.getProgramList(channel):
+            for program in programs:
                 if program.endDate <= self.date:
                     continue
 
@@ -230,6 +233,10 @@ class TVGuide(xbmcgui.WindowXML):
                     controlsToAdd.append([control, program])
 
 
+        for controlId in oldControltoProgramMap:
+            self.removeControl(self.getControl(controlId))
+
+        # add program controls
         for control, program in controlsToAdd:
             self.addControl(control)
             self.controlToProgramMap[control.getId()] = program
@@ -242,8 +249,25 @@ class TVGuide(xbmcgui.WindowXML):
 
         self.getControl(self.C_MAIN_LOADING).setVisible(False)
 
+        # set channel logo or text
+        channelsToShow = channels[channelStart : channelEnd]
+        for idx in range(0, CHANNELS_PER_PAGE):
+            if idx >= len(channelsToShow):
+                self.getControl(4110 + idx).setImage('')
+                self.getControl(4010 + idx).setLabel('')
+            else:
+                channel = channelsToShow[idx]
+                if self.source.hasChannelIcons() and channel.logo is not None:
+                    self.getControl(4110 + idx).setImage(channel.logo)
+                else:
+                    self.getControl(4010 + idx).setLabel(channel.title)
+
         return page
 
+    def onEPGLoadError(self):
+        self.getControl(self.C_MAIN_LOADING).setVisible(False)
+        xbmcgui.Dialog().ok(strings(LOAD_ERROR_TITLE), strings(LOAD_ERROR_LINE1), strings(LOAD_ERROR_LINE2))
+        self.close()
 
     def _secondsToXposition(self, seconds):
         return CELL_WIDTH_CHANNELS + (seconds * CELL_WIDTH / 1800)
@@ -290,12 +314,13 @@ class TVGuide(xbmcgui.WindowXML):
 
         for controlId in self.controlToProgramMap.keys():
             control = self.getControl(controlId)
-            (left, top) = control.getPosition()
+            (leftEdge, top) = control.getPosition()
             y = top + (control.getHeight() / 2)
 
             if currentY < y:
-                if(left <= self.focusX and left + control.getWidth() > self.focusX
-                    and (nearestControl is None or nearestControl.getPosition()[1] > top)):
+                rightEdge = leftEdge + control.getWidth()
+                if(leftEdge <= self.focusX < rightEdge
+                   and (nearestControl is None or nearestControl.getPosition()[1] > top)):
                     nearestControl = control
 
         return nearestControl
@@ -305,12 +330,13 @@ class TVGuide(xbmcgui.WindowXML):
 
         for controlId in self.controlToProgramMap.keys():
             control = self.getControl(controlId)
-            (left, top) = control.getPosition()
+            (leftEdge, top) = control.getPosition()
             y = top + (control.getHeight() / 2)
 
             if currentY > y:
-                if(left <= self.focusX and left + control.getWidth() > self.focusX
-                    and (nearestControl is None or nearestControl.getPosition()[1] < top)):
+                rightEdge = leftEdge + control.getWidth()
+                if(leftEdge <= self.focusX < rightEdge
+                   and (nearestControl is None or nearestControl.getPosition()[1] < top)):
                     nearestControl = control
 
         return nearestControl
