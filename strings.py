@@ -13,6 +13,8 @@ LOAD_ERROR_TITLE = 30110
 LOAD_ERROR_LINE1 = 30111
 LOAD_ERROR_LINE2 = 30112
 
+NOTIFICATION_TEMPLATE = 30200
+
 def strings(id, replacements = None):
     string = xbmcaddon.Addon(id = 'script.tvguide').getLocalizedString(id)
     if replacements is not None:

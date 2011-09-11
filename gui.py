@@ -30,6 +30,8 @@ HALF_HOUR = datetime.timedelta(minutes = 30)
 ADDON = xbmcaddon.Addon(id = 'script.tvguide')
 TEXTURE_BUTTON_NOFOCUS = os.path.join(xbmc.translatePath(ADDON.getAddonInfo('path')), 'resources', 'skins', 'Default', 'media', 'cell-bg.png')
 TEXTURE_BUTTON_FOCUS = os.path.join(xbmc.translatePath(ADDON.getAddonInfo('path')), 'resources', 'skins', 'Default', 'media', 'cell-bg-selected.png')
+TEXTURE_BUTTON_NOFOCUS_NOTIFY = os.path.join(xbmc.translatePath(ADDON.getAddonInfo('path')), 'resources', 'skins', 'Default', 'media', 'cell-bg-notify.png')
+TEXTURE_BUTTON_FOCUS_NOTIFY = os.path.join(xbmc.translatePath(ADDON.getAddonInfo('path')), 'resources', 'skins', 'Default', 'media', 'cell-bg-selected-notify.png')
 
 class TVGuide(xbmcgui.WindowXML):
     C_MAIN_TITLE = 4020
@@ -39,13 +41,18 @@ class TVGuide(xbmcgui.WindowXML):
     C_MAIN_LOADING = 4200
     C_MAIN_LOADING_PROGRESS = 4201
 
-    def __new__(cls, source):
+    def __new__(cls, source, notification):
         return super(TVGuide, cls).__new__(cls, 'script-tvguide-main.xml', ADDON.getAddonInfo('path'))
 
-    def __init__(self,  source):
+    def __init__(self,  source, notification):
+        """
+        @param source: the source of EPG data
+        @type source: source.Source
+        @type notification: notification.Notification
+        """
         super(TVGuide, self).__init__()
-
         self.source = source
+        self.notification = notification
         self.controlToProgramMap = {}
         self.focusX = 0
         self.page = 0
@@ -93,17 +100,21 @@ class TVGuide(xbmcgui.WindowXML):
 
     def onClick(self, controlId):
         program = self.controlToProgramMap[controlId]
-        if program.imageLarge is not None:
-            d = TVGuideInfo(program)
-            d.doModal()
-            del d
+
+        if self.notification.isNotificationRequiredForProgram(program):
+            self.notification.delProgram(program)
+        else:
+            self.notification.addProgram(program)
+
+        idx = self.controlToProgramMap.keys().index(controlId)
+        self.onRedrawEPG(self.page, self.date, autoChangeFocus = False)
+        self.setFocusId(self.controlToProgramMap.keys()[idx])
 
     def onFocus(self, controlId):
         controlInFocus = self.getControl(controlId)
         (left, top) = controlInFocus.getPosition()
         if left > self.focusX or left + controlInFocus.getWidth() < self.focusX:
             self.focusX = left
-
 
         program = self.controlToProgramMap[controlId]
 
@@ -158,7 +169,7 @@ class TVGuide(xbmcgui.WindowXML):
         self.page = self.onRedrawEPG(self.page+ 1, self.date)
         return self._findControlBelow(0)
 
-    def onRedrawEPG(self, page, startTime):
+    def onRedrawEPG(self, page, startTime, autoChangeFocus = True):
         oldControltoProgramMap = self.controlToProgramMap.copy()
         self.controlToProgramMap.clear()
 
@@ -221,15 +232,23 @@ class TVGuide(xbmcgui.WindowXML):
                     cellWidth = 1260 - cellStart
 
                 if cellWidth > 1:
+                    if self.notification.isNotificationRequiredForProgram(program):
+                        noFocusTexture = TEXTURE_BUTTON_NOFOCUS_NOTIFY
+                        focusTexture = TEXTURE_BUTTON_FOCUS_NOTIFY
+                    else:
+                        noFocusTexture = TEXTURE_BUTTON_NOFOCUS
+                        focusTexture = TEXTURE_BUTTON_FOCUS
+
                     control = xbmcgui.ControlButton(
                         cellStart,
                         25 + CELL_HEIGHT * (1 + idx),
                         cellWidth,
                         CELL_HEIGHT,
                         program.title,
-                        noFocusTexture = TEXTURE_BUTTON_NOFOCUS,
-                        focusTexture = TEXTURE_BUTTON_FOCUS
+                        noFocusTexture = noFocusTexture,
+                        focusTexture = focusTexture
                     )
+
                     controlsToAdd.append([control, program])
 
 
@@ -244,7 +263,7 @@ class TVGuide(xbmcgui.WindowXML):
         try:
             self.getFocus()
         except TypeError:
-            if len(self.controlToProgramMap.keys()) > 0:
+            if len(self.controlToProgramMap.keys()) > 0 and autoChangeFocus:
                 self.setFocus(self.getControl(self.controlToProgramMap.keys()[0]))
 
         self.getControl(self.C_MAIN_LOADING).setVisible(False)
