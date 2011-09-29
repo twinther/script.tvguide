@@ -9,12 +9,13 @@
 	</coordinates>
 	<controls>
 		<!-- Background -->
-		<control type="image">
+		<control type="image" id="4600">
 			<posx>0</posx>
 			<posy>0</posy>
 			<width>1280</width>
 			<height>720</height>
 			<texture>tvguide-background.png</texture>
+            <fadetime>500</fadetime>
 		</control>
 
         <control type="group">
@@ -250,6 +251,14 @@
             </control><!-- end group -->
 
             <!-- Program description -->
+            <!--<control type="image" id="4117">-->
+                <!--<description>glasspane</description>-->
+                <!--<posx>0</posx>-->
+                <!--<posy>500</posy>-->
+                <!--<width>1280</width>-->
+                <!--<height>220</height>-->
+                <!--<texture>tvguide-glasspane.png</texture>-->
+            <!--</control>-->
             <control type="label" id="4020">
                 <description>Program title</description>
                 <posx>30</posx>

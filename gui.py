@@ -40,6 +40,7 @@ class TVGuide(xbmcgui.WindowXML):
     C_MAIN_IMAGE = 4023
     C_MAIN_LOADING = 4200
     C_MAIN_LOADING_PROGRESS = 4201
+    C_MAIN_BACKGROUND = 4600
 
     def __new__(cls, source, notification):
         return super(TVGuide, cls).__new__(cls, 'script-tvguide-main.xml', ADDON.getAddonInfo('path'))
@@ -100,15 +101,36 @@ class TVGuide(xbmcgui.WindowXML):
 
     def onClick(self, controlId):
         program = self.controlToProgramMap[controlId]
+        isNotificationRequiredForProgram = self.notification.isNotificationRequiredForProgram(program)
 
-        if self.notification.isNotificationRequiredForProgram(program):
-            self.notification.delProgram(program)
+        playIdx = None
+        options = []
+        if program.channel.isPlayable():
+            options.append('Play')
+            playIdx = len(options) - 1
+
+        if isNotificationRequiredForProgram:
+            options.append('Del notify')
         else:
-            self.notification.addProgram(program)
+            options.append('Add notify')
+        notifyIdx = len(options) - 1
 
-        idx = self.controlToProgramMap.keys().index(controlId)
-        self.onRedrawEPG(self.page, self.date, autoChangeFocus = False)
-        self.setFocusId(self.controlToProgramMap.keys()[idx])
+        idx = xbmcgui.Dialog().select(program.title, options)
+        if idx == notifyIdx:
+            if isNotificationRequiredForProgram:
+                self.notification.delProgram(program)
+            else:
+                self.notification.addProgram(program)
+
+            control = self.getControl(controlId)
+            (left, top) = control.getPosition()
+            y = top + (control.getHeight() / 2)
+            self.onRedrawEPG(self.page, self.date, autoChangeFocus = False)
+            self.setFocus(self._findControlOnRight(left, y))
+
+        elif idx == playIdx:
+            program.channel.play()
+
 
     def onFocus(self, controlId):
         controlInFocus = self.getControl(controlId)

@@ -17,6 +17,7 @@ class Notification(object):
     def __init__(self, source, addonPath, dataPath):
         self.source = source
         self.addonPath = addonPath
+        self.icon = os.path.join(self.addonPath, 'icon.png')
 
         self.conn = sqlite3.connect(os.path.join(dataPath, self.NOTIFICATION_DB), check_same_thread = False)
         self._createTables()
@@ -24,23 +25,37 @@ class Notification(object):
     def __del__(self):
         self.conn.close()
 
+    def createAlarmClockName(self, program):
+        return 'tvguide-%s-%s' % (program.channel.id, program.startDate)
+
     def scheduleNotifications(self):
         print "Scheduling program notifications"
-        programs = self.getPrograms()
-        icon = os.path.join(self.addonPath, 'icon.png')
-        now = datetime.datetime.now()
+        for channelId, programTitle in self.getPrograms():
+            self._processSingleNotification(channelId, programTitle, self._scheduleNotification)
 
+    def _processSingleNotification(self, channelId, programTitle, action):
         for channel in self.source.getChannelList():
             for program in self.source.getProgramList(channel):
-                for nChannel, nProgram in programs:
-                    if nChannel == channel.id and nProgram == program.title and (program.startDate - now).days == 0:
-                        timeToNotification = (program.startDate - now).seconds / 60
+                if channelId == channel.id and programTitle == program.title and self._timeToNotification(program).days == 0:
+                    action(program)
 
-                        id = 'tvguide-%s-%s' % (channel.id, program.startDate)
-                        description = strings(NOTIFICATION_TEMPLATE, channel.title)
+    def _scheduleNotification(self, program):
+        timeToNotification = self._timeToNotification(program).seconds / 60
+        if timeToNotification < 0:
+            return
 
-                        xbmc.executebuiltin("AlarmClock(%s,Notification(%s,%s,10000,%s),%d,True)" %
-                            (id, program.title, description, icon, timeToNotification - 5))
+        name = self.createAlarmClockName(program)
+        description = strings(NOTIFICATION_TEMPLATE, program.channel.title)
+
+        xbmc.executebuiltin('AlarmClock(%s,Notification(%s,%s,10000,%s),%d,True)' %
+            (name.encode('utf-8', 'replace'), program.title.encode('utf-8', 'replace'), description.encode('utf-8', 'replace'), self.icon, timeToNotification - 5))
+
+    def _unscheduleNotification(self, program):
+        name = self.createAlarmClockName(program)
+        xbmc.executebuiltin('CancelAlarm(%s,True)' % name)
+
+    def _timeToNotification(self, program):
+        return program.startDate - datetime.datetime.now()
 
     def addProgram(self, program):
         """
@@ -51,6 +66,8 @@ class Notification(object):
         self.conn.commit()
         c.close()
 
+        self._processSingleNotification(program.channel.id, program.title, self._scheduleNotification)
+
     def delProgram(self, program):
         """
         @type program: source.program
@@ -59,6 +76,9 @@ class Notification(object):
         c.execute("DELETE FROM notification WHERE channel=? AND program=?", [program.channel.id, program.title])
         self.conn.commit()
         c.close()
+
+        self._processSingleNotification(program.channel.id, program.title, self._unscheduleNotification)
+
 
     def getPrograms(self):
         c = self.conn.cursor()
