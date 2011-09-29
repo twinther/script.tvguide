@@ -1,6 +1,7 @@
 import datetime
 import os
 import xbmc
+import xbmcgui
 
 from strings import *
 
@@ -86,7 +87,7 @@ class Notification(object):
         programs = c.fetchall()
         c.close()
 
-        return [program[0] for program in programs]
+        return programs
 
     def isNotificationRequiredForProgram(self, program):
         """
@@ -99,7 +100,22 @@ class Notification(object):
 
         return result
 
+    def clearAllNotifications(self):
+        c = self.conn.cursor()
+        c.execute('DELETE FROM notification')
+        self.conn.commit()
+        c.close()
+
     def _createTables(self):
         c = self.conn.cursor()
         c.execute("CREATE TABLE IF NOT EXISTS notification (channel TEXT, program TEXT)")
         c.close()
+
+
+if __name__ == '__main__':
+    ADDON = xbmcaddon.Addon(id = 'script.tvguide')
+    dataPath = xbmc.translatePath(ADDON.getAddonInfo('profile'))
+    n = Notification(None, ADDON.getAddonInfo('path'), dataPath)
+    n.clearAllNotifications()
+
+    xbmcgui.Dialog().ok(strings(CLEAR_NOTIFICATIONS), strings(DONE))

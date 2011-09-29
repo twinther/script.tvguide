@@ -19,7 +19,7 @@ KEY_INFO = 11
 KEY_NAV_BACK = 92
 KEY_CONTEXT_MENU = 117
 
-CHANNELS_PER_PAGE = 8
+CHANNELS_PER_PAGE = 9
 
 CELL_HEIGHT = 50
 CELL_WIDTH = 275
@@ -103,20 +103,12 @@ class TVGuide(xbmcgui.WindowXML):
         program = self.controlToProgramMap[controlId]
         isNotificationRequiredForProgram = self.notification.isNotificationRequiredForProgram(program)
 
-        playIdx = None
-        options = []
-        if program.channel.isPlayable():
-            options.append('Play')
-            playIdx = len(options) - 1
+        d = PopupMenu(program, not isNotificationRequiredForProgram)
+        d.doModal()
+        buttonClicked = d.buttonClicked
+        del d
 
-        if isNotificationRequiredForProgram:
-            options.append('Del notify')
-        else:
-            options.append('Add notify')
-        notifyIdx = len(options) - 1
-
-        idx = xbmcgui.Dialog().select(program.title, options)
-        if idx == notifyIdx:
+        if buttonClicked == PopupMenu.C_POPUP_REMIND:
             if isNotificationRequiredForProgram:
                 self.notification.delProgram(program)
             else:
@@ -128,7 +120,7 @@ class TVGuide(xbmcgui.WindowXML):
             self.onRedrawEPG(self.page, self.date, autoChangeFocus = False)
             self.setFocus(self._findControlOnRight(left, y))
 
-        elif idx == playIdx:
+        elif buttonClicked == PopupMenu.C_POPUP_PLAY:
             program.channel.play()
 
 
@@ -146,6 +138,9 @@ class TVGuide(xbmcgui.WindowXML):
 
         if program.imageSmall is not None:
             self.getControl(self.C_MAIN_IMAGE).setImage(program.imageSmall)
+
+        if ADDON.getSetting('program.background.enabled') == 'true' and program.imageLarge is not None:
+            self.getControl(self.C_MAIN_BACKGROUND).setImage(program.imageLarge)
 
     def _left(self, currentX, currentY):
         control = self._findControlOnLeft(currentX, currentY)
@@ -263,9 +258,9 @@ class TVGuide(xbmcgui.WindowXML):
 
                     control = xbmcgui.ControlButton(
                         cellStart,
-                        25 + CELL_HEIGHT * (1 + idx),
-                        cellWidth,
-                        CELL_HEIGHT,
+                        60 + CELL_HEIGHT * idx,
+                        cellWidth - 2,
+                        CELL_HEIGHT - 2,
                         program.title,
                         noFocusTexture = noFocusTexture,
                         focusTexture = focusTexture
@@ -384,24 +379,41 @@ class TVGuide(xbmcgui.WindowXML):
 
 
 
-class TVGuideInfo(xbmcgui.WindowXMLDialog):
-    C_INFO_IMAGE = 4000
+class PopupMenu(xbmcgui.WindowXMLDialog):
+    C_POPUP_PLAY = 4000
+    C_POPUP_REMIND = 4001
 
-    def __new__(cls, program):
-        return super(TVGuideInfo, cls).__new__(cls, 'script-tvguide-info.xml', ADDON.getAddonInfo('path'))
+    def __new__(cls, program, showRemind):
+        return super(PopupMenu, cls).__new__(cls, 'script-tvguide-menu.xml', ADDON.getAddonInfo('path'))
 
-    def __init__(self, program):
-        super(TVGuideInfo, self).__init__()
+    def __init__(self, program, showRemind):
+        super(PopupMenu, self).__init__()
         self.program = program
-            
+        self.showRemind = showRemind
+        self.buttonClicked = None
+
     def onInit(self):
-        self.getControl(self.C_INFO_IMAGE).setImage(self.program.imageLarge)
+        playControl = self.getControl(self.C_POPUP_PLAY)
+        remindControl = self.getControl(self.C_POPUP_REMIND)
+
+        playControl.setLabel(strings(WATCH_CHANNEL, self.program.channel.title))
+        if not self.program.channel.isPlayable():
+            playControl.setEnabled(False)
+            self.setFocus(remindControl)
+
+        if self.showRemind:
+            remindControl.setLabel(strings(REMIND_PROGRAM))
+        else:
+            remindControl.setLabel(strings(DONT_REMIND_PROGRAM))
 
     def onAction(self, action):
-        self.close()
+        if action.getId() in [KEY_BACK, KEY_MENU, KEY_NAV_BACK]:
+            self.close()
+            return
 
     def onClick(self, controlId):
-        pass
+        self.buttonClicked = controlId
+        self.close()
 
     def onFocus(self, controlId):
         pass
