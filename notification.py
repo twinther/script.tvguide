@@ -30,7 +30,7 @@ class Notification(object):
         return 'tvguide-%s-%s' % (program.channel.id, program.startDate)
 
     def scheduleNotifications(self):
-        print "Scheduling program notifications"
+        print "[script.tvguide] Scheduling program notifications"
         for channelId, programTitle in self.getPrograms():
             self._processSingleNotification(channelId, programTitle, self._scheduleNotification)
 

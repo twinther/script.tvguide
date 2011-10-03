@@ -19,14 +19,15 @@ SETTINGS = {
     'cache.path' : xbmc.translatePath(ADDON.getAddonInfo('profile')),
     'xmltv.file' : ADDON.getSetting('xmltv.file'),
     'youseetv.category' : ADDON.getSetting('youseetv.category'),
-    'notifications.enabled' : ADDON.getSetting('notifications.enabled')
+    'notifications.enabled' : ADDON.getSetting('notifications.enabled'),
+    'cache.data.on.xbmc.startup' : ADDON.getSetting('cache.data.on.xbmc.startup')
 }
 
 SOURCE = sourceRef(SETTINGS)
 
 n = notification.Notification(SOURCE, ADDON.getAddonInfo('path'), xbmc.translatePath(ADDON.getAddonInfo('profile')))
 
-xbmc.log("Loading TVGuide [script.tvguide] source: " + str(sourceRef))
+xbmc.log("[script.tvguide] Using source: " + str(sourceRef))
 
 if __name__ == '__main__':
     w = gui.TVGuide(source = SOURCE, notification = n)

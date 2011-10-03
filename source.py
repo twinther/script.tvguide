@@ -66,14 +66,14 @@ class Source(object):
         return self.channelIcons
 
     def updateChannelAndProgramListCaches(self):
-        print "Updating script.tvguide channel list caches..."
+        print "[script.tvguide] Updating channel list caches..."
         channelList = self.getChannelList()
 
         for channel in channelList:
-            print "Updating script.tvguide program list caches for channel " + channel.title.decode('iso-8859-1') + "..."
+            print "[script.tvguide] Updating program list caches for channel " + channel.title.decode('iso-8859-1') + "..."
             self.getProgramList(channel)
 
-        print "Done updating script.tvguide caches."
+        print "[script.tvguide] Done updating caches."
 
     def getChannelList(self):
         cacheFile = os.path.join(self.cachePath, self.KEY + '.channellist')
@@ -94,7 +94,7 @@ class Source(object):
                         
                 pickle.dump(channelList, open(cacheFile, 'w'))
             except Exception, ex:
-                print "Unable to get channel list\n" + str(ex)
+                print "[script.tvguide] Unable to get channel list\n" + str(ex)
         else:
             try:
                 channelList = pickle.load(open(cacheFile))
@@ -122,7 +122,7 @@ class Source(object):
                 programList = self._getProgramList(channel)
                 pickle.dump(programList, open(cacheFile, 'w'))
             except Exception, ex:
-                print "Unable to get program list for channel: " + channel + "\n" + str(ex)
+                print "[script.tvguide] Unable to get program list for channel: " + channel + "\n" + str(ex)
         else:
             programList = pickle.load(open(cacheFile))
 
