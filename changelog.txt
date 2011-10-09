@@ -1,4 +1,4 @@
-[B]Version 0.4.0 - 2011-10-xx[/B]
+[B]Version 0.4.0 - 2011-10-09[/B]
 - Add option to get notified before programs start
 - New graphics
 - Readded initial support for streaming channels
