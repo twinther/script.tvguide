@@ -12,13 +12,15 @@ SOURCES = {
     'XMLTV' : source.XMLTVSource
     }
 
-ADDON = xbmcaddon.Addon(id = 'script.tvguide')
+ADDON = xbmcaddon.Addon()
 sourceRef = SOURCES[ADDON.getSetting('source')]
 
 SETTINGS = {
     'cache.path' : xbmc.translatePath(ADDON.getAddonInfo('profile')),
     'xmltv.file' : ADDON.getSetting('xmltv.file'),
     'youseetv.category' : ADDON.getSetting('youseetv.category'),
+    'youseewebtv.playback' : ADDON.getSetting('youseewebtv.playback'),
+    'danishlivetv.playback' : ADDON.getSetting('danishlivetv.playback'),
     'notifications.enabled' : ADDON.getSetting('notifications.enabled'),
     'cache.data.on.xbmc.startup' : ADDON.getSetting('cache.data.on.xbmc.startup')
 }

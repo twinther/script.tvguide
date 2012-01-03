@@ -19,6 +19,9 @@ NOTIFICATION_TEMPLATE = 30200
 WATCH_CHANNEL = 30300
 REMIND_PROGRAM = 30301
 DONT_REMIND_PROGRAM = 30302
+CHOOSE_STRM_FILE = 30304
+REMOVE_STRM_FILE = 30306
+
 
 def strings(id, replacements = None):
     string = xbmcaddon.Addon(id = 'script.tvguide').getLocalizedString(id)

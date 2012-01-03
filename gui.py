@@ -71,6 +71,9 @@ class TVGuide(xbmcgui.WindowXML):
             self.close()
             return
 
+        control = None
+        controlInFocus = None
+
         try:
             controlInFocus = self.getFocus()
             (left, top) = controlInFocus.getPosition()
@@ -79,8 +82,6 @@ class TVGuide(xbmcgui.WindowXML):
         except TypeError:
             currentX = None
             currentY = None
-
-        control = None
 
         if action.getId() == KEY_LEFT:
             control = self._left(currentX, currentY)
@@ -94,6 +95,9 @@ class TVGuide(xbmcgui.WindowXML):
             control = self._pageUp()
         elif action.getId() == KEY_PAGE_DOWN:
             control = self._pageDown()
+        elif action.getId() == KEY_CONTEXT_MENU and controlInFocus is not None:
+            program = self.controlToProgramMap[controlInFocus.getId()]
+            self._showContextMenu(program, controlInFocus)
 
         if control is not None:
             self.setFocus(control)
@@ -101,9 +105,15 @@ class TVGuide(xbmcgui.WindowXML):
 
     def onClick(self, controlId):
         program = self.controlToProgramMap[controlId]
+        if self.source.isPlayable(program.channel):
+            self.source.play(program.channel)
+        else:
+            self._showContextMenu(program, self.getControl(controlId))
+
+    def _showContextMenu(self, program, control):
         isNotificationRequiredForProgram = self.notification.isNotificationRequiredForProgram(program)
 
-        d = PopupMenu(program, not isNotificationRequiredForProgram)
+        d = PopupMenu(self.source, program, not isNotificationRequiredForProgram, self.source.hasChannelIcons())
         d.doModal()
         buttonClicked = d.buttonClicked
         del d
@@ -114,14 +124,19 @@ class TVGuide(xbmcgui.WindowXML):
             else:
                 self.notification.addProgram(program)
 
-            control = self.getControl(controlId)
             (left, top) = control.getPosition()
             y = top + (control.getHeight() / 2)
             self.onRedrawEPG(self.page, self.date, autoChangeFocus = False)
             self.setFocus(self._findControlOnRight(left, y))
 
+        elif buttonClicked == PopupMenu.C_POPUP_CHOOSE_STRM:
+            filename = xbmcgui.Dialog().browse(1, ADDON.getLocalizedString(30304), 'video', '.strm')
+            if filename:
+                self.source.setCustomStreamUrl(program.channel, filename)
+
         elif buttonClicked == PopupMenu.C_POPUP_PLAY:
-            program.channel.play()
+            if self.source.isPlayable(program.channel):
+                self.source.play(program.channel)
 
 
     def onFocus(self, controlId):
@@ -256,12 +271,17 @@ class TVGuide(xbmcgui.WindowXML):
                         noFocusTexture = TEXTURE_BUTTON_NOFOCUS
                         focusTexture = TEXTURE_BUTTON_FOCUS
 
+                    if cellWidth < 25:
+                        title = '' # Text will overflow outside the button if it is to narrow
+                    else:
+                        title = program.title
+
                     control = xbmcgui.ControlButton(
                         cellStart,
                         60 + CELL_HEIGHT * idx,
                         cellWidth - 2,
                         CELL_HEIGHT - 2,
-                        program.title,
+                        title,
                         noFocusTexture = noFocusTexture,
                         focusTexture = focusTexture
                     )
@@ -381,25 +401,53 @@ class TVGuide(xbmcgui.WindowXML):
 
 class PopupMenu(xbmcgui.WindowXMLDialog):
     C_POPUP_PLAY = 4000
-    C_POPUP_REMIND = 4001
+    C_POPUP_CHOOSE_STRM = 4001
+    C_POPUP_REMIND = 4002
+    C_POPUP_CHANNEL_LOGO = 4100
+    C_POPUP_CHANNEL_TITLE = 4101
+    C_POPUP_PROGRAM_TITLE = 4102
 
-    def __new__(cls, program, showRemind):
+    def __new__(cls, source, program, showRemind, hasChannelIcon):
         return super(PopupMenu, cls).__new__(cls, 'script-tvguide-menu.xml', ADDON.getAddonInfo('path'))
 
-    def __init__(self, program, showRemind):
+    def __init__(self, source, program, showRemind, hasChannelIcon):
+        """
+
+        @type source: source.Source
+        @param program:
+        @type program: source.Program
+        @param showRemind:
+        """
         super(PopupMenu, self).__init__()
+        self.source = source
         self.program = program
         self.showRemind = showRemind
         self.buttonClicked = None
+        self.hasChannelIcon = hasChannelIcon
 
     def onInit(self):
         playControl = self.getControl(self.C_POPUP_PLAY)
         remindControl = self.getControl(self.C_POPUP_REMIND)
+        channelLogoControl = self.getControl(self.C_POPUP_CHANNEL_LOGO)
+        channelTitleControl = self.getControl(self.C_POPUP_CHANNEL_TITLE)
+        programTitleControl = self.getControl(self.C_POPUP_PROGRAM_TITLE)
 
         playControl.setLabel(strings(WATCH_CHANNEL, self.program.channel.title))
-        if not self.program.channel.isPlayable():
+        if not self.source.isPlayable(self.program.channel):
             playControl.setEnabled(False)
-            self.setFocus(remindControl)
+            self.setFocusId(self.C_POPUP_CHOOSE_STRM)
+        if self.source.getCustomStreamUrl(self.program.channel):
+            chooseStrmControl = self.getControl(self.C_POPUP_CHOOSE_STRM)
+            chooseStrmControl.setLabel(strings(REMOVE_STRM_FILE))
+
+        if self.hasChannelIcon:
+            channelLogoControl.setImage(self.program.channel.logo)
+            channelTitleControl.setVisible(False)
+        else:
+            channelTitleControl.setLabel(self.program.channel.title)
+            channelLogoControl.setVisible(False)
+
+        programTitleControl.setLabel(self.program.title)
 
         if self.showRemind:
             remindControl.setLabel(strings(REMIND_PROGRAM))
@@ -407,13 +455,24 @@ class PopupMenu(xbmcgui.WindowXMLDialog):
             remindControl.setLabel(strings(DONT_REMIND_PROGRAM))
 
     def onAction(self, action):
-        if action.getId() in [KEY_BACK, KEY_MENU, KEY_NAV_BACK]:
+        if action.getId() in [KEY_BACK, KEY_MENU, KEY_NAV_BACK, KEY_CONTEXT_MENU]:
             self.close()
             return
 
     def onClick(self, controlId):
-        self.buttonClicked = controlId
-        self.close()
+        if controlId == self.C_POPUP_CHOOSE_STRM and self.source.getCustomStreamUrl(self.program.channel):
+            self.source.deleteCustomStreamUrl(self.program.channel)
+            chooseStrmControl = self.getControl(self.C_POPUP_CHOOSE_STRM)
+            chooseStrmControl.setLabel(strings(CHOOSE_STRM_FILE))
+
+            print self.source.isPlayable(self.program.channel)
+            if not self.source.isPlayable(self.program.channel):
+                playControl = self.getControl(self.C_POPUP_PLAY)
+                playControl.setEnabled(False)
+
+        else:
+            self.buttonClicked = controlId
+            self.close()
 
     def onFocus(self, controlId):
         pass

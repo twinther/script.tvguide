@@ -8,16 +8,16 @@ from strings import *
 import ysapi
 
 import xbmc
-import xbmcgui
 import pickle
+from sqlite3 import dbapi2 as sqlite3
 
-STREAM_DR1 = 'rtmp://rtmplive.dr.dk/live/livedr01astream3'
-STREAM_DR2 = 'rtmp://rtmplive.dr.dk/live/livedr02astream3'
-STREAM_DR_UPDATE = 'rtmp://rtmplive.dr.dk/live/livedr03astream3'
-STREAM_DR_K = 'rtmp://rtmplive.dr.dk/live/livedr04astream3'
-STREAM_DR_RAMASJANG = 'rtmp://rtmplive.dr.dk/live/livedr05astream3'
-STREAM_DR_HD = 'rtmp://livetv.gss.dr.dk/live/livedr06astream3'
-STREAM_24_NORDJYSKE = 'mms://stream.nordjyske.dk/24nordjyske - Full Broadcast Quality'
+STREAM_DR1 = 'plugin://plugin.video.dr.dk.live/?playChannel=1'
+STREAM_DR2 = 'plugin://plugin.video.dr.dk.live/?playChannel=2'
+STREAM_DR_UPDATE = 'plugin://plugin.video.dr.dk.live/?playChannel=3'
+STREAM_DR_K = 'plugin://plugin.video.dr.dk.live/?playChannel=4'
+STREAM_DR_RAMASJANG = 'plugin://plugin.video.dr.dk.live/?playChannel=5'
+STREAM_DR_HD = 'plugin://plugin.video.dr.dk.live/?playChannel=6'
+STREAM_24_NORDJYSKE = 'plugin://plugin.video.dr.dk.live/?playChannel=200'
 
 class Channel(object):
     def __init__(self, id, title, logo = None, streamUrl = None):
@@ -29,18 +29,23 @@ class Channel(object):
     def isPlayable(self):
         return hasattr(self, 'streamUrl') and self.streamUrl
 
-    def play(self):
-        print "Playing %s" % self.streamUrl
-#        item = xbmcgui.ListItem(path = self.streamUrl)
-#        item.setProperty('IsLive', 'true')
-        xbmc.Player().play(item = self.streamUrl + ' live=1')
-
     def __repr__(self):
         return 'Channel(id=%s, title=%s, logo=%s, streamUrl=%s)' \
                % (self.id, self.title, self.logo, self.streamUrl)
 
 class Program(object):
     def __init__(self, channel, title, startDate, endDate, description, imageLarge = None, imageSmall=None):
+        """
+
+        @param channel:
+        @type channel: source.Channel
+        @param title:
+        @param startDate:
+        @param endDate:
+        @param description:
+        @param imageLarge:
+        @param imageSmall:
+        """
         self.channel = channel
         self.title = title
         self.startDate = startDate
@@ -57,10 +62,18 @@ class Program(object):
 class Source(object):
     KEY = "undefiend"
     STREAMS = {}
+    SOURCE_DB = 'source.db'
 
     def __init__(self, settings, hasChannelIcons):
         self.channelIcons = hasChannelIcons
         self.cachePath = settings['cache.path']
+        self.playbackUsingDanishLiveTV = settings['danishlivetv.playback'] == 'true'
+
+        self.conn = sqlite3.connect(os.path.join(self.cachePath, self.SOURCE_DB), check_same_thread = False)
+        self._createTables()
+
+    def __del__(self):
+        self.conn.close()
 
     def hasChannelIcons(self):
         return self.channelIcons
@@ -88,8 +101,11 @@ class Source(object):
         if not cacheHit:
             try:
                 channelList = self._getChannelList()
+                # Setup additional stream urls
                 for channel in channelList:
-                    if self.STREAMS.has_key(channel.id):
+                    if channel.streamUrl:
+                        continue
+                    elif self.playbackUsingDanishLiveTV and self.STREAMS.has_key(channel.id):
                         channel.streamUrl = self.STREAMS[channel.id]
                         
                 pickle.dump(channelList, open(cacheFile, 'w'))
@@ -122,7 +138,7 @@ class Source(object):
                 programList = self._getProgramList(channel)
                 pickle.dump(programList, open(cacheFile, 'w'))
             except Exception, ex:
-                print "[script.tvguide] Unable to get program list for channel: " + channel + "\n" + str(ex)
+                print "[script.tvguide] Unable to get program list for channel: " + str(channel) + "\n" + str(ex)
         else:
             programList = pickle.load(open(cacheFile))
 
@@ -137,6 +153,51 @@ class Source(object):
         u.close()
             
         return content
+
+    def setCustomStreamUrl(self, channel, stream_url):
+        c = self.conn.cursor()
+        c.execute("DELETE FROM custom_stream_url WHERE channel=?", [channel.id])
+        c.execute("INSERT INTO custom_stream_url(channel, stream_url) VALUES(?, ?)", [channel.id, stream_url])
+        self.conn.commit()
+        c.close()
+
+    def getCustomStreamUrl(self, channel):
+        c = self.conn.cursor()
+        c.execute("SELECT stream_url FROM custom_stream_url WHERE channel=?", [channel.id])
+        stream_url = c.fetchone()
+        c.close()
+
+        if stream_url:
+            return stream_url[0]
+        else:
+            return None
+
+    def deleteCustomStreamUrl(self, channel):
+        c = self.conn.cursor()
+        c.execute("DELETE FROM custom_stream_url WHERE channel=?", [channel.id])
+        self.conn.commit()
+        c.close()
+
+    def isPlayable(self, channel):
+        customStreamUrl = self.getCustomStreamUrl(channel)
+        return customStreamUrl is not None or channel.isPlayable()
+
+    def play(self, channel):
+        customStreamUrl = self.getCustomStreamUrl(channel)
+        if customStreamUrl:
+            print type(customStreamUrl)
+            xbmc.log("Playing custom stream url: %s" % customStreamUrl)
+            xbmc.Player().play(item = customStreamUrl)
+
+        elif channel.isPlayable():
+            xbmc.log("Playing : %s" % channel.streamUrl)
+            xbmc.Player().play(item = channel.streamUrl)
+
+    def _createTables(self):
+        c = self.conn.cursor()
+        c.execute("CREATE TABLE IF NOT EXISTS custom_stream_url(channel TEXT, stream_url TEXT)")
+        c.close()
+
 
 class DrDkSource(Source):
     KEY = 'drdk'
@@ -203,11 +264,14 @@ class YouSeeTvSource(Source):
         self.date = datetime.datetime.today()
         self.channelCategory = settings['youseetv.category']
         self.ysApi = ysapi.YouSeeTVGuideApi()
+        self.playbackUsingYouSeeWebTv = settings['youseewebtv.playback'] == 'true'
 
     def _getChannelList(self):
         channelList = list()
         for channel in self.ysApi.channelsInCategory(self.channelCategory):
             c = Channel(id = channel['id'], title = channel['name'], logo = channel['logo'])
+            if self.playbackUsingYouSeeWebTv:
+                c.streamUrl = 'plugin://plugin.video.yousee.tv/?channel=' + str(c.id)
             channelList.append(c)
 
         return channelList

@@ -4,13 +4,7 @@ import xbmc
 import xbmcgui
 
 from strings import *
-
-try:
-    # Used by Eden/external python
-    from sqlite3 import dbapi2 as sqlite3
-except ImportError:
-    # Used by Dharma/internal python
-    from pysqlite2 import dbapi2 as sqlite3
+from sqlite3 import dbapi2 as sqlite3
 
 class Notification(object):
     NOTIFICATION_DB = 'notification.db'

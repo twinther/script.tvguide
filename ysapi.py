@@ -66,7 +66,7 @@ class YouSeeTVGuideApi(YouSeeApi):
         """
         return self._invoke(AREA_TVGUIDE, 'programs', {
             'channel_id' : channelId,
-            'offset' : 0
+            'offset' : offset
         })
 
 
