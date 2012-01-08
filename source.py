@@ -363,6 +363,11 @@ class TvTidSource(Source):
 class XMLTVSource(Source):
     KEY = 'xmltv'
 
+    STREAMS = {
+        'DR1.dr.dk' : STREAM_DR1,
+        'www.ontv.dk/tv/1' : STREAM_DR1
+    }
+
     def __init__(self, settings):
         self.xmlTvFile = settings['xmltv.file']
         self.time = time.time()

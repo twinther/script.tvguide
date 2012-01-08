@@ -1,4 +1,5 @@
 [B]Version 1.2.0 - 2012-01-xx[/B]
+- Fixed a rendering problem when the source contains more than one day of programs
 - Changed popup menu to a context menu
 - Added option to choose custom stream file instead of built-in streaming options
 - Added support for stream playback using YouSee web-tv and Danish Live TV addons

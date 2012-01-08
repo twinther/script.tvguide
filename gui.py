@@ -59,11 +59,11 @@ class TVGuide(xbmcgui.WindowXML):
         self.page = 0
 
         # find nearest half hour
-        self.date = datetime.datetime.today()
-        self.date -= datetime.timedelta(minutes = self.date.minute % 30)
+        self.viewStartDate = datetime.datetime.today()
+        self.viewStartDate -= datetime.timedelta(minutes = self.viewStartDate.minute % 30)
 
     def onInit(self):
-        self.onRedrawEPG(0, self.date)
+        self.onRedrawEPG(0, self.viewStartDate)
         self.getControl(self.C_MAIN_IMAGE).setImage('tvguide-logo-%s.png' % self.source.KEY)
 
     def onAction(self, action):
@@ -126,7 +126,7 @@ class TVGuide(xbmcgui.WindowXML):
 
             (left, top) = control.getPosition()
             y = top + (control.getHeight() / 2)
-            self.onRedrawEPG(self.page, self.date, autoChangeFocus = False)
+            self.onRedrawEPG(self.page, self.viewStartDate, autoChangeFocus = False)
             self.setFocus(self._findControlOnRight(left, y))
 
         elif buttonClicked == PopupMenu.C_POPUP_CHOOSE_STRM:
@@ -160,8 +160,8 @@ class TVGuide(xbmcgui.WindowXML):
     def _left(self, currentX, currentY):
         control = self._findControlOnLeft(currentX, currentY)
         if control is None:
-            self.date -= datetime.timedelta(hours = 2)
-            self.onRedrawEPG(self.page, self.date)
+            self.viewStartDate -= datetime.timedelta(hours = 2)
+            self.onRedrawEPG(self.page, self.viewStartDate)
             control = self._findControlOnLeft(1280, currentY)
 
         (left, top) = control.getPosition()
@@ -171,8 +171,8 @@ class TVGuide(xbmcgui.WindowXML):
     def _right(self, currentX, currentY):
         control = self._findControlOnRight(currentX, currentY)
         if control is None:
-            self.date += datetime.timedelta(hours = 2)
-            self.onRedrawEPG(self.page, self.date)
+            self.viewStartDate += datetime.timedelta(hours = 2)
+            self.onRedrawEPG(self.page, self.viewStartDate)
             control = self._findControlOnRight(0, currentY)
 
         (left, top) = control.getPosition()
@@ -182,23 +182,23 @@ class TVGuide(xbmcgui.WindowXML):
     def _up(self, currentY):
         control = self._findControlAbove(currentY)
         if control is None:
-            self.page = self.onRedrawEPG(self.page - 1, self.date)
+            self.page = self.onRedrawEPG(self.page - 1, self.viewStartDate)
             control = self._findControlAbove(720)
         return control
 
     def _down(self, currentY):
         control = self._findControlBelow(currentY)
         if control is None:
-            self.page = self.onRedrawEPG(self.page + 1, self.date)
+            self.page = self.onRedrawEPG(self.page + 1, self.viewStartDate)
             control = self._findControlBelow(0)
         return control
 
     def _pageUp(self):
-        self.page = self.onRedrawEPG(self.page - 1, self.date)
+        self.page = self.onRedrawEPG(self.page - 1, self.viewStartDate)
         return self._findControlAbove(720)
 
     def _pageDown(self):
-        self.page = self.onRedrawEPG(self.page+ 1, self.date)
+        self.page = self.onRedrawEPG(self.page+ 1, self.viewStartDate)
         return self._findControlBelow(0)
 
     def onRedrawEPG(self, page, startTime, autoChangeFocus = True):
@@ -210,7 +210,7 @@ class TVGuide(xbmcgui.WindowXML):
         self.getControl(self.C_MAIN_LOADING).setVisible(True)
 
         # move timebar to current time
-        timeDelta = datetime.datetime.today() - self.date
+        timeDelta = datetime.datetime.today() - self.viewStartDate
         c = self.getControl(4100)
         (x, y) = c.getPosition()
         c.setPosition(self._secondsToXposition(timeDelta.seconds), y)
@@ -219,7 +219,7 @@ class TVGuide(xbmcgui.WindowXML):
         self.getControl(4501).setVisible(self.source.hasChannelIcons())
 
         # date and time row
-        self.getControl(4000).setLabel(self.date.strftime('%a, %d. %b'))
+        self.getControl(4000).setLabel(self.viewStartDate.strftime('%a, %d. %b'))
         for col in range(1, 5):
             self.getControl(4000 + col).setLabel(startTime.strftime('%H:%M'))
             startTime += HALF_HOUR
@@ -230,7 +230,7 @@ class TVGuide(xbmcgui.WindowXML):
             self.onEPGLoadError()
             return
         totalPages = len(channels) / CHANNELS_PER_PAGE
-        if len(channels) % CHANNELS_PER_PAGE == 0:
+        if not len(channels) % CHANNELS_PER_PAGE:
             totalPages -= 1
 
         if page < 0:
@@ -241,20 +241,23 @@ class TVGuide(xbmcgui.WindowXML):
         channelStart = page * CHANNELS_PER_PAGE
         channelEnd = page * CHANNELS_PER_PAGE + CHANNELS_PER_PAGE
 
+        viewEndDate = self.viewStartDate + datetime.timedelta(hours = 2)
         controlsToAdd = list()
-        for idx, channel in enumerate(channels[channelStart : channelEnd]):
-            progressControl.setPercent(idx * 100 / CHANNELS_PER_PAGE)
+        viewChannels = channels[channelStart : channelEnd]
+        for idx, channel in enumerate(viewChannels):
+            progressControl.setPercent(idx * 100 / len(viewChannels))
             programs = self.source.getProgramList(channel)
             if programs is None:
                 self.onEPGLoadError()
                 return
 
             for program in programs:
-                if program.endDate <= self.date:
+                if program.endDate <= self.viewStartDate or program.startDate >= viewEndDate:
+                    # Program is out of bounds for current view
                     continue
 
-                startDelta = program.startDate - self.date
-                stopDelta = program.endDate - self.date
+                startDelta = program.startDate - self.viewStartDate
+                stopDelta = program.endDate - self.viewStartDate
 
                 cellStart = self._secondsToXposition(startDelta.seconds)
                 if startDelta.days < 0:
