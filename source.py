@@ -1,9 +1,28 @@
+#
+#      Copyright (C) 2012 Tommy Winther
+#      http://tommy.winther.nu
+#
+#  This Program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2, or (at your option)
+#  any later version.
+#
+#  This Program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+#  GNU General Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License
+#  along with this Program; see the file LICENSE.txt.  If not, write to
+#  the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
+#  http://www.gnu.org/copyleft/gpl.html
+#
 import os
 import simplejson
 import datetime
 import time
 import urllib2
-from elementtree import ElementTree
+from xml.etree import ElementTree
 from strings import *
 import ysapi
 
@@ -59,6 +78,10 @@ class Program(object):
             (self.channel, self.title, self.startDate, self.endDate, self.description, self.imageLarge, self.imageSmall)
 
 
+class SourceException(Exception):
+    pass
+
+
 class Source(object):
     KEY = "undefiend"
     STREAMS = {}
@@ -79,14 +102,15 @@ class Source(object):
         return self.channelIcons
 
     def updateChannelAndProgramListCaches(self):
-        print "[script.tvguide] Updating channel list caches..."
+        xbmc.log("[script.tvguide] Updating channel list caches...", xbmc.LOGDEBUG)
         channelList = self.getChannelList()
+        date = datetime.datetime.now()
 
         for channel in channelList:
-            print "[script.tvguide] Updating program list caches for channel " + channel.title.decode('iso-8859-1') + "..."
-            self.getProgramList(channel)
+            xbmc.log("[script.tvguide] Updating program list caches for channel " + channel.title.decode('iso-8859-1') + "...", xbmc.LOGDEBUG)
+            self.getProgramList(channel, date)
 
-        print "[script.tvguide] Done updating caches."
+        xbmc.log("[script.tvguide] Done updating caches.", xbmc.LOGDEBUG)
 
     def getChannelList(self):
         cacheFile = os.path.join(self.cachePath, self.KEY + '.channellist')
@@ -97,7 +121,6 @@ class Source(object):
         except OSError:
             cacheHit = False
 
-        channelList = None
         if not cacheHit:
             try:
                 channelList = self._getChannelList()
@@ -109,42 +132,33 @@ class Source(object):
                         channel.streamUrl = self.STREAMS[channel.id]
                         
                 pickle.dump(channelList, open(cacheFile, 'w'))
-            except Exception, ex:
-                print "[script.tvguide] Unable to get channel list\n" + str(ex)
+            except Exception as ex:
+                raise SourceException(ex)
         else:
-            try:
-                channelList = pickle.load(open(cacheFile))
-            except Exception:
-                pass
+            channelList = pickle.load(open(cacheFile))
 
         return channelList
 
     def _getChannelList(self):
         return None
 
-    def getProgramList(self, channel):
+    def getProgramList(self, channel, date):
         id = str(channel.id).replace('/', '')
-        cacheFile = os.path.join(self.cachePath, self.KEY + '-' + id + '.programlist')
+        dateString = date.strftime('%Y%m%d')
+        cacheFile = os.path.join(self.cachePath, '%s-%s-%s.programlist' % (self.KEY, id, dateString))
 
-        try:
-            cachedOn = datetime.datetime.fromtimestamp(os.path.getmtime(cacheFile))
-            cacheHit = cachedOn.day == datetime.datetime.now().day
-        except OSError:
-            cacheHit = False
-
-        programList = None
-        if not cacheHit:
+        if not os.path.exists(cacheFile):
             try:
-                programList = self._getProgramList(channel)
+                programList = self._getProgramList(channel, date)
                 pickle.dump(programList, open(cacheFile, 'w'))
-            except Exception, ex:
-                print "[script.tvguide] Unable to get program list for channel: " + str(channel) + "\n" + str(ex)
+            except Exception as ex:
+                raise SourceException(ex)
         else:
             programList = pickle.load(open(cacheFile))
 
         return programList
     
-    def _getProgramList(self, channel):
+    def _getProgramList(self, channel, date):
         return None
 
     def _downloadUrl(self, url):
@@ -215,7 +229,6 @@ class DrDkSource(Source):
 
     def __init__(self, settings):
         Source.__init__(self, settings, False)
-        self.date = datetime.datetime.today()
 
     def _getChannelList(self):
         jsonChannels = simplejson.loads(self._downloadUrl(self.CHANNELS_URL))
@@ -227,8 +240,8 @@ class DrDkSource(Source):
 
         return channelList
 
-    def _getProgramList(self, channel):
-        url = self.PROGRAMS_URL % (channel.id.replace('+', '%2b'), self.date.strftime('%Y-%m-%dT%H:%M:%S'))
+    def _getProgramList(self, channel, date):
+        url = self.PROGRAMS_URL % (channel.id.replace('+', '%2b'), date.strftime('%Y-%m-%dT00:00:00'))
         jsonPrograms = simplejson.loads(self._downloadUrl(url))
         programs = list()
 
@@ -276,9 +289,9 @@ class YouSeeTvSource(Source):
 
         return channelList
 
-    def _getProgramList(self, channel):
+    def _getProgramList(self, channel, date):
         programs = list()
-        for program in self.ysApi.programs(channel.id):
+        for program in self.ysApi.programs(channel.id, tvdate = date):
             description = program['description']
             if description is None:
                 description = strings(NO_DESCRIPTION)
@@ -307,7 +320,8 @@ class TvTidSource(Source):
     KEY = 'tvtiddk'
 
     BASE_URL = 'http://tvtid.tv2.dk%s'
-    FETCH_URL = BASE_URL % '/js/fetch.js.php/from-%d.js'
+    CHANNELS_URL = BASE_URL % '/api/channels.php/'
+    PROGRAMS_URL = BASE_URL % '/api/programs.php/date-%s.json'
 
     STREAMS = {
         11825154 : STREAM_DR1,
@@ -320,43 +334,47 @@ class TvTidSource(Source):
 
     def __init__(self, settings):
         Source.__init__(self, settings, True)
-        self.time = time.time()
-
-        # calculate nearest hour
-        self.time -= self.time % 3600
 
     def _getChannelList(self):
-        response = self._downloadUrl(self.FETCH_URL % self.time)
-        json = simplejson.loads(response)
-
+        response = self._downloadUrl(self.CHANNELS_URL)
+        channels = simplejson.loads(response)
         channelList = list()
-        for channel in json['channels']:
-            print str(channel['id']) + " - " + channel['name'].encode('utf-8', 'replace')
-            logoFile = self.BASE_URL % channel['logo']
+        for channel in channels:
+            logoFile = channel['images']['114x50']['url']
 
             c = Channel(id = channel['id'], title = channel['name'], logo = logoFile)
             channelList.append(c)
 
         return channelList
 
-    def _getProgramList(self, channel):
-        response = self._downloadUrl(self.FETCH_URL % self.time)
-        json = simplejson.loads(response)
+    def _getProgramList(self, channel, date):
+        """
 
-        c = None
-        for c in json['channels']:
-            if c['id'] == channel.id:
-                break
+        @param channel:
+        @param date:
+        @type date: datetime.datetime
+        @return:
+        """
+        dateString = date.strftime('%Y%m%d')
+        cacheFile = os.path.join(self.cachePath, '%s-%s-%s.programlist.source' % (self.KEY, id, dateString))
+        if not os.path.exists(cacheFile):
+            response = self._downloadUrl(self.PROGRAMS_URL % date.strftime('%Y%m%d'))
+            json = simplejson.loads(response)
+            pickle.dump(json, open(cacheFile, 'w'))
+        else:
+            json = pickle.load(open(cacheFile))
+
 
         # assume we always find a channel
         programs = list()
 
-        for program in c['program']:
-            description = program['short_description']
-            if description is None:
+        for program in json[str(channel.id)]:
+            if program.has_key('review'):
+                description = program['review']
+            else:
                 description = strings(NO_DESCRIPTION)
 
-            programs.append(Program(channel, program['title'], datetime.datetime.fromtimestamp(program['start_timestamp']), datetime.datetime.fromtimestamp(program['end_timestamp']), description))
+            programs.append(Program(channel, program['title'], datetime.datetime.fromtimestamp(program['sts']), datetime.datetime.fromtimestamp(program['ets']), description))
 
         return programs
 
@@ -394,7 +412,7 @@ class XMLTVSource(Source):
 
         return channelList
 
-    def _getProgramList(self, channel):
+    def _getProgramList(self, channel, date):
         doc = self._loadXml()
         programs = list()
         for program in doc.findall('programme'):
