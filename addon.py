@@ -51,7 +51,6 @@ try:
 
     if __name__ == '__main__':
         n = notification.Notification(SOURCE, ADDON.getAddonInfo('path'), xbmc.translatePath(ADDON.getAddonInfo('profile')))
-
         w = gui.TVGuide(source = SOURCE, notification = n)
         w.doModal()
         del w

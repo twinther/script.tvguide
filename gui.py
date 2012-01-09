@@ -285,7 +285,8 @@ class TVGuide(xbmcgui.WindowXML):
         # channels
         try:
             channels = self.source.getChannelList()
-        except source.SourceException:
+        except source.SourceException as ex:
+            print ex
             self.onEPGLoadError()
             return
 
@@ -317,7 +318,8 @@ class TVGuide(xbmcgui.WindowXML):
                     programList = self.source.getProgramList(channel, self.viewStartDate - datetime.timedelta(days = 1))
                     if programList:
                         programs += programList
-            except source.SourceException:
+            except source.SourceException as ex:
+                print ex
                 self.onEPGLoadError()
                 return
 

@@ -32,6 +32,14 @@
     <string id="30305">Du kan vælge din egen .strm fil som skal afspilles, når du vælger at se denne kanal.</string>
     <string id="30306">Fjern stream fil</string>
 
+    <string id="30400">TV guiden er indstillet til at streame TV via YouSee</string>
+    <string id="30401">web-tv, men denne addon er ikke installeret.</string>
+    <string id="30402">Streaming via denne addon deaktiveres nu.</string>
+
+    <string id="30403">TV guiden er indstillet til at streame TV via Danish</string>
+    <string id="30404">Live TV, men denne addon er ikke installeret.</string>
+    <string id="30405">Streaming via denne addon deaktiveres nu.</string>
+
     <string id="99980">Game over, man! [I]Game over![/I]</string>
     <string id="99981">You can't handle the truth!</string>
     <string id="99982">Danger Will Robinson</string>

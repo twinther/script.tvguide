@@ -27,6 +27,7 @@ from strings import *
 import ysapi
 
 import xbmc
+import xbmcgui
 import pickle
 from sqlite3 import dbapi2 as sqlite3
 
@@ -90,10 +91,20 @@ class Source(object):
     def __init__(self, settings, hasChannelIcons):
         self.channelIcons = hasChannelIcons
         self.cachePath = settings['cache.path']
-        self.playbackUsingDanishLiveTV = settings['danishlivetv.playback'] == 'true'
+        self.playbackUsingDanishLiveTV = False
 
         self.conn = sqlite3.connect(os.path.join(self.cachePath, self.SOURCE_DB), check_same_thread = False)
         self._createTables()
+
+        try:
+            if settings['danishlivetv.playback'] == 'true':
+                xbmcaddon.Addon(id = 'plugin.video.dr.dk.live') # raises Exception if addon is not installed
+                self.playbackUsingDanishLiveTV = True
+        except Exception:
+            ADDON.setSetting('danishlivetv.playback', 'false')
+            xbmcgui.Dialog().ok(ADDON.getAddonInfo('name'), strings(DANISH_LIVE_TV_MISSING_1),
+                strings(DANISH_LIVE_TV_MISSING_2), strings(DANISH_LIVE_TV_MISSING_3))
+
 
     def __del__(self):
         self.conn.close()
@@ -124,16 +135,17 @@ class Source(object):
         if not cacheHit:
             try:
                 channelList = self._getChannelList()
-                # Setup additional stream urls
-                for channel in channelList:
-                    if channel.streamUrl:
-                        continue
-                    elif self.playbackUsingDanishLiveTV and self.STREAMS.has_key(channel.id):
-                        channel.streamUrl = self.STREAMS[channel.id]
-                        
-                pickle.dump(channelList, open(cacheFile, 'w'))
             except Exception as ex:
                 raise SourceException(ex)
+
+            # Setup additional stream urls
+            for channel in channelList:
+                if channel.streamUrl:
+                    continue
+                elif self.playbackUsingDanishLiveTV and self.STREAMS.has_key(channel.id):
+                    channel.streamUrl = self.STREAMS[channel.id]
+
+            pickle.dump(channelList, open(cacheFile, 'w'))
         else:
             channelList = pickle.load(open(cacheFile))
 
@@ -277,7 +289,16 @@ class YouSeeTvSource(Source):
         self.date = datetime.datetime.today()
         self.channelCategory = settings['youseetv.category']
         self.ysApi = ysapi.YouSeeTVGuideApi()
-        self.playbackUsingYouSeeWebTv = settings['youseewebtv.playback'] == 'true'
+        self.playbackUsingYouSeeWebTv = False
+
+        try:
+            if settings['youseewebtv.playback'] == 'true':
+                xbmcaddon.Addon(id = 'plugin.video.yousee.tv') # raises Exception if addon is not installed
+                self.playbackUsingYouSeeWebTv = True
+        except Exception:
+            ADDON.setSetting('youseewebtv.playback', 'false')
+            xbmcgui.Dialog().ok(ADDON.getAddonInfo('name'), strings(YOUSEE_WEBTV_MISSING_1),
+                strings(YOUSEE_WEBTV_MISSING_2), strings(YOUSEE_WEBTV_MISSING_3))
 
     def _getChannelList(self):
         channelList = list()

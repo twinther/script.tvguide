@@ -19,6 +19,8 @@
 #
 import xbmcaddon
 
+ADDON = xbmcaddon.Addon(id = 'script.tvguide')
+
 NO_DESCRIPTION = 30000
 
 NO_STREAM_AVAILABLE_TITLE = 30100
@@ -41,9 +43,16 @@ DONT_REMIND_PROGRAM = 30302
 CHOOSE_STRM_FILE = 30304
 REMOVE_STRM_FILE = 30306
 
+YOUSEE_WEBTV_MISSING_1 = 30400
+YOUSEE_WEBTV_MISSING_2 = 30401
+YOUSEE_WEBTV_MISSING_3 = 30402
+
+DANISH_LIVE_TV_MISSING_1 = 30403
+DANISH_LIVE_TV_MISSING_2 = 30404
+DANISH_LIVE_TV_MISSING_3 = 30405
 
 def strings(id, replacements = None):
-    string = xbmcaddon.Addon(id = 'script.tvguide').getLocalizedString(id)
+    string = ADDON.getLocalizedString(id)
     if replacements is not None:
         return string % replacements
     else:
