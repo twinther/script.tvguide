@@ -38,6 +38,10 @@
             <posy>50</posy>
             <width>240</width>
             <height>50</height>
+            <align>center</align>
+            <aligny>center</aligny>
+            <font>font13</font>
+            <textcolor>ffffffff</textcolor>
         </control>
 
         <control type="button" id="4000">
@@ -50,9 +54,9 @@
             <onup>4003</onup>
             <ondown>4001</ondown>
             <align>center</align>
-            <alingy>center</alingy>
+            <aligny>center</aligny>
             <font>font13</font>
-            <color>ffffffff</color>
+            <textcolor>ffffffff</textcolor>
         </control>
 
         <control type="button" id="4001">
@@ -65,9 +69,9 @@
             <onup>4000</onup>
             <ondown>4002</ondown>
             <align>center</align>
-            <alingy>center</alingy>
+            <aligny>center</aligny>
             <font>font13</font>
-            <color>ffffffff</color>
+            <textcolor>ffffffff</textcolor>
             <label>$ADDON[script.tvguide 30304]</label>
         </control>
         <control type="label">
@@ -76,7 +80,7 @@
             <width>240</width>
             <height>200</height>
             <font>font13</font>
-            <color>ffffffff</color>
+            <textcolor>ffffffff</textcolor>
             <label>$ADDON[script.tvguide 30305]</label>
             <wrapmultiline>true</wrapmultiline>
         </control>
@@ -87,9 +91,9 @@
             <width>240</width>
             <height>50</height>
             <align>center</align>
-            <alingy>center</alingy>
+            <aligny>center</aligny>
             <font>font13</font>
-            <color>ffffffff</color>
+            <textcolor>ffffffff</textcolor>
         </control>
         <control type="button" id="4002">
             <posx>20</posx>
@@ -101,9 +105,9 @@
             <onup>4001</onup>
             <ondown>4003</ondown>
             <align>center</align>
-            <alingy>center</alingy>
+            <aligny>center</aligny>
             <font>font13</font>
-            <color>ffffffff</color>
+            <textcolor>ffffffff</textcolor>
         </control>
 
 
@@ -117,9 +121,9 @@
             <onup>4002</onup>
             <ondown>4000</ondown>
             <align>center</align>
-            <alingy>center</alingy>
+            <aligny>center</aligny>
             <font>font13</font>
-            <color>ffffffff</color>
+            <textcolor>ffffffff</textcolor>
             <label>$ADDON[script.tvguide 30303]</label>
         </control>
 
