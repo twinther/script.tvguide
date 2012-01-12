@@ -5,6 +5,7 @@
 - Added option to choose custom stream file instead of built-in streaming options
 - Added support for stream playback using YouSee web-tv and Danish Live TV addons
 - Improved error handling with option for the user to submit exceptions/bugs
+- Fixed problem with missing cache folder (thanks spiff)
 
 [B]Version 1.1.0 - 2011-10-03[/B]
 - Add option to get notified before programs start

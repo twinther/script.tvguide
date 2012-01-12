@@ -20,7 +20,7 @@
 import buggalo
 import xbmc
 import xbmcaddon
-
+import os
 import source
 import gui
 import notification
@@ -35,7 +35,7 @@ try:
 
     ADDON = xbmcaddon.Addon()
     sourceRef = SOURCES[ADDON.getSetting('source')]
-
+    os.makedirs(xbmc.translatePath(ADDON.getAddonInfo('profile')))
     SETTINGS = {
         'cache.path' : xbmc.translatePath(ADDON.getAddonInfo('profile')),
         'xmltv.file' : ADDON.getSetting('xmltv.file'),
