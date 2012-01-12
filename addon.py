@@ -35,7 +35,6 @@ try:
 
     ADDON = xbmcaddon.Addon()
     sourceRef = SOURCES[ADDON.getSetting('source')]
-    os.makedirs(xbmc.translatePath(ADDON.getAddonInfo('profile')))
     SETTINGS = {
         'cache.path' : xbmc.translatePath(ADDON.getAddonInfo('profile')),
         'xmltv.file' : ADDON.getSetting('xmltv.file'),
@@ -46,6 +45,8 @@ try:
         'cache.data.on.xbmc.startup' : ADDON.getSetting('cache.data.on.xbmc.startup')
     }
 
+    if not os.path.exists(SETTINGS['cache.path']):
+        os.makedirs(SETTINGS['cache.path'])
     SOURCE = sourceRef(SETTINGS)
     xbmc.log("[script.tvguide] Using source: " + str(sourceRef), xbmc.LOGDEBUG)
 
