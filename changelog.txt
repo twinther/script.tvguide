@@ -6,6 +6,7 @@
 - Added support for stream playback using YouSee web-tv and Danish Live TV addons
 - Improved error handling with option for the user to submit exceptions/bugs
 - Fixed problem with missing cache folder (thanks spiff)
+- Added option to clear cache on startup before updating program information
 
 [B]Version 1.1.0 - 2011-10-03[/B]
 - Add option to get notified before programs start

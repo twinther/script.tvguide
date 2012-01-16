@@ -23,16 +23,23 @@ import xbmcgui
 
 from strings import *
 
-try:
-    xbmc.log("Clearing TVGuide [script.tvguide] caches...", xbmc.LOGDEBUG)
-    cachePath = xbmc.translatePath(xbmcaddon.Addon(id = 'script.tvguide').getAddonInfo('profile'))
+def clear_cache():
+    try:
+        xbmc.log("Clearing TVGuide [script.tvguide] caches...", xbmc.LOGDEBUG)
+        cachePath = xbmc.translatePath(xbmcaddon.Addon(id = 'script.tvguide').getAddonInfo('profile'))
 
-    for file in os.listdir(cachePath):
-        if file not in ['settings.xml', 'notification.db', 'source.db']:
-            os.unlink(os.path.join(cachePath, file))
+        for file in os.listdir(cachePath):
+            if file not in ['settings.xml', 'notification.db', 'source.db']:
+                os.unlink(os.path.join(cachePath, file))
 
-    xbmcgui.Dialog().ok(strings(CLEAR_CACHE), strings(DONE))
+        xbmc.log("[script.tvguide] Caches cleared!", xbmc.LOGDEBUG)
+        return True
+    except Exception:
+        xbmc.log('[script.tvguide] Caught exception while clearing cache!', xbmc.LOGDEBUG)
+        return False
 
-    xbmc.log("[script.tvguide] Caches cleared!", xbmc.LOGDEBUG)
-except Exception:
-    xbmc.log('[script.tvguide] Caught exception while clearing cache!', xbmc.LOGDEBUG)
+
+if __name__ == '__main__':
+    if clear_cache():
+        xbmcgui.Dialog().ok(strings(CLEAR_CACHE), strings(DONE))
+

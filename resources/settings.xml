@@ -10,20 +10,24 @@
 
         <setting id="youseewebtv.playback" label="30111" type="bool" default="true"
                  visible="eq(-2,0)" />
-
         <setting id="danishlivetv.playback" label="30113" type="bool" default="true"
                  visible="eq(-3,1) | eq(-3,2) | eq(-1,false)" />
+        <setting id="program.background.enabled" label="30107" type="bool" default="true" visible="eq(-4,0)"/>
 
-        <setting id="xmltv.file" label="30103" type="file" visible="eq(-4,3)" />
+        <setting id="xmltv.file" label="30103" type="file" visible="eq(-5,3)" />
 
-        <setting id="program.background.enabled" label="30107" type="bool" default="true" />
-
-        <setting id="cache.data.on.xbmc.startup" label="30110" type="bool" default="true" />
 
         <setting type="sep" />
         <setting type="lsep" label="30109" />
         <setting label="30104" type="action" action="RunScript($CWD/clear_cache.py)" />
+
 	</category>
+
+    <category label="30114">
+        <setting id="cache.data.on.xbmc.startup" label="30110" type="bool" default="true" />
+        <setting id="clear.cache.on.xbmc.startup" label="30115" type="bool" default="false" visible="eq(-1,true)"/>
+
+    </category>
 
     <category label="30112">
         <setting id="notifications.enabled" label="30106" type="bool" default="true" />

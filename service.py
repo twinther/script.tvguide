@@ -20,9 +20,12 @@
 import addon
 import notification
 import xbmc
+import clear_cache
 
 if addon.SETTINGS['cache.data.on.xbmc.startup'] == 'true':
     try:
+        if addon.SETTINGS['clear.cache.on.xbmc.startup'] == 'true':
+            clear_cache.clear_cache()
         addon.SOURCE.updateChannelAndProgramListCaches()
     except Exception:
         xbmc.log('[script.tvguide] Unable to update caches!', xbmc.LOGDEBUG)

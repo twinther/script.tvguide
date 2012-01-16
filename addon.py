@@ -42,7 +42,8 @@ try:
         'youseewebtv.playback' : ADDON.getSetting('youseewebtv.playback'),
         'danishlivetv.playback' : ADDON.getSetting('danishlivetv.playback'),
         'notifications.enabled' : ADDON.getSetting('notifications.enabled'),
-        'cache.data.on.xbmc.startup' : ADDON.getSetting('cache.data.on.xbmc.startup')
+        'cache.data.on.xbmc.startup' : ADDON.getSetting('cache.data.on.xbmc.startup'),
+        'clear.cache.on.xbmc.startup' : ADDON.getSetting('clear.cache.on.xbmc.startup')
     }
 
     if not os.path.exists(SETTINGS['cache.path']):
