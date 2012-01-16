@@ -211,9 +211,10 @@ class Source(object):
     def play(self, channel):
         customStreamUrl = self.getCustomStreamUrl(channel)
         if customStreamUrl:
-            print type(customStreamUrl)
             xbmc.log("Playing custom stream url: %s" % customStreamUrl)
-            xbmc.Player().play(item = customStreamUrl)
+            playlist = xbmc.PlayList(xbmc.PLAYLIST_VIDEO)
+            playlist.load(customStreamUrl)
+            xbmc.Player().play(playlist)
 
         elif channel.isPlayable():
             xbmc.log("Playing : %s" % channel.streamUrl)
