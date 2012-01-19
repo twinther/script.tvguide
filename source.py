@@ -125,6 +125,7 @@ class Source(object):
 
     def getChannelList(self):
         cacheFile = os.path.join(self.cachePath, self.KEY + '.channellist')
+        channelList = None
 
         try:
             cachedOn = datetime.datetime.fromtimestamp(os.path.getmtime(cacheFile))
@@ -132,7 +133,15 @@ class Source(object):
         except OSError:
             cacheHit = False
 
-        if not cacheHit:
+        if cacheHit:
+            try:
+                channelList = pickle.load(open(cacheFile))
+            except Exception:
+                # Ignore cache load problem
+                xbmc.log('[script.tvguide] Exception while loading cached channel list')
+
+        if not cacheHit or not channelList:
+            xbmc.log('[script.tvguide] Caching channel list...')
             try:
                 channelList = self._getChannelList()
             except Exception as ex:
@@ -146,8 +155,6 @@ class Source(object):
                     channel.streamUrl = self.STREAMS[channel.id]
 
             pickle.dump(channelList, open(cacheFile, 'w'))
-        else:
-            channelList = pickle.load(open(cacheFile))
 
         return channelList
 
@@ -159,14 +166,20 @@ class Source(object):
         dateString = date.strftime('%Y%m%d')
         cacheFile = os.path.join(self.cachePath, '%s-%s-%s.programlist' % (self.KEY, id, dateString))
 
-        if not os.path.exists(cacheFile):
+        programList = None
+        if os.path.exists(cacheFile):
+            try:
+                programList = pickle.load(open(cacheFile))
+            except Exception:
+                xbmc.log('[script.tvguide] Exception while loading cached program list for channel %s' % channel.id)
+
+        if not programList:
+            xbmc.log('[script.tvguide] Caching program list for channel %s...' % channel.id)
             try:
                 programList = self._getProgramList(channel, date)
                 pickle.dump(programList, open(cacheFile, 'w'))
             except Exception as ex:
                 raise SourceException(ex)
-        else:
-            programList = pickle.load(open(cacheFile))
 
         return programList
     
