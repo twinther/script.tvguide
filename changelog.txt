@@ -1,4 +1,4 @@
-[B]Version 1.2.0 - 2012-01-xx[/B]
+[B]Version 1.2.0 - 2012-01-19[/B]
 - Fixed a rendering problem when the source contains more than one day of programs
 - Improved handling of programs in the future
 - Changed popup menu to a context menu
