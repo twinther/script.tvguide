@@ -417,11 +417,15 @@ class XMLTVSource(Source):
     }
 
     def __init__(self, settings):
-        self.xmlTvFile = settings['xmltv.file']
         self.logoFolder = settings['xmltv.logo.folder']
         self.time = time.time()
 
         super(XMLTVSource, self).__init__(settings)
+
+        self.xmlTvFile = os.path.join(self.cachePath, '%s.xmltv' % self.KEY)
+        if xbmcvfs.exists(settings['xmltv.file']):
+            xbmc.log('[script.tvguide] Caching XMLTV file...')
+            xbmcvfs.copy(settings['xmltv.file'], self.xmlTvFile)
 
         # calculate nearest hour
         self.time -= self.time % 3600
