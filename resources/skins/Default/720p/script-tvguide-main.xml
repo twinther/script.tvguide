@@ -200,7 +200,7 @@
                 <height>400</height>
                 <visible>true</visible>
 
-                <control type="image" id="4110">
+                <control type="largeimage" id="4110">
                     <description>1st channel</description>
                     <posx>10</posx>
                     <posy>0</posy>
@@ -209,7 +209,7 @@
                     <aspectratio>keep</aspectratio>
                     <fadetime>500</fadetime>
                 </control>
-                <control type="image" id="4111">
+                <control type="largeimage" id="4111">
                     <description>2nd channel</description>
                     <posx>10</posx>
                     <posy>50</posy>
@@ -218,7 +218,7 @@
                     <aspectratio>keep</aspectratio>
                     <fadetime>500</fadetime>
                 </control>
-                <control type="image" id="4112">
+                <control type="largeimage" id="4112">
                     <description>3rd channel</description>
                     <posx>10</posx>
                     <posy>100</posy>
@@ -227,7 +227,7 @@
                     <aspectratio>keep</aspectratio>
                     <fadetime>500</fadetime>
                 </control>
-                <control type="image" id="4113">
+                <control type="largeimage" id="4113">
                     <description>4th channel</description>
                     <posx>10</posx>
                     <posy>150</posy>
@@ -236,7 +236,7 @@
                     <aspectratio>keep</aspectratio>
                     <fadetime>500</fadetime>
                 </control>
-                <control type="image" id="4114">
+                <control type="largeimage" id="4114">
                     <description>5th channel</description>
                     <posx>10</posx>
                     <posy>200</posy>
@@ -245,7 +245,7 @@
                     <aspectratio>keep</aspectratio>
                     <fadetime>500</fadetime>
                 </control>
-                <control type="image" id="4115">
+                <control type="largeimage" id="4115">
                     <description>6th channel</description>
                     <posx>10</posx>
                     <posy>250</posy>
@@ -254,7 +254,7 @@
                     <aspectratio>keep</aspectratio>
                     <fadetime>500</fadetime>
                 </control>
-                <control type="image" id="4116">
+                <control type="largeimage" id="4116">
                     <description>7th channel</description>
                     <posx>10</posx>
                     <posy>300</posy>
@@ -263,7 +263,7 @@
                     <aspectratio>keep</aspectratio>
                     <fadetime>500</fadetime>
                 </control>
-                <control type="image" id="4117">
+                <control type="largeimage" id="4117">
                     <description>8th channel</description>
                     <posx>10</posx>
                     <posy>350</posy>
@@ -272,7 +272,7 @@
                     <aspectratio>keep</aspectratio>
                     <fadetime>500</fadetime>
                 </control>
-                <control type="image" id="4118">
+                <control type="largeimage" id="4118">
                     <description>9th channel</description>
                     <posx>10</posx>
                     <posy>400</posy>

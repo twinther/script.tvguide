@@ -96,7 +96,7 @@ class TVGuide(xbmcgui.WindowXML):
 
     def onAction(self, action):
         try:
-            if action.getId() in [ACTION_PARENT_DIR, ACTION_PREVIOUS_MENU, KEY_NAV_BACK]:
+            if action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK]:
                 self.close()
                 return
 
@@ -127,7 +127,7 @@ class TVGuide(xbmcgui.WindowXML):
                 control = self._pageUp()
             elif action.getId() == ACTION_PAGE_DOWN:
                 control = self._pageDown()
-            elif action.getId() == KEY_CONTEXT_MENU and controlInFocus is not None:
+            elif action.getId() in [KEY_CONTEXT_MENU, ACTION_PREVIOUS_MENU] and controlInFocus is not None:
                 program = self.controlToProgramMap[controlInFocus.getId()]
                 self._showContextMenu(program, controlInFocus)
 
@@ -264,7 +264,7 @@ class TVGuide(xbmcgui.WindowXML):
         self.controlToProgramMap.clear()
 
         progressControl = self.getControl(self.C_MAIN_LOADING_PROGRESS)
-        progressControl.setPercent(1)
+        progressControl.setPercent(0.1)
         self.getControl(self.C_MAIN_LOADING).setVisible(True)
 
         # move timebar to current time
@@ -273,7 +273,7 @@ class TVGuide(xbmcgui.WindowXML):
         (x, y) = c.getPosition()
         c.setPosition(self._secondsToXposition(timeDelta.seconds), y)
 
-        self.getControl(4500).setVisible(not(self.source.hasChannelIcons()))
+        self.getControl(4500).setVisible(not self.source.hasChannelIcons())
         self.getControl(4501).setVisible(self.source.hasChannelIcons())
 
         # date and time row

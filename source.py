@@ -28,6 +28,7 @@ import ysapi
 
 import xbmc
 import xbmcgui
+import xbmcvfs
 import pickle
 from sqlite3 import dbapi2 as sqlite3
 
@@ -421,12 +422,17 @@ class XMLTVSource(Source):
 
     def __init__(self, settings):
         self.xmlTvFile = settings['xmltv.file']
+        self.logoFolder = settings['xmltv.logo.folder']
         self.time = time.time()
-        try:
-            doc = self._loadXml()
-            hasChannelIcons = doc.find('channel/icon') is not None
-        except Exception:
-            hasChannelIcons = False
+
+        if self.logoFolder and xbmcvfs.exists(self.logoFolder):
+            hasChannelIcons = True
+        else:
+            try:
+                doc = self._loadXml()
+                hasChannelIcons = doc.find('channel/icon') is not None
+            except Exception:
+                hasChannelIcons = False
 
         super(XMLTVSource, self).__init__(settings, hasChannelIcons)
 
@@ -437,10 +443,15 @@ class XMLTVSource(Source):
         doc = self._loadXml()
         channelList = list()
         for channel in doc.findall('channel'):
+            title = channel.findtext('display-name')
             logo = None
+            if self.logoFolder:
+                logoFile = os.path.join(self.logoFolder, title + '.png')
+                if xbmcvfs.exists(logoFile):
+                    logo = logoFile
             if channel.find('icon'):
                 logo = channel.find('icon').get('src')
-            c = Channel(id = channel.get('id'), title = channel.findtext('display-name'), logo = logo)
+            c = Channel(id = channel.get('id'), title = title, logo = logo)
             channelList.append(c)
 
         return channelList
