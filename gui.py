@@ -151,7 +151,7 @@ class TVGuide(xbmcgui.WindowXML):
     def _showContextMenu(self, program, control):
         isNotificationRequiredForProgram = self.notification.isNotificationRequiredForProgram(program)
 
-        d = PopupMenu(self.source, program, not isNotificationRequiredForProgram, self.source.hasChannelIcons())
+        d = PopupMenu(self.source, program, not isNotificationRequiredForProgram)
         d.doModal()
         buttonClicked = d.buttonClicked
         del d
@@ -273,9 +273,6 @@ class TVGuide(xbmcgui.WindowXML):
         (x, y) = c.getPosition()
         c.setPosition(self._secondsToXposition(timeDelta.seconds), y)
 
-        self.getControl(4500).setVisible(not self.source.hasChannelIcons())
-        self.getControl(4501).setVisible(self.source.hasChannelIcons())
-
         # date and time row
         self.getControl(4000).setLabel(self.viewStartDate.strftime('%a, %d. %b'))
         for col in range(1, 5):
@@ -392,10 +389,11 @@ class TVGuide(xbmcgui.WindowXML):
                 self.getControl(4010 + idx).setLabel('')
             else:
                 channel = channelsToShow[idx]
-                if self.source.hasChannelIcons() and channel.logo is not None:
+                self.getControl(4010 + idx).setLabel(channel.title)
+                if channel.logo is not None:
                     self.getControl(4110 + idx).setImage(channel.logo)
                 else:
-                    self.getControl(4010 + idx).setLabel(channel.title)
+                    self.getControl(4110 + idx).setImage('')
 
         return page
 
@@ -486,10 +484,10 @@ class PopupMenu(xbmcgui.WindowXMLDialog):
     C_POPUP_CHANNEL_TITLE = 4101
     C_POPUP_PROGRAM_TITLE = 4102
 
-    def __new__(cls, source, program, showRemind, hasChannelIcon):
+    def __new__(cls, source, program, showRemind):
         return super(PopupMenu, cls).__new__(cls, 'script-tvguide-menu.xml', ADDON.getAddonInfo('path'))
 
-    def __init__(self, source, program, showRemind, hasChannelIcon):
+    def __init__(self, source, program, showRemind):
         """
 
         @type source: source.Source
@@ -502,7 +500,6 @@ class PopupMenu(xbmcgui.WindowXMLDialog):
         self.program = program
         self.showRemind = showRemind
         self.buttonClicked = None
-        self.hasChannelIcon = hasChannelIcon
 
     def onInit(self):
         try:
@@ -520,7 +517,7 @@ class PopupMenu(xbmcgui.WindowXMLDialog):
                 chooseStrmControl = self.getControl(self.C_POPUP_CHOOSE_STRM)
                 chooseStrmControl.setLabel(strings(REMOVE_STRM_FILE))
 
-            if self.hasChannelIcon:
+            if self.program.channel.logo is not None:
                 channelLogoControl.setImage(self.program.channel.logo)
                 channelTitleControl.setVisible(False)
             else:

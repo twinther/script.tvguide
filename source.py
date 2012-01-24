@@ -89,8 +89,7 @@ class Source(object):
     STREAMS = {}
     SOURCE_DB = 'source.db'
 
-    def __init__(self, settings, hasChannelIcons):
-        self.channelIcons = hasChannelIcons
+    def __init__(self, settings):
         self.cachePath = settings['cache.path']
         self.playbackUsingDanishLiveTV = False
 
@@ -109,9 +108,6 @@ class Source(object):
 
     def __del__(self):
         self.conn.close()
-
-    def hasChannelIcons(self):
-        return self.channelIcons
 
     def updateChannelAndProgramListCaches(self):
         xbmc.log("[script.tvguide] Updating channel list caches...", xbmc.LOGDEBUG)
@@ -253,7 +249,7 @@ class DrDkSource(Source):
     }
 
     def __init__(self, settings):
-        Source.__init__(self, settings, False)
+        Source.__init__(self, settings)
 
     def _getChannelList(self):
         jsonChannels = simplejson.loads(self._downloadUrl(self.CHANNELS_URL))
@@ -298,7 +294,7 @@ class YouSeeTvSource(Source):
     }
 
     def __init__(self, settings):
-        Source.__init__(self, settings, True)
+        Source.__init__(self, settings)
         self.date = datetime.datetime.today()
         self.channelCategory = settings['youseetv.category']
         self.ysApi = ysapi.YouSeeTVGuideApi()
@@ -367,7 +363,7 @@ class TvTidSource(Source):
     }
 
     def __init__(self, settings):
-        Source.__init__(self, settings, True)
+        Source.__init__(self, settings)
 
     def _getChannelList(self):
         response = self._downloadUrl(self.CHANNELS_URL)
@@ -425,16 +421,7 @@ class XMLTVSource(Source):
         self.logoFolder = settings['xmltv.logo.folder']
         self.time = time.time()
 
-        if self.logoFolder and xbmcvfs.exists(self.logoFolder):
-            hasChannelIcons = True
-        else:
-            try:
-                doc = self._loadXml()
-                hasChannelIcons = doc.find('channel/icon') is not None
-            except Exception:
-                hasChannelIcons = False
-
-        super(XMLTVSource, self).__init__(settings, hasChannelIcons)
+        super(XMLTVSource, self).__init__(settings)
 
         # calculate nearest hour
         self.time -= self.time % 3600
