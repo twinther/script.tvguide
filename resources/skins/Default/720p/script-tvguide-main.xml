@@ -305,6 +305,16 @@
                 <aligny>center</aligny>
                 <visible>!Control.IsVisible(4200)</visible>
             </control>
+            <control type="image" id="4024">
+                <description>Channel logo</description>
+                <posx>640</posx>
+                <posy>518</posy>
+                <width>80</width>
+                <height>40</height>
+                <aspectratio>keep</aspectratio>
+                <fadetime>500</fadetime>
+                <visible>!Control.IsVisible(4200)</visible>
+            </control>
             <control type="label" id="4021">
                 <description>Program time</description>
                 <posx>900</posx>

@@ -63,6 +63,7 @@ class TVGuide(xbmcgui.WindowXML):
     C_MAIN_TIME = 4021
     C_MAIN_DESCRIPTION = 4022
     C_MAIN_IMAGE = 4023
+    C_MAIN_LOGO = 4024
     C_MAIN_LOADING = 4200
     C_MAIN_LOADING_PROGRESS = 4201
     C_MAIN_BACKGROUND = 4600
@@ -193,6 +194,9 @@ class TVGuide(xbmcgui.WindowXML):
             self.getControl(self.C_MAIN_TITLE).setLabel('[B]%s[/B]' % program.title)
             self.getControl(self.C_MAIN_TIME).setLabel('[B]%s - %s[/B]' % (program.startDate.strftime('%H:%M'), program.endDate.strftime('%H:%M')))
             self.getControl(self.C_MAIN_DESCRIPTION).setText(program.description)
+
+            if program.channel.logo is not None:
+                self.getControl(self.C_MAIN_LOGO).setImage(program.channel.logo)
 
             if program.imageSmall is not None:
                 self.getControl(self.C_MAIN_IMAGE).setImage(program.imageSmall)
