@@ -80,7 +80,7 @@ class TVGuide(xbmcgui.WindowXML):
         super(TVGuide, self).__init__()
         self.source = source
         self.notification = notification
-        self.controlToProgramMap = {}
+        self.controlToProgramMap = dict()
         self.focusX = 0
         self.page = 0
 
@@ -129,8 +129,9 @@ class TVGuide(xbmcgui.WindowXML):
             elif action.getId() == ACTION_PAGE_DOWN:
                 control = self._pageDown()
             elif action.getId() in [KEY_CONTEXT_MENU, ACTION_PREVIOUS_MENU] and controlInFocus is not None:
-                program = self.controlToProgramMap[controlInFocus.getId()]
-                self._showContextMenu(program, controlInFocus)
+                program = self._getProgramFromControlId(controlInFocus.getId())
+                if program is not None:
+                    self._showContextMenu(program, controlInFocus)
 
             if control is not None:
                 self.setFocus(control)
@@ -141,7 +142,10 @@ class TVGuide(xbmcgui.WindowXML):
 
     def onClick(self, controlId):
         try:
-            program = self.controlToProgramMap[controlId]
+            program = self._getProgramFromControlId(controlId)
+            if program is None:
+                return
+
             if self.source.isPlayable(program.channel):
                 self.source.play(program.channel)
             else:
@@ -185,11 +189,13 @@ class TVGuide(xbmcgui.WindowXML):
             except TypeError:
                 return
 
+            program = self._getProgramFromControlId(controlId)
+            if program is None:
+                return
+
             (left, top) = controlInFocus.getPosition()
             if left > self.focusX or left + controlInFocus.getWidth() < self.focusX:
                 self.focusX = left
-
-            program = self.controlToProgramMap[controlId]
 
             self.getControl(self.C_MAIN_TITLE).setLabel('[B]%s[/B]' % program.title)
             self.getControl(self.C_MAIN_TIME).setLabel('[B]%s - %s[/B]' % (program.startDate.strftime('%H:%M'), program.endDate.strftime('%H:%M')))
@@ -287,9 +293,8 @@ class TVGuide(xbmcgui.WindowXML):
         try:
             channels = self.source.getChannelList()
         except source.SourceException as ex:
-            print ex
             self.onEPGLoadError()
-            return
+            return page
 
         totalPages = len(channels) / CHANNELS_PER_PAGE
         if not len(channels) % CHANNELS_PER_PAGE:
@@ -320,13 +325,12 @@ class TVGuide(xbmcgui.WindowXML):
                     if programList:
                         programs += programList
             except source.SourceException as ex:
-                print ex
                 self.onEPGLoadError()
-                return
+                return page
 
             if programs is None:
                 self.onEPGLoadError()
-                return
+                return page
 
             for program in programs:
                 if program.endDate <= self.viewStartDate or program.startDate >= viewEndDate:
@@ -381,7 +385,7 @@ class TVGuide(xbmcgui.WindowXML):
             self.getFocus()
         except TypeError:
             if len(self.controlToProgramMap.keys()) > 0 and autoChangeFocus:
-                self.setFocus(self.getControl(self.controlToProgramMap.keys()[0]))
+                self.setFocusId(self.controlToProgramMap.keys()[0])
 
         self.getControl(self.C_MAIN_LOADING).setVisible(False)
 
@@ -478,6 +482,10 @@ class TVGuide(xbmcgui.WindowXML):
 
         return nearestControl
 
+    def _getProgramFromControlId(self, controlId):
+        if self.controlToProgramMap.has_key(controlId):
+            return self.controlToProgramMap[controlId]
+        return None
 
 
 class PopupMenu(xbmcgui.WindowXMLDialog):

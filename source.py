@@ -138,7 +138,7 @@ class Source(object):
                 xbmc.log('[script.tvguide] Exception while loading cached channel list')
 
         if not cacheHit or not channelList:
-            xbmc.log('[script.tvguide] Caching channel list...')
+            xbmc.log('[script.tvguide] Caching channel list...', xbmc.LOGDEBUG)
             try:
                 channelList = self._getChannelList()
             except Exception as ex:
@@ -159,19 +159,23 @@ class Source(object):
         return None
 
     def getProgramList(self, channel, date):
-        id = str(channel.id).replace('/', '')
+        if type(channel.id) in [str, unicode]:
+            id = channel.id.encode('utf-8', errors='ignore')
+        else:
+            id = str(channel.id)
+
         dateString = date.strftime('%Y%m%d')
-        cacheFile = os.path.join(self.cachePath, '%s-%s-%s.programlist' % (self.KEY, id, dateString))
+        cacheFile = os.path.join(self.cachePath, '%s-%s-%s.programlist' % (self.KEY, id.replace('/', ''), dateString))
 
         programList = None
         if os.path.exists(cacheFile):
             try:
                 programList = pickle.load(open(cacheFile))
             except Exception:
-                xbmc.log('[script.tvguide] Exception while loading cached program list for channel %s' % channel.id)
+                xbmc.log('[script.tvguide] Exception while loading cached program list for channel %s' % id)
 
         if not programList:
-            xbmc.log('[script.tvguide] Caching program list for channel %s...' % channel.id)
+            xbmc.log('[script.tvguide] Caching program list for channel %s...' % id, xbmc.LOGDEBUG)
             try:
                 programList = self._getProgramList(channel, date)
                 pickle.dump(programList, open(cacheFile, 'w'))
@@ -346,7 +350,6 @@ class YouSeeTvSource(Source):
 
 
 class TvTidSource(Source):
-    # http://tvtid.tv2.dk/js/fetch.js.php/from-1291057200.js
     KEY = 'tvtiddk'
 
     BASE_URL = 'http://tvtid.tv2.dk%s'
@@ -386,13 +389,18 @@ class TvTidSource(Source):
         @return:
         """
         dateString = date.strftime('%Y%m%d')
-        cacheFile = os.path.join(self.cachePath, '%s-%s-%s.programlist.source' % (self.KEY, id, dateString))
-        if not os.path.exists(cacheFile):
+        cacheFile = os.path.join(self.cachePath, '%s-%s-%s.programlist.source' % (self.KEY, channel.id, dateString))
+        json = None
+        if os.path.exists(cacheFile):
+            try:
+                json = pickle.load(open(cacheFile))
+            except Exception:
+                pass
+
+        if not os.path.exists(cacheFile) or json is None:
             response = self._downloadUrl(self.PROGRAMS_URL % date.strftime('%Y%m%d'))
             json = simplejson.loads(response)
             pickle.dump(json, open(cacheFile, 'w'))
-        else:
-            json = pickle.load(open(cacheFile))
 
 
         # assume we always find a channel
