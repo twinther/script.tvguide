@@ -25,6 +25,8 @@ import source
 import gui
 import notification
 
+buggalo.SUBMIT_URL = 'http://tommy.winther.nu/exception/submit.php'
+
 try:
     SOURCES = {
         'YouSee.tv' : source.YouSeeTvSource,
