@@ -320,10 +320,10 @@ class TVGuide(xbmcgui.WindowXML):
                 programList = self.source.getProgramList(channel, self.viewStartDate)
                 if programList:
                     programs += programList
-                if not isinstance(self.source, source.XMLTVSource):
-                    programList = self.source.getProgramList(channel, self.viewStartDate - datetime.timedelta(days = 1))
-                    if programList:
-                        programs += programList
+                #if not isinstance(self.source, source.XMLTVSource):
+                #    programList = self.source.getProgramList(channel, self.viewStartDate - datetime.timedelta(days = 1))
+                #    if programList:
+                #        programs += programList
             except source.SourceException as ex:
                 self.onEPGLoadError()
                 return page
