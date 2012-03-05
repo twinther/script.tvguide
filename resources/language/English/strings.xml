@@ -34,5 +34,11 @@
     <string id="30304">Choose stream file</string>
     <string id="30305">You can choose your own .strm file to play, when you want to watch this channel.</string>
     <string id="30306">Remove stream file</string>
+    <string id="30307">Channels</string>
+
+    <string id="30500">[B]Edit channel order and visibility[/B]</string>
+    <string id="30501">Move up and down to change the position of[CR]the channel. Select or navigate left to accept[CR]the position.</string>
+    <string id="30502">Save</string>
+    <string id="30503">Cancel</string>
 </strings>
 

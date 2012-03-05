@@ -34,6 +34,7 @@
     <string id="30304">Vælg stream fil</string>
     <string id="30305">Du kan vælge din egen .strm fil som skal afspilles, når du vælger at se denne kanal.</string>
     <string id="30306">Fjern stream fil</string>
+    <string id="30307">Kanaler</string>
 
     <string id="30400">TV guiden er indstillet til at streame TV via YouSee</string>
     <string id="30401">web-tv, men denne addon er ikke installeret.</string>

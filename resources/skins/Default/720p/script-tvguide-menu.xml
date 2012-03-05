@@ -110,7 +110,6 @@
             <textcolor>ffffffff</textcolor>
         </control>
 
-
         <control type="button" id="4003">
             <posx>20</posx>
             <posy>650</posy>
@@ -124,7 +123,7 @@
             <aligny>center</aligny>
             <font>font13</font>
             <textcolor>ffffffff</textcolor>
-            <label>$ADDON[script.tvguide 30303]</label>
+            <label>$ADDON[script.tvguide 30307]</label>
         </control>
 
     </controls>

@@ -55,8 +55,6 @@ try:
     xbmc.log("[script.tvguide] Using source: " + str(sourceRef), xbmc.LOGDEBUG)
 
     if __name__ == '__main__':
-        source.SourceUpdaterThread(SOURCE).start()
-
         n = notification.Notification(SOURCE, ADDON.getAddonInfo('path'), xbmc.translatePath(ADDON.getAddonInfo('profile')))
         w = gui.TVGuide(source = SOURCE, notification = n)
         w.doModal()

@@ -42,11 +42,13 @@ STREAM_DR_HD = 'plugin://plugin.video.dr.dk.live/?playChannel=6'
 STREAM_24_NORDJYSKE = 'plugin://plugin.video.dr.dk.live/?playChannel=200'
 
 class Channel(object):
-    def __init__(self, id, title, logo = None, streamUrl = None):
+    def __init__(self, id, title, logo = None, streamUrl = None, visible = True, weight = 0):
         self.id = id
         self.title = title
         self.logo = logo
         self.streamUrl = streamUrl
+        self.visible = visible
+        self.weight = weight
 
     def isPlayable(self):
         return hasattr(self, 'streamUrl') and self.streamUrl
@@ -115,6 +117,7 @@ class Source(object):
         self.updateInProgress = False
         self.cachePath = settings['cache.path']
         self.playbackUsingDanishLiveTV = False
+        self.channelList = list()
 
         self.conn = sqlite3.connect(os.path.join(self.cachePath, self.SOURCE_DB), detect_types=sqlite3.PARSE_DECLTYPES, check_same_thread = False)
         self.conn.execute('PRAGMA foreign_keys = ON')
@@ -151,7 +154,7 @@ class Source(object):
             elif self.playbackUsingDanishLiveTV and self.STREAMS.has_key(channel.id):
                 channel.streamUrl = self.STREAMS[channel.id]
         self._storeChannelListInDatabase(channelList)
-
+        self.channelList = None
         self.updateInProgress = False
         return channelList
 
@@ -164,8 +167,25 @@ class Source(object):
 
         self.updateInProgress = False
 
+    def getChannel(self, id):
+        c = self.conn.cursor()
+        c.execute('SELECT * FROM channels WHERE source=? AND id=?', [self.KEY, id])
+        row = c.fetchone()
+        channel = Channel(row['id'], row['title'],row['logo'], row['stream_url'], row['visible'], row['weight'])
+        c.close()
+
+        return channel
+
     def getChannelList(self):
-        return self._retrieveChannelListFromDatabase()
+        # check if data is up-to-date in database
+        if self._isChannelListCacheExpired():
+            self.updateChannelListCache()
+
+        # cache channelList in memory
+        if not self.channelList:
+            self.channelList = self._retrieveChannelListFromDatabase()
+
+        return self.channelList
 
     def getChannelListFromExternal(self):
         """
@@ -177,33 +197,37 @@ class Source(object):
     def _storeChannelListInDatabase(self, channelList):
         c = self.conn.cursor()
         for channel in channelList:
-            c.execute('INSERT OR IGNORE INTO channels(id, title, logo, stream_url, source) VALUES(?, ?, ?, ?, ?)', [channel.id, channel.title, channel.logo, channel.streamUrl, self.KEY])
-            c.execute('UPDATE channels SET title=?, logo=?, stream_url=? WHERE id=? AND source=?', [channel.title, channel.logo, channel.streamUrl, channel.id, self.KEY])
+            c.execute('INSERT OR IGNORE INTO channels(id, title, logo, stream_url, visible, weight, source) VALUES(?, ?, ?, ?, ?, ?, ?)', [channel.id, channel.title, channel.logo, channel.streamUrl, channel.visible, channel.weight, self.KEY])
+            c.execute('UPDATE channels SET title=?, logo=?, stream_url=?, visible=?, weight=? WHERE id=? AND source=?', [channel.title, channel.logo, channel.streamUrl, channel.visible, channel.weight, channel.id, self.KEY])
 
         c.execute("UPDATE sources SET channels_updated=DATETIME('now') WHERE id=?", [self.KEY])
+        self.channelList = None
         self.conn.commit()
 
-    def _retrieveChannelListFromDatabase(self):
+    def _retrieveChannelListFromDatabase(self, onlyVisible = True):
         c = self.conn.cursor()
-
-        # check if data is up-to-date in database
         channelList = list()
-        if self._isChannelListCacheExpired():
-            channelList = self.updateChannelListCache()
-
+        if onlyVisible:
+            c.execute('SELECT * FROM channels WHERE source=? AND visible=? ORDER BY weight', [self.KEY, True])
         else:
-            c.execute('SELECT * FROM channels WHERE source=?', [self.KEY])
-            for row in c:
-                channel = Channel(row['id'], row['title'],row['logo'], row['stream_url'])
-                channelList.append(channel)
-
+            c.execute('SELECT * FROM channels WHERE source=? ORDER BY weight', [self.KEY])
+        for row in c:
+            channel = Channel(row['id'], row['title'],row['logo'], row['stream_url'], row['visible'], row['weight'])
+            channelList.append(channel)
+        c.close()
         return channelList
 
     def _isChannelListCacheExpired(self):
-        return self._getLastUpdated() < datetime.datetime.now() - datetime.timedelta(days = 1)
+        c = self.conn.cursor()
+        c.execute('SELECT channels_updated FROM sources WHERE id=?', [self.KEY])
+        lastUpdated = c.fetchone()['channels_updated']
+        c.close()
 
+        return lastUpdated < datetime.datetime.now() - datetime.timedelta(days = 1)
 
     def getProgramList(self, channel, startTime):
+        if self._isProgramListCacheExpired(startTime):
+            self.updateProgramListCaches(self.getChannelList(), startTime)
         return self._retrieveProgramListFromDatabase(channel, startTime)
 
     def getProgramListFromExternal(self, channel, date):
@@ -244,9 +268,6 @@ class Source(object):
         @type startTime: datetime.datetime
         @return:
         """
-        if self._isProgramListCacheExpired(startTime):
-            self.updateProgramListCaches(self.getChannelList(), startTime)
-
         endTime = startTime + datetime.timedelta(hours = 2)
         programList = list()
 
@@ -275,19 +296,6 @@ class Source(object):
         u.close()
             
         return content
-
-    def _getLastUpdated(self):
-        c = self.conn.cursor()
-        try:
-            c.execute('SELECT channels_updated FROM sources WHERE id=?', [self.KEY])
-            lastUpdated = c.fetchone()['channels_updated']
-        except Exception:
-            # make sure we have a record in sources for this Source
-            c.execute("INSERT INTO sources(id, channels_updated) VALUES(?, DATETIME('now', '-1 day'))", [self.KEY])
-            self.conn.commit()
-            lastUpdated = datetime.datetime.now() - datetime.timedelta(days = 1)
-        c.close()
-        return lastUpdated
 
     def setCustomStreamUrl(self, channel, stream_url):
         c = self.conn.cursor()
@@ -346,8 +354,11 @@ class Source(object):
             # For caching data
             c.execute('CREATE TABLE sources(id TEXT PRIMARY KEY, channels_updated TIMESTAMP)')
             c.execute('CREATE TABLE sources_updates(source TEXT, date TEXT, programs_updated TIMESTAMP)')
-            c.execute('CREATE TABLE channels(id TEXT, title TEXT, logo TEXT, stream_url TEXT, source TEXT, visible INTEGER, weight INTEGER, PRIMARY KEY (id, source), FOREIGN KEY(source) REFERENCES sources(id) ON DELETE CASCADE)')
+            c.execute('CREATE TABLE channels(id TEXT, title TEXT, logo TEXT, stream_url TEXT, source TEXT, visible BOOLEAN, weight INTEGER, PRIMARY KEY (id, source), FOREIGN KEY(source) REFERENCES sources(id) ON DELETE CASCADE)')
             c.execute('CREATE TABLE programs(channel TEXT, title TEXT, start_date TIMESTAMP, end_date TIMESTAMP, description TEXT, image_large TEXT, image_small TEXT, source TEXT, FOREIGN KEY(channel, source) REFERENCES channels(id, source) ON DELETE CASCADE)')
+
+        # make sure we have a record in sources for this Source
+        c.execute("INSERT OR IGNORE INTO sources(id, channels_updated) VALUES(?, DATETIME('now', '-1 day'))", [self.KEY])
 
         self.conn.commit()
         c.close()
@@ -585,9 +596,21 @@ class XMLTVSource(Source):
 
         return programs
 
+    def _isChannelListCacheExpired(self):
+        """
+        Check if xmlTvFile was modified, otherwise cache is not expired.
+        """
+        c = self.conn.cursor()
+        c.execute('SELECT channels_updated FROM sources WHERE id=?', [self.KEY])
+        lastUpdated = c.fetchone()['channels_updated']
+        c.close()
+
+        fileModified = os.stat(self.xmlTvFile).st_mtime
+        return fileModified > lastUpdated
+
+
     def _isProgramListCacheExpired(self, startTime):
-        # todo check sources.channel_updated and timestamp on xml file
-        return True
+        return self._isChannelListCacheExpired()
 
     def _loadXml(self):
         f = open(self.xmlTvFile)

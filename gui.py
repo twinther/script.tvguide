@@ -65,7 +65,6 @@ class TVGuide(xbmcgui.WindowXML):
     C_MAIN_IMAGE = 4023
     C_MAIN_LOGO = 4024
     C_MAIN_LOADING = 4200
-    C_MAIN_LOADING_PROGRESS = 4201
     C_MAIN_BACKGROUND = 4600
 
     def __new__(cls, source, notification):
@@ -146,10 +145,15 @@ class TVGuide(xbmcgui.WindowXML):
             if program is None:
                 return
 
-            if self.source.isPlayable(program.channel):
-                self.source.play(program.channel)
-            else:
-                self._showContextMenu(program, self.getControl(controlId))
+#            if self.source.isPlayable(program.channel):
+#                self.source.play(program.channel)
+#            else:
+#                self._showContextMenu(program, self.getControl(controlId))
+            d = ChannelsMenu(self.source)
+            d.doModal()
+            del d
+            self.onRedrawEPG(self.page, self.viewStartDate)
+
         except Exception:
             buggalo.onExceptionRaised()
 
@@ -181,6 +185,10 @@ class TVGuide(xbmcgui.WindowXML):
             if self.source.isPlayable(program.channel):
                 self.source.play(program.channel)
 
+        elif buttonClicked == PopupMenu.C_POPUP_CHANNELS:
+            d = ChannelsMenu(self.source)
+            d.doModal()
+            del d
 
     def onFocus(self, controlId):
         try:
@@ -270,12 +278,11 @@ class TVGuide(xbmcgui.WindowXML):
         return self._findControlBelow(0)
 
     def onRedrawEPG(self, page, startTime, autoChangeFocus = True):
-        oldControltoProgramMap = self.controlToProgramMap.copy()
-        self.controlToProgramMap.clear()
+        self.getControl(self.C_MAIN_LOADING).setVisible(False)
+        for controlId in self.controlToProgramMap:
+            self.removeControl(self.getControl(controlId))
 
-        progressControl = self.getControl(self.C_MAIN_LOADING_PROGRESS)
-        progressControl.setPercent(0.1)
-        self.getControl(self.C_MAIN_LOADING).setVisible(True)
+        self.controlToProgramMap.clear()
 
         # move timebar to current time
         timeDelta = datetime.datetime.today() - self.viewStartDate
@@ -292,7 +299,7 @@ class TVGuide(xbmcgui.WindowXML):
         # channels
         try:
             channels = self.source.getChannelList()
-        except source.SourceException as ex:
+        except source.SourceException:
             self.onEPGLoadError()
             return page
 
@@ -308,23 +315,12 @@ class TVGuide(xbmcgui.WindowXML):
         channelStart = page * CHANNELS_PER_PAGE
         channelEnd = page * CHANNELS_PER_PAGE + CHANNELS_PER_PAGE
 
-        viewEndDate = self.viewStartDate + datetime.timedelta(hours = 2)
         controlsToAdd = list()
         viewChannels = channels[channelStart : channelEnd]
         for idx, channel in enumerate(viewChannels):
-            progressControl.setPercent((idx * 100 / len(viewChannels)) + 1)
-
-            # Loads programs for yesterday as well to compensate for midnight
-            programs = list()
             try:
-                programList = self.source.getProgramList(channel, self.viewStartDate)
-                if programList:
-                    programs += programList
-                #if not isinstance(self.source, source.XMLTVSource):
-                #    programList = self.source.getProgramList(channel, self.viewStartDate - datetime.timedelta(days = 1))
-                #    if programList:
-                #        programs += programList
-            except source.SourceException as ex:
+                programs = self.source.getProgramList(channel, self.viewStartDate)
+            except source.SourceException:
                 self.onEPGLoadError()
                 return page
 
@@ -333,10 +329,6 @@ class TVGuide(xbmcgui.WindowXML):
                 return page
 
             for program in programs:
-                if program.endDate <= self.viewStartDate or program.startDate >= viewEndDate:
-                    # Program is out of bounds for current view
-                    continue
-
                 startDelta = program.startDate - self.viewStartDate
                 stopDelta = program.endDate - self.viewStartDate
 
@@ -356,7 +348,7 @@ class TVGuide(xbmcgui.WindowXML):
                         focusTexture = TEXTURE_BUTTON_FOCUS
 
                     if cellWidth < 25:
-                        title = '' # Text will overflow outside the button if it is to narrow
+                        title = '' # Text will overflow outside the button if it is too narrow
                     else:
                         title = program.title
 
@@ -372,10 +364,6 @@ class TVGuide(xbmcgui.WindowXML):
 
                     controlsToAdd.append([control, program])
 
-
-        for controlId in oldControltoProgramMap:
-            self.removeControl(self.getControl(controlId))
-
         # add program controls
         for control, program in controlsToAdd:
             self.addControl(control)
@@ -386,8 +374,6 @@ class TVGuide(xbmcgui.WindowXML):
         except TypeError:
             if len(self.controlToProgramMap.keys()) > 0 and autoChangeFocus:
                 self.setFocusId(self.controlToProgramMap.keys()[0])
-
-        self.getControl(self.C_MAIN_LOADING).setVisible(False)
 
         # set channel logo or text
         channelsToShow = channels[channelStart : channelEnd]
@@ -403,10 +389,11 @@ class TVGuide(xbmcgui.WindowXML):
                 else:
                     self.getControl(4110 + idx).setImage('')
 
+        self.getControl(self.C_MAIN_LOADING).setVisible(True)
         return page
 
     def onEPGLoadError(self):
-        self.getControl(self.C_MAIN_LOADING).setVisible(False)
+        self.getControl(self.C_MAIN_LOADING).setVisible(True)
         xbmcgui.Dialog().ok(strings(LOAD_ERROR_TITLE), strings(LOAD_ERROR_LINE1), strings(LOAD_ERROR_LINE2))
         self.close()
 
@@ -492,6 +479,7 @@ class PopupMenu(xbmcgui.WindowXMLDialog):
     C_POPUP_PLAY = 4000
     C_POPUP_CHOOSE_STRM = 4001
     C_POPUP_REMIND = 4002
+    C_POPUP_CHANNELS = 4003
     C_POPUP_CHANNEL_LOGO = 4100
     C_POPUP_CHANNEL_TITLE = 4101
     C_POPUP_PROGRAM_TITLE = 4102
@@ -574,3 +562,131 @@ class PopupMenu(xbmcgui.WindowXMLDialog):
 
     def onFocus(self, controlId):
         pass
+
+
+class ChannelsMenu(xbmcgui.WindowXMLDialog):
+    C_CHANNELS_LIST = 6000
+    C_CHANNELS_SELECTION_VISIBLE = 6001
+    C_CHANNELS_SELECTION = 6002
+    C_CHANNELS_SAVE = 6003
+    C_CHANNELS_CANCEL = 6004
+
+    def __new__(cls, source):
+        return super(ChannelsMenu, cls).__new__(cls, 'script-tvguide-channels.xml', ADDON.getAddonInfo('path'))
+
+    def __init__(self, source):
+        """
+
+        @type source: source.Source
+        """
+        super(ChannelsMenu, self).__init__()
+        self.source = source
+        self.channelList = source._retrieveChannelListFromDatabase(False)
+
+    def onInit(self):
+        try:
+            self.updateChannelList()
+            self.setFocusId(self.C_CHANNELS_LIST)
+
+        except Exception:
+            buggalo.onExceptionRaised()
+
+    def onAction(self, action):
+        try:
+            if action.getId() in [ACTION_PARENT_DIR, ACTION_PREVIOUS_MENU, KEY_NAV_BACK, KEY_CONTEXT_MENU]:
+                self.close()
+                return
+
+            if self.getFocusId() == self.C_CHANNELS_LIST and action.getId() == ACTION_LEFT:
+                listControl = self.getControl(self.C_CHANNELS_LIST)
+                idx = listControl.getSelectedPosition()
+                buttonControl = self.getControl(self.C_CHANNELS_SELECTION)
+                buttonControl.setLabel('[B]%s[/B]' % self.channelList[idx].title)
+
+                self.getControl(self.C_CHANNELS_SELECTION_VISIBLE).setVisible(False)
+                self.setFocusId(self.C_CHANNELS_SELECTION)
+
+            elif self.getFocusId() == self.C_CHANNELS_SELECTION and action.getId() in [ACTION_RIGHT, ACTION_SELECT_ITEM]:
+                self.getControl(self.C_CHANNELS_SELECTION_VISIBLE).setVisible(True)
+                xbmc.sleep(350)
+                self.setFocusId(self.C_CHANNELS_LIST)
+
+            elif self.getFocusId() == self.C_CHANNELS_SELECTION and action.getId() == ACTION_UP:
+                listControl = self.getControl(self.C_CHANNELS_LIST)
+                idx = listControl.getSelectedPosition()
+                self.swapChannels(idx, idx - 1)
+                listControl.selectItem(idx - 1)
+
+            elif self.getFocusId() == self.C_CHANNELS_SELECTION and action.getId() == ACTION_DOWN:
+                listControl = self.getControl(self.C_CHANNELS_LIST)
+                idx = listControl.getSelectedPosition()
+                self.swapChannels(idx, idx + 1)
+                listControl.selectItem(idx + 1)
+
+        except Exception:
+            buggalo.onExceptionRaised()
+
+    def onClick(self, controlId):
+        try:
+            if controlId == self.C_CHANNELS_LIST:
+                listControl = self.getControl(self.C_CHANNELS_LIST)
+                item = listControl.getSelectedItem()
+                channel = self.channelList[int(item.getProperty('idx'))]
+                channel.visible = not channel.visible
+
+                if channel.visible:
+                    iconImage = 'tvguide-channel-visible.png'
+                else:
+                    iconImage = 'tvguide-channel-hidden.png'
+                item.setIconImage(iconImage)
+
+            elif controlId == self.C_CHANNELS_SAVE:
+                self.source._storeChannelListInDatabase(self.channelList)
+                self.close()
+
+            elif controlId == self.C_CHANNELS_CANCEL:
+                self.close()
+
+        except Exception:
+            buggalo.onExceptionRaised()
+
+    def onFocus(self, controlId):
+        pass
+
+    def updateChannelList(self):
+        listControl = self.getControl(self.C_CHANNELS_LIST)
+        listControl.reset()
+        for idx, channel in enumerate(self.channelList):
+            if channel.visible:
+                iconImage = 'tvguide-channel-visible.png'
+            else:
+                iconImage = 'tvguide-channel-hidden.png'
+
+            item = xbmcgui.ListItem('%3d. %s' % (idx+1, channel.title), iconImage = iconImage)
+            item.setProperty('idx', str(idx))
+            listControl.addItem(item)
+
+    def updateListItem(self, idx, item = None):
+        if item is None:
+            item = xbmcgui.ListItem()
+        channel = self.channelList[idx]
+        item.setLabel('%3d. %s' % (idx+1, channel.title))
+
+        if channel.visible:
+            iconImage = 'tvguide-channel-visible.png'
+        else:
+            iconImage = 'tvguide-channel-hidden.png'
+        item.setIconImage(iconImage)
+        item.setProperty('idx', str(idx))
+
+    def swapChannels(self, fromIdx, toIdx):
+        c = self.channelList[fromIdx]
+        self.channelList[fromIdx] = self.channelList[toIdx]
+        self.channelList[toIdx] = c
+
+        listControl = self.getControl(self.C_CHANNELS_LIST)
+        self.updateListItem(fromIdx, listControl.getListItem(fromIdx))
+        self.updateListItem(toIdx, listControl.getListItem(toIdx))
+
+
+

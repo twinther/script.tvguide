@@ -2,6 +2,7 @@
 - Added French translation
 - Use script.module.buggalo for error reporting
 - Cache EPG data to local SQLite database (based on work by timpinkawa)
+- Added option to edit channel order and visibility
 
 [B]Version 1.2.2 - 2012-01-28[/B]
 - Fixed compatibility problem with Python 2.6 and previous versions
