@@ -42,7 +42,7 @@ STREAM_DR_HD = 'plugin://plugin.video.dr.dk.live/?playChannel=6'
 STREAM_24_NORDJYSKE = 'plugin://plugin.video.dr.dk.live/?playChannel=200'
 
 class Channel(object):
-    def __init__(self, id, title, logo = None, streamUrl = None, visible = True, weight = 0):
+    def __init__(self, id, title, logo = None, streamUrl = None, visible = True, weight = -1):
         self.id = id
         self.title = title
         self.logo = logo
@@ -196,9 +196,10 @@ class Source(object):
 
     def _storeChannelListInDatabase(self, channelList):
         c = self.conn.cursor()
-        for channel in channelList:
-            c.execute('INSERT OR IGNORE INTO channels(id, title, logo, stream_url, visible, weight, source) VALUES(?, ?, ?, ?, ?, ?, ?)', [channel.id, channel.title, channel.logo, channel.streamUrl, channel.visible, channel.weight, self.KEY])
-            c.execute('UPDATE channels SET title=?, logo=?, stream_url=?, visible=?, weight=? WHERE id=? AND source=?', [channel.title, channel.logo, channel.streamUrl, channel.visible, channel.weight, channel.id, self.KEY])
+        for idx, channel in enumerate(channelList):
+            c.execute('INSERT OR IGNORE INTO channels(id, title, logo, stream_url, visible, weight, source) VALUES(?, ?, ?, ?, ?, (CASE ? WHEN -1 THEN (SELECT COALESCE(MAX(weight)+1, 0) FROM channels WHERE source=?) ELSE ? END), ?)', [channel.id, channel.title, channel.logo, channel.streamUrl, channel.visible, channel.weight, self.KEY, channel.weight, self.KEY])
+            if not c.rowcount:
+                c.execute('UPDATE channels SET title=?, logo=?, stream_url=?, visible=?, weight=(CASE ? WHEN -1 THEN (SELECT COALESCE(MAX(weight)+1, 0) FROM channels WHERE source=?) ELSE ? END) WHERE id=? AND source=?', [channel.title, channel.logo, channel.streamUrl, channel.visible, channel.weight, self.KEY, channel.weight, channel.id, self.KEY])
 
         c.execute("UPDATE sources SET channels_updated=DATETIME('now') WHERE id=?", [self.KEY])
         self.channelList = None
@@ -254,7 +255,8 @@ class Source(object):
 
         dateStr = date.strftime('%Y-%m-%d')
         c.execute("INSERT OR IGNORE INTO sources_updates(source, date, programs_updated) VALUES(?, ?, DATETIME('now'))", [self.KEY, dateStr])
-        c.execute("UPDATE sources_updates SET programs_updated=DATETIME('now') WHERE source=? AND date=?", [self.KEY, dateStr])
+        if not c.rowcount:
+            c.execute("UPDATE sources_updates SET programs_updated=DATETIME('now') WHERE source=? AND date=?", [self.KEY, dateStr])
 
         self.conn.commit()
         c.close()
@@ -347,7 +349,7 @@ class Source(object):
             version = [0, 0, 0]
 
         if version < [1, 3, 0]:
-            c.execute('CREATE TABLE custom_stream_url(channel TEXT, stream_url TEXT)')
+            c.execute('CREATE TABLE IF NOT EXISTS custom_stream_url(channel TEXT, stream_url TEXT)')
             c.execute('CREATE TABLE version (major INTEGER, minor INTEGER, patch INTEGER)')
             c.execute('INSERT INTO version(major, minor, patch) VALUES(1, 3, 0)')
 

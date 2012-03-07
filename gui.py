@@ -684,6 +684,10 @@ class ChannelsMenu(xbmcgui.WindowXMLDialog):
         self.channelList[fromIdx] = self.channelList[toIdx]
         self.channelList[toIdx] = c
 
+        # recalculate weight
+        for idx, channel in enumerate(self.channelList):
+            channel.weight = idx
+
         listControl = self.getControl(self.C_CHANNELS_LIST)
         self.updateListItem(fromIdx, listControl.getListItem(fromIdx))
         self.updateListItem(toIdx, listControl.getListItem(toIdx))
