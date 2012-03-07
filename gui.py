@@ -145,14 +145,10 @@ class TVGuide(xbmcgui.WindowXML):
             if program is None:
                 return
 
-#            if self.source.isPlayable(program.channel):
-#                self.source.play(program.channel)
-#            else:
-#                self._showContextMenu(program, self.getControl(controlId))
-            d = ChannelsMenu(self.source)
-            d.doModal()
-            del d
-            self.onRedrawEPG(self.page, self.viewStartDate)
+            if self.source.isPlayable(program.channel):
+                self.source.play(program.channel)
+            else:
+                self._showContextMenu(program, self.getControl(controlId))
 
         except Exception:
             buggalo.onExceptionRaised()
@@ -189,6 +185,7 @@ class TVGuide(xbmcgui.WindowXML):
             d = ChannelsMenu(self.source)
             d.doModal()
             del d
+            self.onRedrawEPG(self.page, self.viewStartDate)
 
     def onFocus(self, controlId):
         try:
