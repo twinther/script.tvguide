@@ -20,44 +20,25 @@
 import buggalo
 import xbmc
 import xbmcaddon
-import os
-import source
+import xbmcgui
+import source as src
 import gui
 import notification
 
 buggalo.SUBMIT_URL = 'http://tommy.winther.nu/exception/submit.php'
 
 try:
-    SOURCES = {
-        'YouSee.tv' : source.YouSeeTvSource,
-        'DR.dk' : source.DrDkSource,
-        'TVTID.dk' : source.TvTidSource,
-        'XMLTV' : source.XMLTVSource
-        }
-
     ADDON = xbmcaddon.Addon()
-    sourceRef = SOURCES[ADDON.getSetting('source')]
-    SETTINGS = {
-        'cache.path' : xbmc.translatePath(ADDON.getAddonInfo('profile')),
-        'xmltv.file' : ADDON.getSetting('xmltv.file'),
-        'xmltv.logo.folder' : ADDON.getSetting('xmltv.logo.folder'),
-        'youseetv.category' : ADDON.getSetting('youseetv.category'),
-        'youseewebtv.playback' : ADDON.getSetting('youseewebtv.playback'),
-        'danishlivetv.playback' : ADDON.getSetting('danishlivetv.playback'),
-        'notifications.enabled' : ADDON.getSetting('notifications.enabled'),
-        'cache.data.on.xbmc.startup' : ADDON.getSetting('cache.data.on.xbmc.startup'),
-        'clear.cache.on.xbmc.startup' : ADDON.getSetting('clear.cache.on.xbmc.startup')
-    }
+    SOURCE = src.instantiateSource(ADDON)
+    xbmc.log("[script.tvguide] Using source: %s" % str(type(SOURCE)), xbmc.LOGDEBUG)
 
-    if not os.path.exists(SETTINGS['cache.path']):
-        os.makedirs(SETTINGS['cache.path'])
-    SOURCE = sourceRef(SETTINGS)
-    xbmc.log("[script.tvguide] Using source: " + str(sourceRef), xbmc.LOGDEBUG)
+    n = notification.Notification(SOURCE, ADDON.getAddonInfo('path'), xbmc.translatePath(ADDON.getAddonInfo('profile')))
+    w = gui.TVGuide(source = SOURCE, notification = n)
+    w.doModal()
+    del w
 
-    if __name__ == '__main__':
-        n = notification.Notification(SOURCE, ADDON.getAddonInfo('path'), xbmc.translatePath(ADDON.getAddonInfo('profile')))
-        w = gui.TVGuide(source = SOURCE, notification = n)
-        w.doModal()
-        del w
+except src.SourceUpdateInProgressException:
+    xbmcgui.Dialog().ok('error', 'database update in progress...')
+
 except Exception:
     buggalo.onExceptionRaised()

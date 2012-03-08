@@ -30,7 +30,6 @@ import xbmc
 import xbmcgui
 import xbmcvfs
 import pickle
-import threading
 from sqlite3 import dbapi2 as sqlite3
 
 STREAM_DR1 = 'plugin://plugin.video.dr.dk.live/?playChannel=1'
@@ -86,46 +85,30 @@ class Program(object):
 class SourceException(Exception):
     pass
 
-
-class SourceUpdaterThread(threading.Thread):
-    def __init__(self, source):
-        """
-
-        @param source:
-        @type source: source.Source
-        @return:
-        """
-        super(SourceUpdaterThread, self).__init__()
-        self.source = source
-
-    def run(self):
-        channelList = None
-        if self.source._isChannelListCacheExpired():
-            channelList = self.source.updateChannelListCache()
-
-        if self.source._isProgramListCacheExpired():
-            if channelList is None:
-                channelList = self.source.getChannelList()
-            self.source.updateProgramListCaches(channelList)
+class SourceUpdateInProgressException(SourceException):
+    pass
 
 class Source(object):
     KEY = "undefined"
     STREAMS = {}
     SOURCE_DB = 'source.db'
 
-    def __init__(self, settings):
-        self.updateInProgress = False
-        self.cachePath = settings['cache.path']
+    def __init__(self, addon, cachePath):
+        self.cachePath = cachePath
         self.playbackUsingDanishLiveTV = False
         self.channelList = list()
 
-        self.conn = sqlite3.connect(os.path.join(self.cachePath, self.SOURCE_DB), detect_types=sqlite3.PARSE_DECLTYPES, check_same_thread = False)
-        self.conn.execute('PRAGMA foreign_keys = ON')
-        self.conn.row_factory = sqlite3.Row
-        self._createTables()
+        try:
+            #noinspection PyArgumentList
+            self.conn = sqlite3.connect(os.path.join(self.cachePath, self.SOURCE_DB), detect_types=sqlite3.PARSE_DECLTYPES, check_same_thread = False)
+            self.conn.execute('PRAGMA foreign_keys = ON')
+            self.conn.row_factory = sqlite3.Row
+            self._createTables()
+        except sqlite3.OperationalError, ex:
+            raise SourceUpdateInProgressException(ex)
 
         try:
-            if settings['danishlivetv.playback'] == 'true':
+            if addon.getSetting('danishlivetv.playback') == 'true':
                 xbmcaddon.Addon(id = 'plugin.video.dr.dk.live') # raises Exception if addon is not installed
                 self.playbackUsingDanishLiveTV = True
         except Exception:
@@ -136,36 +119,62 @@ class Source(object):
     def __del__(self):
         self.conn.close()
 
-    def isUpdateInProgress(self):
-        return self.updateInProgress
+    def getDataFromExternal(self, date, progress_callback = None):
+        """
+        Retrieve data from external as a list or iterable. Data may contain both Channel and Program objects.
+        The source may choose to ignore the date parameter and return all data available.
 
-    def updateChannelListCache(self):
-        self.updateInProgress = True
-        xbmc.log('[script.tvguide] Updating channel list caches...', xbmc.LOGDEBUG)
+        @param date: the date to retrieve the data for
+        @param progress_callback:
+        @return:
+        """
+        raise SourceException('getDataFromExternal not implemented!')
+
+    def updateChannelAndProgramListCaches(self, date = datetime.datetime.now(), progress_callback = None, clearExistingProgramList = True):
         try:
-            channelList = self.getChannelListFromExternal()
-        except Exception as ex:
-            raise SourceException(ex)
+            xbmc.log('[script.tvguide] Updating caches...', xbmc.LOGDEBUG)
 
-        # Setup additional stream urls
-        for channel in channelList:
-            if channel.streamUrl:
-                continue
-            elif self.playbackUsingDanishLiveTV and self.STREAMS.has_key(channel.id):
-                channel.streamUrl = self.STREAMS[channel.id]
-        self._storeChannelListInDatabase(channelList)
-        self.channelList = None
-        self.updateInProgress = False
-        return channelList
+            c = self.conn.cursor()
+            if clearExistingProgramList:
+                c.execute('DELETE FROM programs WHERE source=?', [self.KEY])
 
-    def updateProgramListCaches(self, channelList, date = datetime.datetime.now()):
-        self.updateInProgress = True
-        for channel in channelList:
-            xbmc.log("[script.tvguide] Updating program list caches for channel " + channel.title.decode('iso-8859-1') + "...", xbmc.LOGDEBUG)
-            programList = self.getProgramListFromExternal(channel, date)
-            self._storeProgramListInDatabase(channel, programList, date, False)
+            for item in self.getDataFromExternal(date, progress_callback):
+                if isinstance(item, Channel):
+                    channel = item
+                    if channel.streamUrl:
+                        continue
+                    elif self.playbackUsingDanishLiveTV and self.STREAMS.has_key(channel.id):
+                        channel.streamUrl = self.STREAMS[channel.id]
+                    c.execute('INSERT OR IGNORE INTO channels(id, title, logo, stream_url, visible, weight, source) VALUES(?, ?, ?, ?, ?, (CASE ? WHEN -1 THEN (SELECT COALESCE(MAX(weight)+1, 0) FROM channels WHERE source=?) ELSE ? END), ?)', [channel.id, channel.title, channel.logo, channel.streamUrl, channel.visible, channel.weight, self.KEY, channel.weight, self.KEY])
+                    if not c.rowcount:
+                        c.execute('UPDATE channels SET title=?, logo=?, stream_url=?, visible=?, weight=(CASE ? WHEN -1 THEN (SELECT COALESCE(MAX(weight)+1, 0) FROM channels WHERE source=?) ELSE ? END) WHERE id=? AND source=?', [channel.title, channel.logo, channel.streamUrl, channel.visible, channel.weight, self.KEY, channel.weight, channel.id, self.KEY])
 
-        self.updateInProgress = False
+                elif isinstance(item, Program):
+                    program = item
+                    if isinstance(program.channel, Channel):
+                        channel = program.channel.id
+                    else:
+                        channel = program.channel
+
+                    c.execute('INSERT INTO programs(channel, title, start_date, end_date, description, image_large, image_small, source) VALUES(?, ?, ?, ?, ?, ?, ?, ?)',
+                        [channel, program.title, program.startDate, program.endDate, program.description, program.imageLarge, program.imageSmall, self.KEY])
+
+            # channels updated
+            c.execute("UPDATE sources SET channels_updated=DATETIME('now') WHERE id=?", [self.KEY])
+
+            # programs updated
+            dateStr = date.strftime('%Y-%m-%d')
+            c.execute("INSERT OR IGNORE INTO sources_updates(source, date, programs_updated) VALUES(?, ?, DATETIME('now'))", [self.KEY, dateStr])
+            if not c.rowcount:
+                c.execute("UPDATE sources_updates SET programs_updated=DATETIME('now') WHERE source=? AND date=?", [self.KEY, dateStr])
+
+            self.conn.commit()
+            c.close()
+
+        #except Exception as ex:
+        #    raise SourceException(ex)
+        finally:
+            pass
 
     def getChannel(self, id):
         c = self.conn.cursor()
@@ -176,23 +185,16 @@ class Source(object):
 
         return channel
 
-    def getChannelList(self):
+    def getChannelList(self, progress_callback = None):
         # check if data is up-to-date in database
         if self._isChannelListCacheExpired():
-            self.updateChannelListCache()
+            self.updateChannelAndProgramListCaches(progress_callback = progress_callback)
 
         # cache channelList in memory
         if not self.channelList:
             self.channelList = self._retrieveChannelListFromDatabase()
 
         return self.channelList
-
-    def getChannelListFromExternal(self):
-        """
-        Retrieves the actual channel data from the external source.
-        Must be implemented by each sub-class.
-        """
-        raise SourceException('getChannelListFromExternal(..) not implemented!')
 
     def _storeChannelListInDatabase(self, channelList):
         c = self.conn.cursor()
@@ -226,40 +228,10 @@ class Source(object):
 
         return lastUpdated < datetime.datetime.now() - datetime.timedelta(days = 1)
 
-    def getProgramList(self, channel, startTime):
+    def getProgramList(self, channel, startTime, progress_callback = None):
         if self._isProgramListCacheExpired(startTime):
-            self.updateProgramListCaches(self.getChannelList(), startTime)
+            self.updateChannelAndProgramListCaches(startTime, progress_callback, clearExistingProgramList = False)
         return self._retrieveProgramListFromDatabase(channel, startTime)
-
-    def getProgramListFromExternal(self, channel, date):
-        """
-        Retrieves the actual program data from the external source.
-        Must be implemented by each sub-class.
-        """
-        raise SourceException('getProgramListFromExternal(..) not implemented!')
-
-    def _storeProgramListInDatabase(self, channel, programList, date, clearExistingProgramList = True):
-        """
-        Deletes any existing programs for the channel and creates the new one.
-        @param channel:
-        @param programList:
-        @param clearExistingProgramList:
-        @return:
-        """
-        c = self.conn.cursor()
-        if clearExistingProgramList:
-            c.execute('DELETE FROM programs WHERE channel=? AND source=?', [channel.id, self.KEY])
-        for program in programList:
-            c.execute('INSERT INTO programs(channel, title, start_date, end_date, description, image_large, image_small, source) VALUES(?, ?, ?, ?, ?, ?, ?, ?)',
-                [channel.id, program.title, program.startDate, program.endDate, program.description, program.imageLarge, program.imageSmall, self.KEY])
-
-        dateStr = date.strftime('%Y-%m-%d')
-        c.execute("INSERT OR IGNORE INTO sources_updates(source, date, programs_updated) VALUES(?, ?, DATETIME('now'))", [self.KEY, dateStr])
-        if not c.rowcount:
-            c.execute("UPDATE sources_updates SET programs_updated=DATETIME('now') WHERE source=? AND date=?", [self.KEY, dateStr])
-
-        self.conn.commit()
-        c.close()
 
     def _retrieveProgramListFromDatabase(self, channel, startTime):
         """
@@ -380,18 +352,22 @@ class DrDkSource(Source):
         'dr.dk/mas/whatson/channel/TV' : STREAM_DR_HD
     }
 
-    def __init__(self, settings):
-        Source.__init__(self, settings)
+    def __init__(self, addon, cachePath):
+        Source.__init__(self, addon, cachePath)
 
-    def getChannelListFromExternal(self):
+    def getDataFromExternal(self, date, progress_callback = None):
         jsonChannels = simplejson.loads(self._downloadUrl(self.CHANNELS_URL))
-        channelList = list()
+        data = list()
 
-        for channel in jsonChannels['result']:
+        channels = jsonChannels['result']
+        for idx, channel in enumerate(channels):
             c = Channel(id = channel['source_url'], title = channel['name'])
-            channelList.append(c)
+            data.append(c)
+            data.extend(self.getProgramListFromExternal(channel, date))
 
-        return channelList
+            progress_callback(100.0 / len(channels) * idx)
+
+        return data
 
     def getProgramListFromExternal(self, channel, date):
         url = self.PROGRAMS_URL % (channel.id.replace('+', '%2b'), date.strftime('%Y-%m-%dT00:00:00'))
@@ -425,15 +401,15 @@ class YouSeeTvSource(Source):
         503 : STREAM_DR_HD
     }
 
-    def __init__(self, settings):
-        Source.__init__(self, settings)
+    def __init__(self, addon, cachePath):
+        Source.__init__(self, addon, cachePath)
         self.date = datetime.datetime.today()
-        self.channelCategory = settings['youseetv.category']
+        self.channelCategory = addon.getSetting('youseetv.category')
         self.ysApi = ysapi.YouSeeTVGuideApi()
         self.playbackUsingYouSeeWebTv = False
 
         try:
-            if settings['youseewebtv.playback'] == 'true':
+            if addon.getSetting('youseewebtv.playback') == 'true':
                 xbmcaddon.Addon(id = 'plugin.video.yousee.tv') # raises Exception if addon is not installed
                 self.playbackUsingYouSeeWebTv = True
         except Exception:
@@ -441,15 +417,19 @@ class YouSeeTvSource(Source):
             xbmcgui.Dialog().ok(ADDON.getAddonInfo('name'), strings(YOUSEE_WEBTV_MISSING_1),
                 strings(YOUSEE_WEBTV_MISSING_2), strings(YOUSEE_WEBTV_MISSING_3))
 
-    def getChannelListFromExternal(self):
-        channelList = list()
-        for channel in self.ysApi.channelsInCategory(self.channelCategory):
+    def getDataFromExternal(self, date, progress_callback = None):
+        data = list()
+        channels = self.ysApi.channelsInCategory(self.channelCategory)
+        for idx, channel in enumerate(channels):
             c = Channel(id = channel['id'], title = channel['name'], logo = channel['logo'])
             if self.playbackUsingYouSeeWebTv:
                 c.streamUrl = 'plugin://plugin.video.yousee.tv/?channel=' + str(c.id)
-            channelList.append(c)
+            data.append(c)
+            data.extend(self.getProgramListFromExternal(c, date))
 
-        return channelList
+            progress_callback(100.0 / len(channels) * idx)
+
+        return data
 
     def getProgramListFromExternal(self, channel, date):
         programs = list()
@@ -493,20 +473,23 @@ class TvTidSource(Source):
         26005640 : STREAM_DR_HD
     }
 
-    def __init__(self, settings):
-        Source.__init__(self, settings)
+    def __init__(self, addon, cachePath):
+        Source.__init__(self, addon, cachePath)
 
-    def getChannelListFromExternal(self):
+    def getDataFromExternal(self, date, progress_callback = None):
         response = self._downloadUrl(self.CHANNELS_URL)
         channels = simplejson.loads(response)
-        channelList = list()
-        for channel in channels:
+        data = list()
+        for idx, channel in enumerate(channels):
             logoFile = channel['images']['114x50']['url']
 
             c = Channel(id = channel['id'], title = channel['name'], logo = logoFile)
-            channelList.append(c)
+            data.append(c)
+            data.extend(self.getProgramListFromExternal(channel, date))
 
-        return channelList
+            progress_callback(100.0 / len(channels) * idx)
+
+        return data
 
     def getProgramListFromExternal(self, channel, date):
         """
@@ -552,51 +535,60 @@ class XMLTVSource(Source):
         'www.ontv.dk/tv/1' : STREAM_DR1
     }
 
-    def __init__(self, settings):
-        self.logoFolder = settings['xmltv.logo.folder']
+    def __init__(self, addon, cachePath):
+        self.logoFolder = addon.getSetting('xmltv.logo.folder')
         self.time = time.time()
 
-        super(XMLTVSource, self).__init__(settings)
+        super(XMLTVSource, self).__init__(addon, cachePath)
 
         self.xmlTvFile = os.path.join(self.cachePath, '%s.xmltv' % self.KEY)
-        if xbmcvfs.exists(settings['xmltv.file']):
+        if xbmcvfs.exists(addon.getSetting('xmltv.file')):
             xbmc.log('[script.tvguide] Caching XMLTV file...')
-            xbmcvfs.copy(settings['xmltv.file'], self.xmlTvFile)
+            xbmcvfs.copy(addon.getSetting('xmltv.file'), self.xmlTvFile)
 
         # calculate nearest hour
         self.time -= self.time % 3600
 
-    def getChannelListFromExternal(self):
-        doc = self._loadXml()
-        channelList = list()
-        for channel in doc.findall('channel'):
-            title = channel.findtext('display-name')
-            logo = None
-            if self.logoFolder:
-                logoFile = os.path.join(self.logoFolder, title + '.png')
-                if xbmcvfs.exists(logoFile):
-                    logo = logoFile
-            if channel.find('icon'):
-                logo = channel.find('icon').get('src')
-            c = Channel(id = channel.get('id'), title = title, logo = logo)
-            channelList.append(c)
+    def getDataFromExternal(self, date, progress_callback = None):
+        size = os.path.getsize(self.xmlTvFile)
+        f = open(self.xmlTvFile, "rb")
+        context = ElementTree.iterparse(f, events=("start", "end"))
+        event, root = context.next()
+        elements_parsed = 0
 
-        return channelList
+        for event, elem in context:
+            if event == "end":
+                result = None
+                if elem.tag == "programme":
+                    channel = elem.get("channel")
+                    description = elem.findtext("desc")
+                    if not description:
+                        description = strings(NO_DESCRIPTION)
+                    result = Program(channel, elem.findtext('title'), self._parseDate(elem.get('start')), self._parseDate(elem.get('stop')), description)
 
-    def getProgramListFromExternal(self, channel, date):
-        doc = self._loadXml()
-        programs = list()
-        for program in doc.findall('programme'):
-            if program.get('channel') != channel.id:
-                continue
+                elif elem.tag == "channel":
+                    id = elem.get("id")
+                    title = elem.findtext("display-name")
+                    logo = None
+                    if self.logoFolder:
+                        logoFile = os.path.join(self.logoFolder, title + '.png')
+                        if xbmcvfs.exists(logoFile):
+                            logo = logoFile
+                    if not logo:
+                        iconElement = elem.find("icon")
+                        if iconElement is not None:
+                            logo = iconElement.get("src")
+                    result = Channel(id, title, logo)
 
-            description = program.findtext('desc')
-            if description is None:
-                description = strings(NO_DESCRIPTION)
+                if result:
+                    elements_parsed += 1
+                    if progress_callback and elements_parsed % 500 == 0:
+                        if not progress_callback((f.tell(), size)):
+                            return
+                    yield result
 
-            programs.append(Program(channel, program.findtext('title'), self._parseDate(program.get('start')), self._parseDate(program.get('stop')), description))
-
-        return programs
+            root.clear()
+        self.completed = True
 
     def _isChannelListCacheExpired(self):
         """
@@ -607,7 +599,7 @@ class XMLTVSource(Source):
         lastUpdated = c.fetchone()['channels_updated']
         c.close()
 
-        fileModified = os.stat(self.xmlTvFile).st_mtime
+        fileModified = os.path.getmtime(self.xmlTvFile)
         return fileModified > lastUpdated
 
 
@@ -626,4 +618,22 @@ class XMLTVSource(Source):
         dateStringWithoutTimeZone = dateString[:-6]
         t = time.strptime(dateStringWithoutTimeZone, '%Y%m%d%H%M%S')
         return datetime.datetime(t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec)
+
+
+def instantiateSource(addon):
+    SOURCES = {
+        'YouSee.tv' : YouSeeTvSource,
+        'DR.dk' : DrDkSource,
+        'TVTID.dk' : TvTidSource,
+        'XMLTV' : XMLTVSource
+    }
+
+    cachePath = xbmc.translatePath(ADDON.getAddonInfo('profile'))
+
+    if not os.path.exists(cachePath):
+        os.makedirs(cachePath)
+
+    s = SOURCES[addon.getSetting('source')]
+    return s(addon, cachePath)
+
 

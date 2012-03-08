@@ -17,31 +17,29 @@
 #  the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
 #  http://www.gnu.org/copyleft/gpl.html
 #
-import addon
+import xbmcaddon
 import notification
 import xbmc
 import clear_cache
+import source as src
 
-if addon.SETTINGS['cache.data.on.xbmc.startup'] == 'true':
+
+ADDON = xbmcaddon.Addon(id = 'script.tvguide')
+source = src.instantiateSource(ADDON)
+if ADDON.getSetting('cache.data.on.xbmc.startup') == 'true':
     try:
-        if addon.SETTINGS['clear.cache.on.xbmc.startup'] == 'true':
+        if ADDON.getSetting('clear.cache.on.xbmc.startup') == 'true':
             clear_cache.clear_cache()
         channelList = None
-        if addon.SOURCE._isChannelListCacheExpired():
-            channelList = addon.SOURCE.updateChannelListCache()
+        if source._isChannelListCacheExpired():
+            channelList = source.updateChannelAndProgramListCaches()
 
-        if addon.SOURCE._isProgramListCacheExpired():
-            if channelList is None:
-                channelList = addon.SOURCE.getChannelList()
-            addon.SOURCE.updateProgramListCaches(channelList)
+    except Exception, ex:
+        xbmc.log('[script.tvguide] Unable to update caches: %s' % str(ex) , xbmc.LOGDEBUG)
 
-    except Exception:
-        xbmc.log('[script.tvguide] Unable to update caches!', xbmc.LOGDEBUG)
-
-if addon.SETTINGS['notifications.enabled'] == 'true':
+if ADDON.getSetting('notifications.enabled') == 'true':
     try:
-        n = notification.Notification(addon.SOURCE, addon.ADDON.getAddonInfo('path'),
-            xbmc.translatePath(addon.ADDON.getAddonInfo('profile')))
+        n = notification.Notification(source, ADDON.getAddonInfo('path'), xbmc.translatePath(ADDON.getAddonInfo('profile')))
         n.scheduleNotifications()
     except Exception:
         xbmc.log('[script.tvguide] Unable to schedules notifications!', xbmc.LOGDEBUG)

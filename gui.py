@@ -65,6 +65,7 @@ class TVGuide(xbmcgui.WindowXML):
     C_MAIN_IMAGE = 4023
     C_MAIN_LOGO = 4024
     C_MAIN_LOADING = 4200
+    C_MAIN_LOADING_PROGRESS = 4201
     C_MAIN_BACKGROUND = 4600
 
     def __new__(cls, source, notification):
@@ -295,7 +296,7 @@ class TVGuide(xbmcgui.WindowXML):
 
         # channels
         try:
-            channels = self.source.getChannelList()
+            channels = self.source.getChannelList(self.onSourceProgressUpdate)
         except source.SourceException:
             self.onEPGLoadError()
             return page
@@ -316,7 +317,7 @@ class TVGuide(xbmcgui.WindowXML):
         viewChannels = channels[channelStart : channelEnd]
         for idx, channel in enumerate(viewChannels):
             try:
-                programs = self.source.getProgramList(channel, self.viewStartDate)
+                programs = self.source.getProgramList(channel, self.viewStartDate, self.onSourceProgressUpdate)
             except source.SourceException:
                 self.onEPGLoadError()
                 return page
@@ -393,6 +394,14 @@ class TVGuide(xbmcgui.WindowXML):
         self.getControl(self.C_MAIN_LOADING).setVisible(True)
         xbmcgui.Dialog().ok(strings(LOAD_ERROR_TITLE), strings(LOAD_ERROR_LINE1), strings(LOAD_ERROR_LINE2))
         self.close()
+
+    def onSourceProgressUpdate(self, percentageComplete):
+        progressControl = self.getControl(self.C_MAIN_LOADING_PROGRESS)
+        if percentageComplete < 1:
+            progressControl.setPercent(1)
+        else:
+            progressControl.setPercent(percentageComplete)
+        return True
 
     def _secondsToXposition(self, seconds):
         return CELL_WIDTH_CHANNELS + (seconds * CELL_WIDTH / 1800)
