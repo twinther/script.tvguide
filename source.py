@@ -160,13 +160,13 @@ class Source(object):
                         [channel, program.title, program.startDate, program.endDate, program.description, program.imageLarge, program.imageSmall, self.KEY])
 
             # channels updated
-            c.execute("UPDATE sources SET channels_updated=DATETIME('now') WHERE id=?", [self.KEY])
+            c.execute("UPDATE sources SET channels_updated=? WHERE id=?", [datetime.datetime.now(),self.KEY])
 
             # programs updated
             dateStr = date.strftime('%Y-%m-%d')
-            c.execute("INSERT OR IGNORE INTO sources_updates(source, date, programs_updated) VALUES(?, ?, DATETIME('now'))", [self.KEY, dateStr])
+            c.execute("INSERT OR IGNORE INTO sources_updates(source, date, programs_updated) VALUES(?, ?, ?)", [self.KEY, dateStr, datetime.datetime.now()])
             if not c.rowcount:
-                c.execute("UPDATE sources_updates SET programs_updated=DATETIME('now') WHERE source=? AND date=?", [self.KEY, dateStr])
+                c.execute("UPDATE sources_updates SET programs_updated=? WHERE source=? AND date=?", [datetime.datetime.now(), self.KEY, dateStr])
 
             self.conn.commit()
             c.close()
@@ -203,7 +203,7 @@ class Source(object):
             if not c.rowcount:
                 c.execute('UPDATE channels SET title=?, logo=?, stream_url=?, visible=?, weight=(CASE ? WHEN -1 THEN (SELECT COALESCE(MAX(weight)+1, 0) FROM channels WHERE source=?) ELSE ? END) WHERE id=? AND source=?', [channel.title, channel.logo, channel.streamUrl, channel.visible, channel.weight, self.KEY, channel.weight, channel.id, self.KEY])
 
-        c.execute("UPDATE sources SET channels_updated=DATETIME('now') WHERE id=?", [self.KEY])
+        c.execute("UPDATE sources SET channels_updated=? WHERE id=?", [datetime.datetime.now(), self.KEY])
         self.channelList = None
         self.conn.commit()
 
@@ -228,12 +228,12 @@ class Source(object):
 
         return lastUpdated < datetime.datetime.now() - datetime.timedelta(days = 1)
 
-    def getProgramList(self, channel, startTime, progress_callback = None):
+    def getProgramList(self, channels, startTime, progress_callback = None):
         if self._isProgramListCacheExpired(startTime):
             self.updateChannelAndProgramListCaches(startTime, progress_callback, clearExistingProgramList = False)
-        return self._retrieveProgramListFromDatabase(channel, startTime)
+        return self._retrieveProgramListFromDatabase(channels, startTime)
 
-    def _retrieveProgramListFromDatabase(self, channel, startTime):
+    def _retrieveProgramListFromDatabase(self, channels, startTime):
         """
 
         @param channel:
@@ -245,10 +245,14 @@ class Source(object):
         endTime = startTime + datetime.timedelta(hours = 2)
         programList = list()
 
+        channelMap = dict()
+        for c in channels:
+            channelMap[c.id] = c
+
         c = self.conn.cursor()
-        c.execute('SELECT * FROM programs WHERE channel=? AND source=? AND end_date >= ? AND start_date <= ?', [channel.id, self.KEY, startTime, endTime])
+        c.execute('SELECT * FROM programs WHERE channel IN (\'' + ('\',\''.join(channelMap.keys())) + '\') AND source=? AND end_date >= ? AND start_date <= ?', [self.KEY, startTime, endTime])
         for row in c:
-            program = Program(channel, row['title'], row['start_date'], row['end_date'], row['description'], row['image_large'], row['image_small'])
+            program = Program(channelMap[row['channel']], row['title'], row['start_date'], row['end_date'], row['description'], row['image_large'], row['image_small'])
             programList.append(program)
 
         return programList
@@ -303,11 +307,11 @@ class Source(object):
         customStreamUrl = self.getCustomStreamUrl(channel)
         if customStreamUrl:
             xbmc.log("Playing custom stream url: %s" % customStreamUrl)
-            xbmc.Player().play(item = customStreamUrl)
+            xbmc.Player().play(item = customStreamUrl, windowed=True)
 
         elif channel.isPlayable():
             xbmc.log("Playing : %s" % channel.streamUrl)
-            xbmc.Player().play(item = channel.streamUrl)
+            xbmc.Player().play(item = channel.streamUrl, windowed=True)
 
     def _createTables(self):
         c = self.conn.cursor()
@@ -332,7 +336,7 @@ class Source(object):
             c.execute('CREATE TABLE programs(channel TEXT, title TEXT, start_date TIMESTAMP, end_date TIMESTAMP, description TEXT, image_large TEXT, image_small TEXT, source TEXT, FOREIGN KEY(channel, source) REFERENCES channels(id, source) ON DELETE CASCADE)')
 
         # make sure we have a record in sources for this Source
-        c.execute("INSERT OR IGNORE INTO sources(id, channels_updated) VALUES(?, DATETIME('now', '-1 day'))", [self.KEY])
+        c.execute("INSERT OR IGNORE INTO sources(id, channels_updated) VALUES(?, ?)", [self.KEY, datetime.datetime.now() - datetime.timedelta(days = 1)])
 
         self.conn.commit()
         c.close()
@@ -541,10 +545,11 @@ class XMLTVSource(Source):
 
         super(XMLTVSource, self).__init__(addon, cachePath)
 
-        self.xmlTvFile = os.path.join(self.cachePath, '%s.xmltv' % self.KEY)
-        if xbmcvfs.exists(addon.getSetting('xmltv.file')):
-            xbmc.log('[script.tvguide] Caching XMLTV file...')
-            xbmcvfs.copy(addon.getSetting('xmltv.file'), self.xmlTvFile)
+        self.xmlTvFile = addon.getSetting('xmltv.file')
+        #self.xmlTvFile = os.path.join(self.cachePath, '%s.xmltv' % self.KEY)
+        #if xbmcvfs.exists(addon.getSetting('xmltv.file')):
+        #    xbmc.log('[script.tvguide] Caching XMLTV file...')
+        #    xbmcvfs.copy(addon.getSetting('xmltv.file'), self.xmlTvFile)
 
         # calculate nearest hour
         self.time -= self.time % 3600
@@ -583,7 +588,7 @@ class XMLTVSource(Source):
                 if result:
                     elements_parsed += 1
                     if progress_callback and elements_parsed % 500 == 0:
-                        if not progress_callback((f.tell(), size)):
+                        if not progress_callback(100.0 / size * f.tell()):
                             return
                     yield result
 
@@ -599,7 +604,9 @@ class XMLTVSource(Source):
         lastUpdated = c.fetchone()['channels_updated']
         c.close()
 
-        fileModified = os.path.getmtime(self.xmlTvFile)
+        fileModified = datetime.datetime.fromtimestamp(os.path.getmtime(self.xmlTvFile))
+        print lastUpdated
+        print fileModified
         return fileModified > lastUpdated
 
 

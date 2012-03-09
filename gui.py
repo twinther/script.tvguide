@@ -148,6 +148,7 @@ class TVGuide(xbmcgui.WindowXML):
 
             if self.source.isPlayable(program.channel):
                 self.source.play(program.channel)
+                self.getControl(5000).setVisible(False)
             else:
                 self._showContextMenu(program, self.getControl(controlId))
 
@@ -315,52 +316,54 @@ class TVGuide(xbmcgui.WindowXML):
 
         controlsToAdd = list()
         viewChannels = channels[channelStart : channelEnd]
-        for idx, channel in enumerate(viewChannels):
-            try:
-                programs = self.source.getProgramList(channel, self.viewStartDate, self.onSourceProgressUpdate)
-            except source.SourceException:
-                self.onEPGLoadError()
-                return page
+        try:
+            programs = self.source.getProgramList(viewChannels, self.viewStartDate, self.onSourceProgressUpdate)
+        except source.SourceException:
+            self.onEPGLoadError()
+            return page
 
-            if programs is None:
-                self.onEPGLoadError()
-                return page
+        if programs is None:
+            self.onEPGLoadError()
+            return page
 
-            for program in programs:
-                startDelta = program.startDate - self.viewStartDate
-                stopDelta = program.endDate - self.viewStartDate
+#        for idx, channel in enumerate(viewChannels):
+        for program in programs:
+            idx = viewChannels.index(program.channel)
 
-                cellStart = self._secondsToXposition(startDelta.seconds)
-                if startDelta.days < 0:
-                    cellStart = CELL_WIDTH_CHANNELS
-                cellWidth = self._secondsToXposition(stopDelta.seconds) - cellStart
-                if cellStart + cellWidth > 1260:
-                    cellWidth = 1260 - cellStart
+            startDelta = program.startDate - self.viewStartDate
+            stopDelta = program.endDate - self.viewStartDate
 
-                if cellWidth > 1:
-                    if self.notification.isNotificationRequiredForProgram(program):
-                        noFocusTexture = TEXTURE_BUTTON_NOFOCUS_NOTIFY
-                        focusTexture = TEXTURE_BUTTON_FOCUS_NOTIFY
-                    else:
-                        noFocusTexture = TEXTURE_BUTTON_NOFOCUS
-                        focusTexture = TEXTURE_BUTTON_FOCUS
+            cellStart = self._secondsToXposition(startDelta.seconds)
+            if startDelta.days < 0:
+                cellStart = CELL_WIDTH_CHANNELS
+            cellWidth = self._secondsToXposition(stopDelta.seconds) - cellStart
+            if cellStart + cellWidth > 1260:
+                cellWidth = 1260 - cellStart
 
-                    if cellWidth < 25:
-                        title = '' # Text will overflow outside the button if it is too narrow
-                    else:
-                        title = program.title
+            if cellWidth > 1:
+                if self.notification.isNotificationRequiredForProgram(program):
+                    noFocusTexture = TEXTURE_BUTTON_NOFOCUS_NOTIFY
+                    focusTexture = TEXTURE_BUTTON_FOCUS_NOTIFY
+                else:
+                    noFocusTexture = TEXTURE_BUTTON_NOFOCUS
+                    focusTexture = TEXTURE_BUTTON_FOCUS
 
-                    control = xbmcgui.ControlButton(
-                        cellStart,
-                        60 + CELL_HEIGHT * idx,
-                        cellWidth - 2,
-                        CELL_HEIGHT - 2,
-                        title,
-                        noFocusTexture = noFocusTexture,
-                        focusTexture = focusTexture
-                    )
+                if cellWidth < 25:
+                    title = '' # Text will overflow outside the button if it is too narrow
+                else:
+                    title = program.title
 
-                    controlsToAdd.append([control, program])
+                control = xbmcgui.ControlButton(
+                    cellStart,
+                    60 + CELL_HEIGHT * idx,
+                    cellWidth - 2,
+                    CELL_HEIGHT - 2,
+                    title,
+                    noFocusTexture = noFocusTexture,
+                    focusTexture = focusTexture
+                )
+
+                controlsToAdd.append([control, program])
 
         # add program controls
         for control, program in controlsToAdd:
@@ -399,8 +402,14 @@ class TVGuide(xbmcgui.WindowXML):
         progressControl = self.getControl(self.C_MAIN_LOADING_PROGRESS)
         if percentageComplete < 1:
             progressControl.setPercent(1)
-        else:
+            self.progressStartTime = datetime.datetime.now()
+            self.progressPreviousPercentage = percentageComplete
+        elif percentageComplete != self.progressPreviousPercentage:
             progressControl.setPercent(percentageComplete)
+            self.progressPreviousPercentage = percentageComplete
+            delta = datetime.datetime.now() - self.progressStartTime
+            print 'time left: ' + str(delta.seconds / float(percentageComplete) * (100.0 - percentageComplete))
+
         return True
 
     def _secondsToXposition(self, seconds):
