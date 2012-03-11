@@ -76,8 +76,8 @@ class SourceInitializer(threading.Thread):
                 xbmc.log("[script.tvguide] Using source: %s" % str(type(source)), xbmc.LOGDEBUG)
                 self.sourceInitializedHandler.onSourceInitialized(source)
                 break
-            except src.SourceUpdateInProgressException:
-                xbmc.log('[script.tvguide] database update in progress...', xbmc.LOGDEBUG)
+            except src.SourceUpdateInProgressException, ex:
+                xbmc.log('[script.tvguide] database update in progress...: %s' % str(ex), xbmc.LOGDEBUG)
                 xbmc.sleep(1000)
 
 
@@ -574,7 +574,7 @@ class TVGuide(xbmcgui.WindowXML):
             else:
                 secondsLeft = delta.seconds / float(percentageComplete) * (100.0 - percentageComplete)
                 if secondsLeft > 30:
-                    secondsLeft -= secondsLeft % 5
+                    secondsLeft -= secondsLeft % 10
                 timeLeftControl.setLabel(strings(TIME_LEFT) % secondsLeft)
 
         return not xbmc.abortRequested
@@ -773,7 +773,6 @@ class ChannelsMenu(xbmcgui.WindowXMLDialog):
         try:
             self.updateChannelList()
             self.setFocusId(self.C_CHANNELS_LIST)
-
         except Exception:
             buggalo.onExceptionRaised()
 

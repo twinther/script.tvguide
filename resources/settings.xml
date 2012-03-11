@@ -5,7 +5,7 @@
                  values="YouSee.tv|DR.dk|TVTID.dk|XMLTV" />
 
         <setting id="youseetv.category" label="30102" type="labelenum" default="Danske"
-                 values="Mine kanaler|Danske|Filmkanaler|Grundpakken|Mellempakken|Fuldpakken|Nordiske|Engelske|Tyske|Latinske|Slaviske|Tyrkiske|Kurdiske|Arabiske|Asiatiske"
+                 values="Danske|Filmkanaler|Grundpakken|Mellempakken|Fuldpakken|Nordiske|Engelske|Tyske|Latinske|Slaviske|Tyrkiske|Kurdiske|Arabiske|Asiatiske"
                  visible="eq(-1,0)" />
 
         <setting id="youseewebtv.playback" label="30111" type="bool" default="true"

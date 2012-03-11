@@ -168,10 +168,10 @@ class Source(object):
         raise SourceException('getDataFromExternal not implemented!')
 
     def updateChannelAndProgramListCaches(self, date = datetime.datetime.now(), progress_callback = None, clearExistingProgramList = True):
+        c = self.conn.cursor()
         try:
             xbmc.log('[script.tvguide] Updating caches...', xbmc.LOGDEBUG)
 
-            c = self.conn.cursor()
             if self.settingsChanged:
                 c.execute('DELETE FROM channels WHERE source=?', [self.KEY])
             self.settingsChanged = False # only want to update once due to changed settings
@@ -179,7 +179,13 @@ class Source(object):
             if clearExistingProgramList:
                 c.execute('DELETE FROM programs WHERE source=?', [self.KEY])
 
+            imported = 0
             for item in self.getDataFromExternal(date, progress_callback):
+                imported += 1
+
+                if imported % 1000 == 0:
+                    self.conn.commit()
+
                 if isinstance(item, Channel):
                     channel = item
                     if channel.streamUrl:
@@ -189,6 +195,7 @@ class Source(object):
                     c.execute('INSERT OR IGNORE INTO channels(id, title, logo, stream_url, visible, weight, source) VALUES(?, ?, ?, ?, ?, (CASE ? WHEN -1 THEN (SELECT COALESCE(MAX(weight)+1, 0) FROM channels WHERE source=?) ELSE ? END), ?)', [channel.id, channel.title, channel.logo, channel.streamUrl, channel.visible, channel.weight, self.KEY, channel.weight, self.KEY])
                     if not c.rowcount:
                         c.execute('UPDATE channels SET title=?, logo=?, stream_url=?, visible=?, weight=(CASE ? WHEN -1 THEN (SELECT COALESCE(MAX(weight)+1, 0) FROM channels WHERE source=?) ELSE ? END) WHERE id=? AND source=?', [channel.title, channel.logo, channel.streamUrl, channel.visible, channel.weight, self.KEY, channel.weight, channel.id, self.KEY])
+                    self.conn.commit()
 
                 elif isinstance(item, Program):
                     program = item
@@ -210,12 +217,19 @@ class Source(object):
                 c.execute("UPDATE sources_updates SET programs_updated=? WHERE source=? AND date=?", [datetime.datetime.now(), self.KEY, dateStr])
 
             self.conn.commit()
-            c.close()
 
-        #except Exception as ex:
-        #    raise SourceException(ex)
+        except Exception, ex:
+            self.conn.rollback()
+            print str(ex)
+
+            # invalidate cached data
+            #noinspection PyTypeChecker
+            c.execute('UPDATE sources SET channels_updated=? WHERE source=?', [datetime.datetime.fromtimestamp(0), self.KEY])
+            self.conn.commit()
+
+            raise SourceException(ex)
         finally:
-            pass
+            c.close()
 
     def getChannel(self, id):
         c = self.conn.cursor()
@@ -418,7 +432,6 @@ class Source(object):
             c.execute('SELECT major, minor, patch FROM version')
             (major, minor, patch) = c.fetchone()
             version = [major, minor, patch]
-            print version
         except sqlite3.OperationalError:
             version = [0, 0, 0]
 
@@ -440,6 +453,7 @@ class Source(object):
             c.execute('CREATE TABLE settings(key TEXT PRIMARY KEY, value TEXT)')
 
         # make sure we have a record in sources for this Source
+        #noinspection PyTypeChecker
         c.execute("INSERT OR IGNORE INTO sources(id, channels_updated) VALUES(?, ?)", [self.KEY, datetime.datetime.fromtimestamp(0)])
 
         self.conn.commit()
@@ -471,15 +485,16 @@ class DrDkSource(Source):
         for idx, channel in enumerate(channels):
             c = Channel(id = channel['source_url'], title = channel['name'])
             data.append(c)
-            data.extend(self.getProgramListFromExternal(channel, date))
+            data.extend(self.getProgramListFromExternal(channel['source_url'], date))
 
             if progress_callback:
-                progress_callback(100.0 / len(channels) * idx)
+                if not progress_callback(100.0 / len(channels) * idx):
+                    return
 
         return data
 
     def getProgramListFromExternal(self, channel, date):
-        url = self.PROGRAMS_URL % (channel.id.replace('+', '%2b'), date.strftime('%Y-%m-%dT00:00:00'))
+        url = self.PROGRAMS_URL % (channel.replace('+', '%2b'), date.strftime('%Y-%m-%dT00:00:00'))
         jsonPrograms = simplejson.loads(self._downloadUrl(url))
         programs = list()
 
@@ -537,7 +552,8 @@ class YouSeeTvSource(Source):
             data.extend(self.getProgramListFromExternal(c, date))
 
             if progress_callback:
-                progress_callback(100.0 / len(channels) * idx)
+                if not progress_callback(100.0 / len(channels) * idx):
+                    return
 
         return data
 
@@ -589,55 +605,28 @@ class TvTidSource(Source):
     def getDataFromExternal(self, date, progress_callback = None):
         response = self._downloadUrl(self.CHANNELS_URL)
         channels = simplejson.loads(response)
-        data = list()
+
+        response = self._downloadUrl(self.PROGRAMS_URL % date.strftime('%Y%m%d'))
+        programs = simplejson.loads(response)
+
         for idx, channel in enumerate(channels):
             logoFile = channel['images']['114x50']['url']
 
             c = Channel(id = channel['id'], title = channel['name'], logo = logoFile)
-            data.append(c)
-            data.extend(self.getProgramListFromExternal(channel, date))
+            yield c
+
+            for program in programs[str(c.id)]:
+                if program.has_key('review'):
+                    description = program['review']
+                else:
+                    description = strings(NO_DESCRIPTION)
+                p = Program(c, program['title'], datetime.datetime.fromtimestamp(program['sts']), datetime.datetime.fromtimestamp(program['ets']), description)
+                yield p
 
             if progress_callback:
-                progress_callback(100.0 / len(channels) * idx)
+                if not progress_callback(100.0 / len(channels) * idx):
+                    return
 
-        return data
-
-    def getProgramListFromExternal(self, channel, date):
-        """
-
-        @param channel:
-        @param date:
-        @type date: datetime.datetime
-        @return:
-        """
-        # todo rewrite to not cache data locally
-        dateString = date.strftime('%Y%m%d')
-        cacheFile = os.path.join(self.cachePath, '%s-%s-%s.programlist.source' % (self.KEY, channel.id, dateString))
-        json = None
-        if os.path.exists(cacheFile):
-            try:
-                json = pickle.load(open(cacheFile))
-            except Exception:
-                pass
-
-        if not os.path.exists(cacheFile) or json is None:
-            response = self._downloadUrl(self.PROGRAMS_URL % date.strftime('%Y%m%d'))
-            json = simplejson.loads(response)
-            pickle.dump(json, open(cacheFile, 'w'))
-
-
-        # assume we always find a channel
-        programs = list()
-
-        for program in json[str(channel.id)]:
-            if program.has_key('review'):
-                description = program['review']
-            else:
-                description = strings(NO_DESCRIPTION)
-
-            programs.append(Program(channel, program['title'], datetime.datetime.fromtimestamp(program['sts']), datetime.datetime.fromtimestamp(program['ets']), description))
-
-        return programs
 
 class XMLTVSource(Source):
     KEY = 'xmltv'
@@ -712,8 +701,6 @@ class XMLTVSource(Source):
         c.close()
 
         fileModified = datetime.datetime.fromtimestamp(os.path.getmtime(self.xmlTvFile))
-        print lastUpdated
-        print fileModified
         return fileModified > lastUpdated
 
 
