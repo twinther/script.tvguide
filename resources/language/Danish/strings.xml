@@ -2,6 +2,9 @@
 <strings>
     <string id="30000">Ingen beskrivelse</string>
     <string id="30001">[B]Indlæser data fra ekstern kilde...[/B]</string>
+    <string id="30002">Beregner resterende tid...</string>
+    <string id="30003">ca. %d sekunder tilbage...</string>
+    <string id="30004">Indlæsning af data allerede påbegyndt...</string>
 
     <string id="30100">Generelt</string>
     <string id="30101">Kilde</string>

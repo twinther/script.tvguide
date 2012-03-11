@@ -3,6 +3,7 @@
 - Use script.module.buggalo for error reporting
 - Cache EPG data to local SQLite database (based on work by timpinkawa)
 - Added option to edit channel order and visibility
+- Automatically detects changes in settings and reloads EPG data as needed
 - Improved XMLTV parsing (thanks timpinkawa)
 - Added initial channel surfing support
   - Press Info for OSD, navigate with Up, Down, Left, Right, Channel + and -

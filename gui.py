@@ -77,7 +77,7 @@ class SourceInitializer(threading.Thread):
                 self.sourceInitializedHandler.onSourceInitialized(source)
                 break
             except src.SourceUpdateInProgressException:
-                print('database update in progress...')
+                xbmc.log('[script.tvguide] database update in progress...', xbmc.LOGDEBUG)
                 xbmc.sleep(1000)
 
 
@@ -125,7 +125,7 @@ class TVGuide(xbmcgui.WindowXML):
         try:
             self.getControl(self.C_MAIN_OSD).setVisible(False)
             self.getControl(self.C_MAIN_LOADING).setVisible(False)
-            # todo set loading text
+            self.getControl(self.C_MAIN_LOADING_TIME_LEFT).setLabel(strings(BACKGROUND_UPDATE_IN_PROGRESS))
 
             SourceInitializer(self).run()
         except Exception:
@@ -563,10 +563,12 @@ class TVGuide(xbmcgui.WindowXML):
             delta = datetime.datetime.now() - self.progressStartTime
 
             if percentageComplete < 20:
-                timeLeftControl.setLabel('calculating remaining time...')
+                timeLeftControl.setLabel(strings(CALCULATING_REMAINING_TIME))
             else:
                 secondsLeft = delta.seconds / float(percentageComplete) * (100.0 - percentageComplete)
-                timeLeftControl.setLabel('%d seconds remaining...' % secondsLeft)
+                if secondsLeft > 30:
+                    secondsLeft -= secondsLeft % 5
+                timeLeftControl.setLabel(strings(TIME_LEFT) % secondsLeft)
 
         return not xbmc.abortRequested
 

@@ -16,17 +16,10 @@
 
         <setting id="xmltv.file" label="30103" type="file" visible="eq(-5,3)" />
         <setting id="xmltv.logo.folder" label="30116" type="folder" visible="eq(-6,3)"/>
-
-        <setting type="sep" />
-        <setting type="lsep" label="30109" />
-        <setting label="30104" type="action" action="RunScript($CWD/clear_cache.py)" />
-
 	</category>
 
     <category label="30114">
         <setting id="cache.data.on.xbmc.startup" label="30110" type="bool" default="true" />
-        <setting id="clear.cache.on.xbmc.startup" label="30115" type="bool" default="false" visible="eq(-1,true)"/>
-
     </category>
 
     <category label="30112">

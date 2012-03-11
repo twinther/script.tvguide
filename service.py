@@ -20,16 +20,12 @@
 import xbmcaddon
 import notification
 import xbmc
-import clear_cache
 import source as src
-
 
 ADDON = xbmcaddon.Addon(id = 'script.tvguide')
 source = src.instantiateSource(ADDON, None)
 if ADDON.getSetting('cache.data.on.xbmc.startup') == 'true':
     try:
-        if ADDON.getSetting('clear.cache.on.xbmc.startup') == 'true':
-            clear_cache.clear_cache()
         channelList = None
         if source._isChannelListCacheExpired():
             channelList = source.updateChannelAndProgramListCaches()

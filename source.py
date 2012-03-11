@@ -40,6 +40,9 @@ STREAM_DR_RAMASJANG = 'plugin://plugin.video.dr.dk.live/?playChannel=5'
 STREAM_DR_HD = 'plugin://plugin.video.dr.dk.live/?playChannel=6'
 STREAM_24_NORDJYSKE = 'plugin://plugin.video.dr.dk.live/?playChannel=200'
 
+SETTINGS_TO_CHECK = ['source', 'youseetv.category', 'youseewebtv.playback', 'danishlivetv.playback', 'xmltv.file',
+                     'xmltv.logo.folder']
+
 class Channel(object):
     def __init__(self, id, title, logo = None, streamUrl = None, visible = True, weight = -1):
         self.id = id
@@ -104,10 +107,6 @@ class Source(object):
 
     def __init__(self, addon, cachePath, playbackCallbackHandler):
         self.cachePath = cachePath
-        self.playbackUsingDanishLiveTV = False
-        self.channelList = list()
-        self.player = SourcePlayer(callbackHandler = playbackCallbackHandler)
-
         try:
             #noinspection PyArgumentList
             self.conn = sqlite3.connect(os.path.join(self.cachePath, self.SOURCE_DB), detect_types=sqlite3.PARSE_DECLTYPES, check_same_thread = False)
@@ -116,6 +115,11 @@ class Source(object):
             self._createTables()
         except sqlite3.OperationalError, ex:
             raise SourceUpdateInProgressException(ex)
+
+        self.playbackUsingDanishLiveTV = False
+        self.channelList = list()
+        self.player = SourcePlayer(callbackHandler = playbackCallbackHandler)
+        self.settingsChanged = self.wasSettingsChanged(addon)
 
         try:
             if addon.getSetting('danishlivetv.playback') == 'true':
@@ -128,6 +132,29 @@ class Source(object):
 
     def __del__(self):
         self.conn.close()
+
+    def wasSettingsChanged(self, addon):
+        settingsChanged = False
+        noRows = True
+
+        c = self.conn.cursor()
+        c.execute('SELECT * FROM settings')
+        for row in c:
+            noRows = False
+            key = row['key']
+            if SETTINGS_TO_CHECK.count(key) and row['value'] != addon.getSetting(key):
+                settingsChanged = True
+
+        if settingsChanged or noRows:
+            for key in SETTINGS_TO_CHECK:
+                c.execute('INSERT OR IGNORE INTO settings(key, value) VALUES (?, ?)', [key, addon.getSetting(key)])
+                if not c.rowcount:
+                    c.execute('UPDATE settings SET value=? WHERE key=?', [addon.getSetting(key), key])
+            self.conn.commit()
+
+        c.close()
+        print 'Settings changed: ' + str(settingsChanged)
+        return settingsChanged
 
     def getDataFromExternal(self, date, progress_callback = None):
         """
@@ -145,6 +172,10 @@ class Source(object):
             xbmc.log('[script.tvguide] Updating caches...', xbmc.LOGDEBUG)
 
             c = self.conn.cursor()
+            if self.settingsChanged:
+                c.execute('DELETE FROM channels WHERE source=?', [self.KEY])
+            self.settingsChanged = False # only want to update once due to changed settings
+
             if clearExistingProgramList:
                 c.execute('DELETE FROM programs WHERE source=?', [self.KEY])
 
@@ -213,7 +244,7 @@ class Source(object):
 
     def getChannelList(self, progress_callback = None):
         # check if data is up-to-date in database
-        if self._isChannelListCacheExpired():
+        if self.settingsChanged or self._isChannelListCacheExpired():
             self.updateChannelAndProgramListCaches(progress_callback = progress_callback)
 
         # cache channelList in memory
@@ -293,15 +324,15 @@ class Source(object):
         return previousProgram
 
     def getProgramList(self, channels, startTime, progress_callback = None):
-        if self._isProgramListCacheExpired(startTime):
+        if self.settingsChanged or self._isProgramListCacheExpired(startTime):
             self.updateChannelAndProgramListCaches(startTime, progress_callback, clearExistingProgramList = False)
         return self._retrieveProgramListFromDatabase(channels, startTime)
 
     def _retrieveProgramListFromDatabase(self, channels, startTime):
         """
 
-        @param channel:
-        @type channel: source.Channel
+        @param channels:
+        @type channels: list of source.Channel
         @param startTime:
         @type startTime: datetime.datetime
         @return:
@@ -401,8 +432,12 @@ class Source(object):
             c.execute('CREATE TABLE sources_updates(source TEXT, date TEXT, programs_updated TIMESTAMP)')
             c.execute('CREATE TABLE channels(id TEXT, title TEXT, logo TEXT, stream_url TEXT, source TEXT, visible BOOLEAN, weight INTEGER, PRIMARY KEY (id, source), FOREIGN KEY(source) REFERENCES sources(id) ON DELETE CASCADE)')
             c.execute('CREATE TABLE programs(channel TEXT, title TEXT, start_date TIMESTAMP, end_date TIMESTAMP, description TEXT, image_large TEXT, image_small TEXT, source TEXT, FOREIGN KEY(channel, source) REFERENCES channels(id, source) ON DELETE CASCADE)')
+            c.execute('CREATE INDEX program_list_idx ON programs(source, channel, start_date, end_date)')
             c.execute('CREATE INDEX start_date_idx ON programs(start_date)')
             c.execute('CREATE INDEX end_date_idx ON programs(end_date)')
+
+            # For active setting
+            c.execute('CREATE TABLE settings(key TEXT PRIMARY KEY, value TEXT)')
 
         # make sure we have a record in sources for this Source
         c.execute("INSERT OR IGNORE INTO sources(id, channels_updated) VALUES(?, ?)", [self.KEY, datetime.datetime.fromtimestamp(0)])
@@ -575,6 +610,7 @@ class TvTidSource(Source):
         @type date: datetime.datetime
         @return:
         """
+        # todo rewrite to not cache data locally
         dateString = date.strftime('%Y%m%d')
         cacheFile = os.path.join(self.cachePath, '%s-%s-%s.programlist.source' % (self.KEY, channel.id, dateString))
         json = None
@@ -665,7 +701,6 @@ class XMLTVSource(Source):
                     yield result
 
             root.clear()
-        self.completed = True
 
     def _isChannelListCacheExpired(self):
         """
