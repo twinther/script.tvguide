@@ -33,6 +33,7 @@ class Notification(object):
         self.addonPath = addonPath
         self.icon = os.path.join(self.addonPath, 'icon.png')
 
+        #noinspection PyArgumentList
         self.conn = sqlite3.connect(os.path.join(dataPath, self.NOTIFICATION_DB), check_same_thread = False)
         self._createTables()
 
@@ -55,7 +56,8 @@ class Notification(object):
                     action(program)
 
     def _scheduleNotification(self, program):
-        timeToNotification = self._timeToNotification(program).seconds / 60
+        t = self._timeToNotification(program)
+        timeToNotification = ((t.days * 86400) + t.seconds) / 60
         if timeToNotification < 0:
             return
 

@@ -46,9 +46,9 @@ ACTION_SHOW_INFO = 11
 ACTION_NEXT_ITEM = 14
 ACTION_PREV_ITEM = 15
 
-
 KEY_NAV_BACK = 92
 KEY_CONTEXT_MENU = 117
+KEY_HOME = 159
 
 CHANNELS_PER_PAGE = 9
 
@@ -82,11 +82,13 @@ class SourceInitializer(threading.Thread):
 
 
 class TVGuide(xbmcgui.WindowXML):
+    C_MAIN_DATE = 4000
     C_MAIN_TITLE = 4020
     C_MAIN_TIME = 4021
     C_MAIN_DESCRIPTION = 4022
     C_MAIN_IMAGE = 4023
     C_MAIN_LOGO = 4024
+    C_MAIN_TIMEBAR = 4100
     C_MAIN_LOADING = 4200
     C_MAIN_LOADING_PROGRESS = 4201
     C_MAIN_LOADING_TIME_LEFT = 4202
@@ -221,6 +223,10 @@ class TVGuide(xbmcgui.WindowXML):
                     control = self._pageUp()
                 elif action.getId() == ACTION_PAGE_DOWN:
                     control = self._pageDown()
+                elif action.getId() == KEY_HOME:
+                    self.viewStartDate = datetime.datetime.today()
+                    self.viewStartDate -= datetime.timedelta(minutes = self.viewStartDate.minute % 30)
+                    self.onRedrawEPG(self.page, self.viewStartDate)
                 elif action.getId() in [KEY_CONTEXT_MENU, ACTION_PREVIOUS_MENU] and controlInFocus is not None:
                     program = self._getProgramFromControlId(controlInFocus.getId())
                     if program is not None:
@@ -430,12 +436,13 @@ class TVGuide(xbmcgui.WindowXML):
 
         # move timebar to current time
         timeDelta = datetime.datetime.today() - self.viewStartDate
-        c = self.getControl(4100)
+        c = self.getControl(self.C_MAIN_TIMEBAR)
         (x, y) = c.getPosition()
+        c.setVisible(timeDelta.days == 0)
         c.setPosition(self._secondsToXposition(timeDelta.seconds), y)
 
         # date and time row
-        self.getControl(4000).setLabel(self.viewStartDate.strftime('%a, %d. %b'))
+        self.getControl(self.C_MAIN_DATE).setLabel(self.viewStartDate.strftime('%a, %d. %b'))
         for col in range(1, 5):
             self.getControl(4000 + col).setLabel(startTime.strftime('%H:%M'))
             startTime += HALF_HOUR
