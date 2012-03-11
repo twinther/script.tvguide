@@ -4,6 +4,9 @@
 - Cache EPG data to local SQLite database (based on work by timpinkawa)
 - Added option to edit channel order and visibility
 - Improved XMLTV parsing (thanks timpinkawa)
+- Added initial channel surfing support
+  - Press Info for OSD, navigate with Up, Down, Left, Right, Channel + and -
+  - Press ContextMenu to minimize video and show EPG
 
 [B]Version 1.2.2 - 2012-01-28[/B]
 - Fixed compatibility problem with Python 2.6 and previous versions

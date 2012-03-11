@@ -15,6 +15,9 @@
 			<height>720</height>
             <texture>tvguide-background-default.jpg</texture>
             <fadetime>500</fadetime>
+            <animation type="Conditional" condition="!Control.IsVisible(5000)">
+                <effect type="fade" start="100" end="0" time="500" />
+            </animation>
 		</control>
         <control type="image">
             <posx>0</posx>
@@ -22,9 +25,12 @@
             <width>1280</width>
             <height>720</height>
             <texture>tvguide-background.png</texture>
+            <animation type="Conditional" condition="!Control.IsVisible(5000)">
+                <effect type="fade" start="100" end="0" time="500" />
+            </animation>
         </control>
 
-        <control type="group">
+        <control type="group" id="5000">
             <description>TV Guide group</description>
             <posx>0</posx>
             <posy>0</posy>
@@ -353,7 +359,6 @@
                 <texture>timebar.png</texture>
             </control>
 
-
             <control type="label" id="4200">
                 <description>visibility marker for loading group</description>
                 <posx>540</posx>
@@ -398,8 +403,103 @@
                     <midtexture>tvguide-white-progress.png</midtexture>
                     <righttexture />
                 </control>
+                <control type="label" id="4202">
+                    <description>loading time left</description>
+                    <posx>70</posx>
+                    <posy>50</posy>
+                    <width>600</width>
+                    <height>55</height>
+                    <label>...</label>
+                    <textcolor>ffffffff</textcolor>
+                    <font>font3013</font>
+                    <aligny>center</aligny>
+                </control>
             </control>
         </control><!-- id="5000" -->
+
+        <control type="videowindow">
+            <posx>0</posx>
+            <posy>0</posy>
+            <width>1280</width>
+            <height>720</height>
+            <animation type="Conditional" condition="Control.IsVisible(5000)">
+                <effect type="zoom" end="25" center="1250,690" time="500" />
+            </animation>
+        </control>
+
+        <control type="group" id="6000">
+            <description>OSD Info bar</description>
+            <posx>0</posx>
+            <posy>500</posy>
+            <width>1280</width>
+            <height>220</height>
+
+            <control type="image">
+                <posx>0</posx>
+                <posy>0</posy>
+                <width>1280</width>
+                <height>220</height>
+                <texture>tvguide-glasspane.png</texture>
+            </control>
+
+            <!-- Program description -->
+            <control type="label" id="6001">
+                <description>Program title</description>
+                <posx>30</posx>
+                <posy>10</posy>
+                <width>850</width>
+                <height>50</height>
+                <label>[B]Title[/B]</label>
+                <textcolor>ffffffff</textcolor>
+                <font>font13</font>
+                <aligny>center</aligny>
+            </control>
+            <control type="label" id="6002">
+                <description>Program time</description>
+                <posx>1230</posx>
+                <posy>10</posy>
+                <width>240</width>
+                <height>50</height>
+                <label>[B]18:00 - 20:00[/B]</label>
+                <textcolor>ffffffff</textcolor>
+                <font>font13</font>
+                <align>right</align>
+                <aligny>center</aligny>
+            </control>
+            <control type="textbox" id="6003">
+                <description>Program description</description>
+                <posx>30</posx>
+                <posy>50</posy>
+                <width>1230</width>
+                <height>149</height>
+                <label>Description</label>
+                <textcolor>ffffffff</textcolor>
+                <font>font13</font>
+                <wrapmultiline>true</wrapmultiline>
+
+                <autoscroll time="3600" delay="6000" repeat="6000">true</autoscroll>
+            </control>
+            <control type="image" id="6004">
+                <description>Program channel logo</description>
+                <posx>1100</posx>
+                <posy>155</posy>
+                <width>160</width>
+                <height>45</height>
+                <aspectratio>keep</aspectratio>
+            </control>
+            <control type="label" id="6005">
+                <description>Program channel text</description>
+                <posx>110</posx>
+                <posy>155</posy>
+                <width>160</width>
+                <height>45</height>
+                <textcolor>ffffffff</textcolor>
+                <font>font13</font>
+                <align>center</align>
+                <visible>StringCompare(Control.GetLabel(6004),)</visible>
+            </control>
+
+        </control>
 
 	</controls>
 </window>

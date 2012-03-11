@@ -18,22 +18,14 @@
 #  http://www.gnu.org/copyleft/gpl.html
 #
 import buggalo
-import xbmc
-import xbmcaddon
 import xbmcgui
 import source as src
 import gui
-import notification
 
 buggalo.SUBMIT_URL = 'http://tommy.winther.nu/exception/submit.php'
 
 try:
-    ADDON = xbmcaddon.Addon()
-    SOURCE = src.instantiateSource(ADDON)
-    xbmc.log("[script.tvguide] Using source: %s" % str(type(SOURCE)), xbmc.LOGDEBUG)
-
-    n = notification.Notification(SOURCE, ADDON.getAddonInfo('path'), xbmc.translatePath(ADDON.getAddonInfo('profile')))
-    w = gui.TVGuide(source = SOURCE, notification = n)
+    w = gui.TVGuide()
     w.doModal()
     del w
 

@@ -82,6 +82,14 @@ class Program(object):
             (self.channel, self.title, self.startDate, self.endDate, self.description, self.imageLarge, self.imageSmall)
 
 
+class SourcePlayer(xbmc.Player):
+    def __init__(self, callbackHandler):
+        super(SourcePlayer, self).__init__(core = xbmc.PLAYER_CORE_AUTO)
+        self.callbackHandler = callbackHandler
+
+    def onPlayBackStopped(self):
+        self.callbackHandler.onPlayBackStopped()
+
 class SourceException(Exception):
     pass
 
@@ -93,10 +101,11 @@ class Source(object):
     STREAMS = {}
     SOURCE_DB = 'source.db'
 
-    def __init__(self, addon, cachePath):
+    def __init__(self, addon, cachePath, playbackCallbackHandler):
         self.cachePath = cachePath
         self.playbackUsingDanishLiveTV = False
         self.channelList = list()
+        self.player = SourcePlayer(callbackHandler = playbackCallbackHandler)
 
         try:
             #noinspection PyArgumentList
@@ -185,6 +194,22 @@ class Source(object):
 
         return channel
 
+    def getNextChannel(self, currentChannel):
+        channels = self.getChannelList()
+        idx = channels.index(currentChannel)
+        idx += 1
+        if idx > len(channels) - 1:
+            idx = 0
+        return channels[idx]
+
+    def getPreviousChannel(self, currentChannel):
+        channels = self.getChannelList()
+        idx = channels.index(currentChannel)
+        idx -= 1
+        if idx < 0:
+            idx = len(channels) - 1
+        return channels[idx]
+
     def getChannelList(self, progress_callback = None):
         # check if data is up-to-date in database
         if self._isChannelListCacheExpired():
@@ -227,6 +252,44 @@ class Source(object):
         c.close()
 
         return lastUpdated < datetime.datetime.now() - datetime.timedelta(days = 1)
+
+    def getCurrentProgram(self, channel):
+        """
+
+        @param channel:
+        @type channel: source.Channel
+        @return:
+        """
+        now = datetime.datetime.now()
+        c = self.conn.cursor()
+        c.execute('SELECT * FROM programs WHERE channel=? AND source=? AND start_date <= ? AND end_date >= ?', [channel.id, self.KEY, now, now])
+        row = c.fetchone()
+        program = Program(channel, row['title'], row['start_date'], row['end_date'], row['description'], row['image_large'], row['image_small'])
+        c.close()
+
+        return program
+
+    def getNextProgram(self, program):
+        nextProgram = None
+        c = self.conn.cursor()
+        c.execute('SELECT * FROM programs WHERE channel=? AND source=? AND start_date >= ? ORDER BY start_date ASC LIMIT 1', [program.channel.id, self.KEY, program.endDate])
+        row = c.fetchone()
+        if row:
+            nextProgram = Program(program.channel, row['title'], row['start_date'], row['end_date'], row['description'], row['image_large'], row['image_small'])
+        c.close()
+
+        return nextProgram
+
+    def getPreviousProgram(self, program):
+        previousProgram = None
+        c = self.conn.cursor()
+        c.execute('SELECT * FROM programs WHERE channel=? AND source=? AND end_date <= ? ORDER BY start_date DESC LIMIT 1', [program.channel.id, self.KEY, program.startDate])
+        row = c.fetchone()
+        if row:
+            previousProgram = Program(program.channel, row['title'], row['start_date'], row['end_date'], row['description'], row['image_large'], row['image_small'])
+        c.close()
+
+        return previousProgram
 
     def getProgramList(self, channels, startTime, progress_callback = None):
         if self._isProgramListCacheExpired(startTime):
@@ -303,15 +366,18 @@ class Source(object):
         customStreamUrl = self.getCustomStreamUrl(channel)
         return customStreamUrl is not None or channel.isPlayable()
 
+    def isPlaying(self):
+        return self.player.isPlaying()
+
     def play(self, channel):
         customStreamUrl = self.getCustomStreamUrl(channel)
         if customStreamUrl:
             xbmc.log("Playing custom stream url: %s" % customStreamUrl)
-            xbmc.Player().play(item = customStreamUrl, windowed=True)
+            self.player.play(item = customStreamUrl, windowed=True)
 
         elif channel.isPlayable():
             xbmc.log("Playing : %s" % channel.streamUrl)
-            xbmc.Player().play(item = channel.streamUrl, windowed=True)
+            self.player.play(item = channel.streamUrl, windowed=True)
 
     def _createTables(self):
         c = self.conn.cursor()
@@ -334,9 +400,11 @@ class Source(object):
             c.execute('CREATE TABLE sources_updates(source TEXT, date TEXT, programs_updated TIMESTAMP)')
             c.execute('CREATE TABLE channels(id TEXT, title TEXT, logo TEXT, stream_url TEXT, source TEXT, visible BOOLEAN, weight INTEGER, PRIMARY KEY (id, source), FOREIGN KEY(source) REFERENCES sources(id) ON DELETE CASCADE)')
             c.execute('CREATE TABLE programs(channel TEXT, title TEXT, start_date TIMESTAMP, end_date TIMESTAMP, description TEXT, image_large TEXT, image_small TEXT, source TEXT, FOREIGN KEY(channel, source) REFERENCES channels(id, source) ON DELETE CASCADE)')
+            c.execute('CREATE INDEX start_date_idx ON programs(start_date)')
+            c.execute('CREATE INDEX end_date_idx ON programs(end_date)')
 
         # make sure we have a record in sources for this Source
-        c.execute("INSERT OR IGNORE INTO sources(id, channels_updated) VALUES(?, ?)", [self.KEY, datetime.datetime.now() - datetime.timedelta(days = 1)])
+        c.execute("INSERT OR IGNORE INTO sources(id, channels_updated) VALUES(?, ?)", [self.KEY, datetime.datetime.fromtimestamp(0)])
 
         self.conn.commit()
         c.close()
@@ -356,8 +424,8 @@ class DrDkSource(Source):
         'dr.dk/mas/whatson/channel/TV' : STREAM_DR_HD
     }
 
-    def __init__(self, addon, cachePath):
-        Source.__init__(self, addon, cachePath)
+    def __init__(self, addon, cachePath, playbackCallbackHandler):
+        super(DrDkSource, self).__init__(addon, cachePath, playbackCallbackHandler)
 
     def getDataFromExternal(self, date, progress_callback = None):
         jsonChannels = simplejson.loads(self._downloadUrl(self.CHANNELS_URL))
@@ -405,8 +473,8 @@ class YouSeeTvSource(Source):
         503 : STREAM_DR_HD
     }
 
-    def __init__(self, addon, cachePath):
-        Source.__init__(self, addon, cachePath)
+    def __init__(self, addon, cachePath, playbackCallbackHandler):
+        super(YouSeeTvSource, self).__init__(addon, cachePath, playbackCallbackHandler)
         self.date = datetime.datetime.today()
         self.channelCategory = addon.getSetting('youseetv.category')
         self.ysApi = ysapi.YouSeeTVGuideApi()
@@ -477,8 +545,8 @@ class TvTidSource(Source):
         26005640 : STREAM_DR_HD
     }
 
-    def __init__(self, addon, cachePath):
-        Source.__init__(self, addon, cachePath)
+    def __init__(self, addon, cachePath, playbackCallbackHandler):
+        super(TvTidSource, self).__init__(addon, cachePath, playbackCallbackHandler)
 
     def getDataFromExternal(self, date, progress_callback = None):
         response = self._downloadUrl(self.CHANNELS_URL)
@@ -539,11 +607,11 @@ class XMLTVSource(Source):
         'www.ontv.dk/tv/1' : STREAM_DR1
     }
 
-    def __init__(self, addon, cachePath):
+    def __init__(self, addon, cachePath, playbackCallbackHandler):
         self.logoFolder = addon.getSetting('xmltv.logo.folder')
         self.time = time.time()
 
-        super(XMLTVSource, self).__init__(addon, cachePath)
+        super(XMLTVSource, self).__init__(addon, cachePath, playbackCallbackHandler)
 
         self.xmlTvFile = addon.getSetting('xmltv.file')
         #self.xmlTvFile = os.path.join(self.cachePath, '%s.xmltv' % self.KEY)
@@ -627,7 +695,7 @@ class XMLTVSource(Source):
         return datetime.datetime(t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec)
 
 
-def instantiateSource(addon):
+def instantiateSource(addon, playbackCallbackHandler):
     SOURCES = {
         'YouSee.tv' : YouSeeTvSource,
         'DR.dk' : DrDkSource,
@@ -641,6 +709,6 @@ def instantiateSource(addon):
         os.makedirs(cachePath)
 
     s = SOURCES[addon.getSetting('source')]
-    return s(addon, cachePath)
+    return s(addon, cachePath, playbackCallbackHandler)
 
 

@@ -23,9 +23,15 @@ import datetime
 import xbmc
 import xbmcgui
 
-import source
+import source as src
+from notification import Notification
 from strings import *
 import buggalo
+import xbmcplugin
+
+MODE_EPG = 1
+MODE_TV = 2
+MODE_OSD = 3
 
 ACTION_LEFT = 1
 ACTION_RIGHT = 2
@@ -66,32 +72,44 @@ class TVGuide(xbmcgui.WindowXML):
     C_MAIN_LOGO = 4024
     C_MAIN_LOADING = 4200
     C_MAIN_LOADING_PROGRESS = 4201
+    C_MAIN_LOADING_TIME_LEFT = 4202
     C_MAIN_BACKGROUND = 4600
+    C_MAIN_EPG = 5000
+    C_MAIN_OSD = 6000
+    C_MAIN_OSD_TITLE = 6001
+    C_MAIN_OSD_TIME = 6002
+    C_MAIN_OSD_DESCRIPTION = 6003
+    C_MAIN_OSD_CHANNEL_LOGO = 6004
+    C_MAIN_OSD_CHANNEL_TITLE = 6005
 
-    def __new__(cls, source, notification):
+    def __new__(cls):
         return super(TVGuide, cls).__new__(cls, 'script-tvguide-main.xml', ADDON.getAddonInfo('path'))
 
-    def __init__(self,  source, notification):
-        """
-        @param source: the source of EPG data
-        @type source: source.Source
-        @type notification: notification.Notification
-        """
+    def __init__(self):
         super(TVGuide, self).__init__()
-        self.source = source
-        self.notification = notification
+        self.source = src.instantiateSource(ADDON, self)
+        self.notification = Notification(self.source, ADDON.getAddonInfo('path'), xbmc.translatePath(ADDON.getAddonInfo('profile')))
         self.controlToProgramMap = dict()
         self.focusX = 0
         self.page = 0
+
+        self.mode = MODE_EPG
+        self.currentChannel = None
+
+        self.osdChannel = None
+        self.osdProgram = None
 
         # find nearest half hour
         self.viewStartDate = datetime.datetime.today()
         self.viewStartDate -= datetime.timedelta(minutes = self.viewStartDate.minute % 30)
 
+        xbmc.log("[script.tvguide] Using source: %s" % str(type(self.source)), xbmc.LOGDEBUG)
+
     def onInit(self):
         try:
-            self.onRedrawEPG(0, self.viewStartDate)
+            self.getControl(self.C_MAIN_OSD).setVisible(False)
             self.getControl(self.C_MAIN_IMAGE).setImage('tvguide-logo-%s.png' % self.source.KEY)
+            self.onRedrawEPG(0, self.viewStartDate)
         except Exception:
             buggalo.onExceptionRaised()
 
@@ -101,40 +119,97 @@ class TVGuide(xbmcgui.WindowXML):
                 self.close()
                 return
 
-            control = None
-            controlInFocus = None
-            try:
-                controlInFocus = self.getFocus()
-                (left, top) = controlInFocus.getPosition()
-                currentX = left + (controlInFocus.getWidth() / 2)
-                currentY = top + (controlInFocus.getHeight() / 2)
-            except TypeError:
-                currentX = None
-                currentY = None
+            if self.mode == MODE_TV:
+                if action.getId() == KEY_CONTEXT_MENU:
+                    self.onRedrawEPG(self.page, self.viewStartDate)
 
-            if action.getId() == ACTION_LEFT:
-                control = self._left(currentX, currentY)
-            elif action.getId() == ACTION_RIGHT:
-                control = self._right(currentX, currentY)
-            elif action.getId() == ACTION_UP:
-                control = self._up(currentY)
-            elif action.getId() == ACTION_DOWN:
-                control = self._down(currentY)
-            elif action.getId() == ACTION_NEXT_ITEM:
-                control= self._nextDay( currentY)
-            elif action.getId() == ACTION_PREV_ITEM:
-                control= self._previousDay(currentY)
-            elif action.getId() == ACTION_PAGE_UP:
-                control = self._pageUp()
-            elif action.getId() == ACTION_PAGE_DOWN:
-                control = self._pageDown()
-            elif action.getId() in [KEY_CONTEXT_MENU, ACTION_PREVIOUS_MENU] and controlInFocus is not None:
-                program = self._getProgramFromControlId(controlInFocus.getId())
-                if program is not None:
-                    self._showContextMenu(program, controlInFocus)
+                elif action.getId() == ACTION_PAGE_UP:
+                    self._channelUp()
 
-            if control is not None:
-                self.setFocus(control)
+                elif action.getId() == ACTION_PAGE_DOWN:
+                    self._channelDown()
+
+                elif action.getId() == ACTION_SHOW_INFO:
+                    self._showOsd()
+
+            elif self.mode == MODE_OSD:
+                if action.getId() == ACTION_SHOW_INFO:
+                    self._hideOsd()
+
+                elif action.getId() == ACTION_SELECT_ITEM:
+                    if self.source.isPlayable(self.osdChannel):
+                        self._playChannel(self.osdChannel)
+                        self._hideOsd()
+
+                elif action.getId() == ACTION_PAGE_UP:
+                    self._channelUp()
+                    self._showOsd()
+
+                elif action.getId() == ACTION_PAGE_DOWN:
+                    self._channelDown()
+                    self._showOsd()
+
+                elif action.getId() == ACTION_UP:
+                    self.osdChannel = self.source.getNextChannel(self.osdChannel)
+                    self.osdProgram = self.source.getCurrentProgram(self.osdChannel)
+                    self._showOsd()
+
+                elif action.getId() == ACTION_DOWN:
+                    self.osdChannel = self.source.getPreviousChannel(self.osdChannel)
+                    self.osdProgram = self.source.getCurrentProgram(self.osdChannel)
+                    self._showOsd()
+
+                elif action.getId() == ACTION_LEFT:
+                    previousProgram = self.source.getPreviousProgram(self.osdProgram)
+                    if previousProgram:
+                        self.osdProgram = previousProgram
+                        self._showOsd()
+
+                elif action.getId() == ACTION_RIGHT:
+                    nextProgram = self.source.getNextProgram(self.osdProgram)
+                    if nextProgram:
+                        self.osdProgram = nextProgram
+                        self._showOsd()
+
+            elif self.mode == MODE_EPG:
+                if action.getId() == KEY_CONTEXT_MENU:
+                    if self.source.isPlaying():
+                        self._hideEpg()
+
+                control = None
+                controlInFocus = None
+                try:
+                    controlInFocus = self.getFocus()
+                    (left, top) = controlInFocus.getPosition()
+                    currentX = left + (controlInFocus.getWidth() / 2)
+                    currentY = top + (controlInFocus.getHeight() / 2)
+                except TypeError:
+                    currentX = None
+                    currentY = None
+
+                if action.getId() == ACTION_LEFT:
+                    control = self._left(currentX, currentY)
+                elif action.getId() == ACTION_RIGHT:
+                    control = self._right(currentX, currentY)
+                elif action.getId() == ACTION_UP:
+                    control = self._up(currentY)
+                elif action.getId() == ACTION_DOWN:
+                    control = self._down(currentY)
+                elif action.getId() == ACTION_NEXT_ITEM:
+                    control= self._nextDay( currentY)
+                elif action.getId() == ACTION_PREV_ITEM:
+                    control= self._previousDay(currentY)
+                elif action.getId() == ACTION_PAGE_UP:
+                    control = self._pageUp()
+                elif action.getId() == ACTION_PAGE_DOWN:
+                    control = self._pageDown()
+                elif action.getId() in [KEY_CONTEXT_MENU, ACTION_PREVIOUS_MENU] and controlInFocus is not None:
+                    program = self._getProgramFromControlId(controlInFocus.getId())
+                    if program is not None:
+                        self._showContextMenu(program, controlInFocus)
+
+                if control is not None:
+                    self.setFocus(control)
 
         except Exception:
             buggalo.onExceptionRaised()
@@ -147,8 +222,7 @@ class TVGuide(xbmcgui.WindowXML):
                 return
 
             if self.source.isPlayable(program.channel):
-                self.source.play(program.channel)
-                self.getControl(5000).setVisible(False)
+                self._playChannel(program.channel)
             else:
                 self._showContextMenu(program, self.getControl(controlId))
 
@@ -181,7 +255,7 @@ class TVGuide(xbmcgui.WindowXML):
 
         elif buttonClicked == PopupMenu.C_POPUP_PLAY:
             if self.source.isPlayable(program.channel):
-                self.source.play(program.channel)
+                self._playChannel(program.channel)
 
         elif buttonClicked == PopupMenu.C_POPUP_CHANNELS:
             d = ChannelsMenu(self.source)
@@ -276,10 +350,63 @@ class TVGuide(xbmcgui.WindowXML):
         self.page = self.onRedrawEPG(self.page+ 1, self.viewStartDate)
         return self._findControlBelow(0)
 
+    def _channelUp(self):
+        channel = self.source.getNextChannel(self.currentChannel)
+        if self.source.isPlayable(channel):
+            self._playChannel(channel)
+
+    def _channelDown(self):
+        channel = self.source.getPreviousChannel(self.currentChannel)
+        if self.source.isPlayable(channel):
+            self._playChannel(channel)
+
+    def _playChannel(self, channel):
+        self.currentChannel = channel
+        wasPlaying = self.source.isPlaying()
+        self.source.play(channel)
+        if not wasPlaying:
+            self._hideEpg()
+
+        self.osdProgram = self.source.getCurrentProgram(self.currentChannel)
+
+    def _showOsd(self):
+        if self.mode != MODE_OSD:
+            self.osdChannel = self.currentChannel
+
+        if self.osdProgram is not None:
+            self.getControl(self.C_MAIN_OSD_TITLE).setLabel('[B]%s[/B]' % self.osdProgram.title)
+            self.getControl(self.C_MAIN_OSD_TIME).setLabel('[B]%s - %s[/B]' % (self.osdProgram.startDate.strftime('%H:%M'), self.osdProgram.endDate.strftime('%H:%M')))
+            self.getControl(self.C_MAIN_OSD_DESCRIPTION).setText(self.osdProgram.description)
+            self.getControl(self.C_MAIN_OSD_CHANNEL_TITLE).setLabel(self.osdChannel.title)
+            if self.osdProgram.channel.logo is not None:
+                self.getControl(self.C_MAIN_OSD_CHANNEL_LOGO).setImage(self.osdProgram.channel.logo)
+            else:
+                self.getControl(self.C_MAIN_OSD_CHANNEL_LOGO).setImage('')
+
+        self.mode = MODE_OSD
+        self.getControl(self.C_MAIN_OSD).setVisible(True)
+
+    def _hideOsd(self):
+        self.mode = MODE_TV
+        self.getControl(self.C_MAIN_OSD).setVisible(False)
+
+    def _hideEpg(self):
+        self.mode = MODE_TV
+        self.getControl(self.C_MAIN_EPG).setVisible(False)
+        for id in self.controlToProgramMap.keys():
+            self.removeControl(self.getControl(id))
+        self.controlToProgramMap.clear()
+
     def onRedrawEPG(self, page, startTime, autoChangeFocus = True):
-        self.getControl(self.C_MAIN_LOADING).setVisible(False)
+        if self.mode == MODE_EPG:
+            self._hideEpg()
+
+        self.mode = MODE_EPG
+        self.getControl(self.C_MAIN_EPG).setVisible(True)
+
         for controlId in self.controlToProgramMap:
             self.removeControl(self.getControl(controlId))
+        self.getControl(self.C_MAIN_LOADING).setVisible(False)
 
         self.controlToProgramMap.clear()
 
@@ -298,7 +425,7 @@ class TVGuide(xbmcgui.WindowXML):
         # channels
         try:
             channels = self.source.getChannelList(self.onSourceProgressUpdate)
-        except source.SourceException:
+        except src.SourceException:
             self.onEPGLoadError()
             return page
 
@@ -318,7 +445,7 @@ class TVGuide(xbmcgui.WindowXML):
         viewChannels = channels[channelStart : channelEnd]
         try:
             programs = self.source.getProgramList(viewChannels, self.viewStartDate, self.onSourceProgressUpdate)
-        except source.SourceException:
+        except src.SourceException:
             self.onEPGLoadError()
             return page
 
@@ -400,6 +527,7 @@ class TVGuide(xbmcgui.WindowXML):
 
     def onSourceProgressUpdate(self, percentageComplete):
         progressControl = self.getControl(self.C_MAIN_LOADING_PROGRESS)
+        timeLeftControl = self.getControl(self.C_MAIN_LOADING_TIME_LEFT)
         if percentageComplete < 1:
             progressControl.setPercent(1)
             self.progressStartTime = datetime.datetime.now()
@@ -408,9 +536,18 @@ class TVGuide(xbmcgui.WindowXML):
             progressControl.setPercent(percentageComplete)
             self.progressPreviousPercentage = percentageComplete
             delta = datetime.datetime.now() - self.progressStartTime
-            print 'time left: ' + str(delta.seconds / float(percentageComplete) * (100.0 - percentageComplete))
 
-        return True
+            if percentageComplete < 20:
+                timeLeftControl.setLabel('calculating remaining time...')
+            else:
+                secondsLeft = delta.seconds / float(percentageComplete) * (100.0 - percentageComplete)
+                timeLeftControl.setLabel('%d seconds remaining...' % secondsLeft)
+
+        return not xbmc.abortRequested
+
+    def onPlayBackStopped(self):
+        self._hideOsd()
+        self.onRedrawEPG(self.page, self.viewStartDate)
 
     def _secondsToXposition(self, seconds):
         return CELL_WIDTH_CHANNELS + (seconds * CELL_WIDTH / 1800)
