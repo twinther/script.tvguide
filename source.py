@@ -88,7 +88,8 @@ class SourcePlayer(xbmc.Player):
         self.callbackHandler = callbackHandler
 
     def onPlayBackStopped(self):
-        self.callbackHandler.onPlayBackStopped()
+        if self.callbackHandler:
+            self.callbackHandler.onPlayBackStopped()
 
 class SourceException(Exception):
     pass
@@ -437,7 +438,8 @@ class DrDkSource(Source):
             data.append(c)
             data.extend(self.getProgramListFromExternal(channel, date))
 
-            progress_callback(100.0 / len(channels) * idx)
+            if progress_callback:
+                progress_callback(100.0 / len(channels) * idx)
 
         return data
 
@@ -499,7 +501,8 @@ class YouSeeTvSource(Source):
             data.append(c)
             data.extend(self.getProgramListFromExternal(c, date))
 
-            progress_callback(100.0 / len(channels) * idx)
+            if progress_callback:
+                progress_callback(100.0 / len(channels) * idx)
 
         return data
 
@@ -559,7 +562,8 @@ class TvTidSource(Source):
             data.append(c)
             data.extend(self.getProgramListFromExternal(channel, date))
 
-            progress_callback(100.0 / len(channels) * idx)
+            if progress_callback:
+                progress_callback(100.0 / len(channels) * idx)
 
         return data
 

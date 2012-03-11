@@ -29,8 +29,5 @@ try:
     w.doModal()
     del w
 
-except src.SourceUpdateInProgressException:
-    xbmcgui.Dialog().ok('error', 'database update in progress...')
-
 except Exception:
     buggalo.onExceptionRaised()

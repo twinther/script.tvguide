@@ -19,6 +19,7 @@
 #
 import os
 import datetime
+import threading
 
 import xbmc
 import xbmcgui
@@ -27,7 +28,6 @@ import source as src
 from notification import Notification
 from strings import *
 import buggalo
-import xbmcplugin
 
 MODE_EPG = 1
 MODE_TV = 2
@@ -64,6 +64,23 @@ TEXTURE_BUTTON_FOCUS = os.path.join(xbmc.translatePath(ADDON.getAddonInfo('path'
 TEXTURE_BUTTON_NOFOCUS_NOTIFY = os.path.join(xbmc.translatePath(ADDON.getAddonInfo('path')), 'resources', 'skins', 'Default', 'media', 'tvguide-program-red.png')
 TEXTURE_BUTTON_FOCUS_NOTIFY = os.path.join(xbmc.translatePath(ADDON.getAddonInfo('path')), 'resources', 'skins', 'Default', 'media', 'tvguide-program-red-focus.png')
 
+class SourceInitializer(threading.Thread):
+    def __init__(self, sourceInitializedHandler):
+        super(SourceInitializer, self).__init__()
+        self.sourceInitializedHandler = sourceInitializedHandler
+
+    def run(self):
+        while not xbmc.abortRequested:
+            try:
+                source = src.instantiateSource(ADDON, self.sourceInitializedHandler)
+                xbmc.log("[script.tvguide] Using source: %s" % str(type(source)), xbmc.LOGDEBUG)
+                self.sourceInitializedHandler.onSourceInitialized(source)
+                break
+            except src.SourceUpdateInProgressException:
+                print('database update in progress...')
+                xbmc.sleep(1000)
+
+
 class TVGuide(xbmcgui.WindowXML):
     C_MAIN_TITLE = 4020
     C_MAIN_TIME = 4021
@@ -87,8 +104,9 @@ class TVGuide(xbmcgui.WindowXML):
 
     def __init__(self):
         super(TVGuide, self).__init__()
-        self.source = src.instantiateSource(ADDON, self)
-        self.notification = Notification(self.source, ADDON.getAddonInfo('path'), xbmc.translatePath(ADDON.getAddonInfo('profile')))
+        self.source = None
+        self.notification = None
+
         self.controlToProgramMap = dict()
         self.focusX = 0
         self.page = 0
@@ -103,13 +121,13 @@ class TVGuide(xbmcgui.WindowXML):
         self.viewStartDate = datetime.datetime.today()
         self.viewStartDate -= datetime.timedelta(minutes = self.viewStartDate.minute % 30)
 
-        xbmc.log("[script.tvguide] Using source: %s" % str(type(self.source)), xbmc.LOGDEBUG)
-
     def onInit(self):
         try:
             self.getControl(self.C_MAIN_OSD).setVisible(False)
-            self.getControl(self.C_MAIN_IMAGE).setImage('tvguide-logo-%s.png' % self.source.KEY)
-            self.onRedrawEPG(0, self.viewStartDate)
+            self.getControl(self.C_MAIN_LOADING).setVisible(False)
+            # todo set loading text
+
+            SourceInitializer(self).run()
         except Exception:
             buggalo.onExceptionRaised()
 
@@ -524,6 +542,13 @@ class TVGuide(xbmcgui.WindowXML):
         self.getControl(self.C_MAIN_LOADING).setVisible(True)
         xbmcgui.Dialog().ok(strings(LOAD_ERROR_TITLE), strings(LOAD_ERROR_LINE1), strings(LOAD_ERROR_LINE2))
         self.close()
+
+    def onSourceInitialized(self, source):
+        self.source = source
+        self.notification = Notification(self.source, ADDON.getAddonInfo('path'), xbmc.translatePath(ADDON.getAddonInfo('profile')))
+
+        self.getControl(self.C_MAIN_IMAGE).setImage('tvguide-logo-%s.png' % self.source.KEY)
+        self.onRedrawEPG(0, self.viewStartDate)
 
     def onSourceProgressUpdate(self, percentageComplete):
         progressControl = self.getControl(self.C_MAIN_LOADING_PROGRESS)
