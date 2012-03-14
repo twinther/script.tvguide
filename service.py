@@ -35,7 +35,7 @@ if ADDON.getSetting('cache.data.on.xbmc.startup') == 'true':
 
 if ADDON.getSetting('notifications.enabled') == 'true':
     try:
-        n = notification.Notification(source, ADDON.getAddonInfo('path'), xbmc.translatePath(ADDON.getAddonInfo('profile')))
+        n = notification.Notification(source, ADDON.getAddonInfo('path'))
         n.scheduleNotifications()
-    except Exception:
-        xbmc.log('[script.tvguide] Unable to schedules notifications!', xbmc.LOGDEBUG)
+    except Exception, ex:
+        xbmc.log('[script.tvguide] Unable to schedules notifications: %s' % str(ex), xbmc.LOGDEBUG)

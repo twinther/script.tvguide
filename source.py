@@ -60,7 +60,7 @@ class Channel(object):
                % (self.id, self.title, self.logo, self.streamUrl)
 
 class Program(object):
-    def __init__(self, channel, title, startDate, endDate, description, imageLarge = None, imageSmall=None):
+    def __init__(self, channel, title, startDate, endDate, description, imageLarge = None, imageSmall=None, notificationScheduled = None):
         """
 
         @param channel:
@@ -79,6 +79,7 @@ class Program(object):
         self.description = description
         self.imageLarge = imageLarge
         self.imageSmall = imageSmall
+        self.notificationScheduled = notificationScheduled
 
     def __repr__(self):
         return 'Program(channel=%s, title=%s, startDate=%s, endDate=%s, description=%s, imageLarge=%s, imageSmall=%s)' % \
@@ -108,8 +109,7 @@ class Source(object):
     def __init__(self, addon, cachePath, playbackCallbackHandler):
         self.cachePath = cachePath
         try:
-            #noinspection PyArgumentList
-            self.conn = sqlite3.connect(os.path.join(self.cachePath, self.SOURCE_DB), detect_types=sqlite3.PARSE_DECLTYPES, check_same_thread = False)
+            self.conn = sqlite3.connect(os.path.join(self.cachePath, self.SOURCE_DB), detect_types=sqlite3.PARSE_DECLTYPES)
             self.conn.execute('PRAGMA foreign_keys = ON')
             self.conn.row_factory = sqlite3.Row
             self._createTables()
@@ -188,9 +188,7 @@ class Source(object):
 
                 if isinstance(item, Channel):
                     channel = item
-                    if channel.streamUrl:
-                        continue
-                    elif self.playbackUsingDanishLiveTV and self.STREAMS.has_key(channel.id):
+                    if not channel.streamUrl and self.playbackUsingDanishLiveTV and self.STREAMS.has_key(channel.id):
                         channel.streamUrl = self.STREAMS[channel.id]
                     c.execute('INSERT OR IGNORE INTO channels(id, title, logo, stream_url, visible, weight, source) VALUES(?, ?, ?, ?, ?, (CASE ? WHEN -1 THEN (SELECT COALESCE(MAX(weight)+1, 0) FROM channels WHERE source=?) ELSE ? END), ?)', [channel.id, channel.title, channel.logo, channel.streamUrl, channel.visible, channel.weight, self.KEY, channel.weight, self.KEY])
                     if not c.rowcount:
@@ -224,7 +222,7 @@ class Source(object):
 
             # invalidate cached data
             #noinspection PyTypeChecker
-            c.execute('UPDATE sources SET channels_updated=? WHERE source=?', [datetime.datetime.fromtimestamp(0), self.KEY])
+            c.execute('UPDATE sources SET channels_updated=? WHERE id=?', [datetime.datetime.fromtimestamp(0), self.KEY])
             self.conn.commit()
 
             raise SourceException(ex)
@@ -359,9 +357,9 @@ class Source(object):
             channelMap[c.id] = c
 
         c = self.conn.cursor()
-        c.execute('SELECT * FROM programs WHERE channel IN (\'' + ('\',\''.join(channelMap.keys())) + '\') AND source=? AND end_date >= ? AND start_date <= ?', [self.KEY, startTime, endTime])
+        c.execute('SELECT p.*, (SELECT 1 FROM notifications n WHERE n.channel=p.channel AND n.program_title=p.title AND n.source=p.source) AS notification_scheduled FROM programs p WHERE p.channel IN (\'' + ('\',\''.join(channelMap.keys())) + '\') AND p.source=? AND p.end_date >= ? AND p.start_date <= ?', [self.KEY, startTime, endTime])
         for row in c:
-            program = Program(channelMap[row['channel']], row['title'], row['start_date'], row['end_date'], row['description'], row['image_large'], row['image_small'])
+            program = Program(channelMap[row['channel']], row['title'], row['start_date'], row['end_date'], row['description'], row['image_large'], row['image_small'], row['notification_scheduled'])
             programList.append(program)
 
         return programList
@@ -452,6 +450,10 @@ class Source(object):
             # For active setting
             c.execute('CREATE TABLE settings(key TEXT PRIMARY KEY, value TEXT)')
 
+            # For notifications
+            c.execute("CREATE TABLE notifications(channel TEXT, program_title TEXT, source TEXT, FOREIGN KEY(channel, source) REFERENCES channels(id, source) ON DELETE CASCADE)")
+
+
         # make sure we have a record in sources for this Source
         #noinspection PyTypeChecker
         c.execute("INSERT OR IGNORE INTO sources(id, channels_updated) VALUES(?, ?)", [self.KEY, datetime.datetime.fromtimestamp(0)])
@@ -529,6 +531,7 @@ class YouSeeTvSource(Source):
         super(YouSeeTvSource, self).__init__(addon, cachePath, playbackCallbackHandler)
         self.date = datetime.datetime.today()
         self.channelCategory = addon.getSetting('youseetv.category')
+        print self.channelCategory
         self.ysApi = ysapi.YouSeeTVGuideApi()
         self.playbackUsingYouSeeWebTv = False
 
