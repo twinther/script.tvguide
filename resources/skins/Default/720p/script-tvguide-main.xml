@@ -215,7 +215,6 @@
                     <width>160</width>
                     <height>45</height>
                     <aspectratio>keep</aspectratio>
-                    <fadetime>500</fadetime>
                     <visible>!StringCompare(Control.GetLabel(4110),)</visible>
                 </control>
                 <control type="image" id="4111">
@@ -225,7 +224,6 @@
                     <width>160</width>
                     <height>45</height>
                     <aspectratio>keep</aspectratio>
-                    <fadetime>500</fadetime>
                     <visible>!StringCompare(Control.GetLabel(4111),)</visible>
                 </control>
                 <control type="image" id="4112">
@@ -235,7 +233,6 @@
                     <width>160</width>
                     <height>45</height>
                     <aspectratio>keep</aspectratio>
-                    <fadetime>500</fadetime>
                     <visible>!StringCompare(Control.GetLabel(4112),)</visible>
                 </control>
                 <control type="image" id="4113">
@@ -245,7 +242,6 @@
                     <width>160</width>
                     <height>45</height>
                     <aspectratio>keep</aspectratio>
-                    <fadetime>500</fadetime>
                     <visible>!StringCompare(Control.GetLabel(4113),)</visible>
                 </control>
                 <control type="image" id="4114">
@@ -255,7 +251,6 @@
                     <width>160</width>
                     <height>45</height>
                     <aspectratio>keep</aspectratio>
-                    <fadetime>500</fadetime>
                     <visible>!StringCompare(Control.GetLabel(4114),)</visible>
                 </control>
                 <control type="image" id="4115">
@@ -265,7 +260,6 @@
                     <width>160</width>
                     <height>45</height>
                     <aspectratio>keep</aspectratio>
-                    <fadetime>500</fadetime>
                     <visible>!StringCompare(Control.GetLabel(4115),)</visible>
                 </control>
                 <control type="image" id="4116">
@@ -275,7 +269,6 @@
                     <width>160</width>
                     <height>45</height>
                     <aspectratio>keep</aspectratio>
-                    <fadetime>500</fadetime>
                     <visible>!StringCompare(Control.GetLabel(4116),)</visible>
                 </control>
                 <control type="image" id="4117">
@@ -285,7 +278,6 @@
                     <width>160</width>
                     <height>45</height>
                     <aspectratio>keep</aspectratio>
-                    <fadetime>500</fadetime>
                     <visible>!StringCompare(Control.GetLabel(4117),)</visible>
                 </control>
                 <control type="image" id="4118">
@@ -295,7 +287,6 @@
                     <width>160</width>
                     <height>45</height>
                     <aspectratio>keep</aspectratio>
-                    <fadetime>500</fadetime>
                     <visible>!StringCompare(Control.GetLabel(4118),)</visible>
                 </control>
             </control>

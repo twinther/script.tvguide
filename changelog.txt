@@ -8,6 +8,7 @@
 - Added initial channel surfing support
   - Press Info for OSD, navigate with Up, Down, Left, Right, Channel + and -
   - Press ContextMenu to minimize video and show EPG
+- Added support for mouse wheel scrolling (will probably crash XBMC in Eden RC2 and earlier)
 
 [B]Version 1.2.2 - 2012-01-28[/B]
 - Fixed compatibility problem with Python 2.6 and previous versions
