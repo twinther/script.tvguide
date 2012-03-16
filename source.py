@@ -183,7 +183,7 @@ class Source(object):
             for item in self.getDataFromExternal(date, progress_callback):
                 imported += 1
 
-                if imported % 1000 == 0:
+                if imported % 10000 == 0:
                     self.conn.commit()
 
                 if isinstance(item, Channel):
@@ -218,7 +218,11 @@ class Source(object):
 
         except Exception, ex:
             self.conn.rollback()
-            print str(ex)
+
+            import traceback as tb
+            import sys
+            (type, value, traceback) = sys.exc_info()
+            tb.print_exception(type, value, traceback)
 
             # invalidate cached data
             #noinspection PyTypeChecker
@@ -481,35 +485,27 @@ class DrDkSource(Source):
 
     def getDataFromExternal(self, date, progress_callback = None):
         jsonChannels = simplejson.loads(self._downloadUrl(self.CHANNELS_URL))
-        data = list()
 
         channels = jsonChannels['result']
         for idx, channel in enumerate(channels):
             c = Channel(id = channel['source_url'], title = channel['name'])
-            data.append(c)
-            data.extend(self.getProgramListFromExternal(channel['source_url'], date))
+            yield c
+
+            url = self.PROGRAMS_URL % (channel['source_url'].replace('+', '%2b'), date.strftime('%Y-%m-%dT00:00:00'))
+            jsonPrograms = simplejson.loads(self._downloadUrl(url))
+            for program in jsonPrograms['result']:
+                if program.has_key('ppu_description'):
+                    description = program['ppu_description']
+                else:
+                    description = strings(NO_DESCRIPTION)
+
+                p = Program(c, program['pro_title'], self._parseDate(program['pg_start']), self._parseDate(program['pg_stop']), description)
+                yield p
 
             if progress_callback:
                 if not progress_callback(100.0 / len(channels) * idx):
                     return
 
-        return data
-
-    def getProgramListFromExternal(self, channel, date):
-        url = self.PROGRAMS_URL % (channel.replace('+', '%2b'), date.strftime('%Y-%m-%dT00:00:00'))
-        jsonPrograms = simplejson.loads(self._downloadUrl(url))
-        programs = list()
-
-        for program in jsonPrograms['result']:
-            if program.has_key('ppu_description'):
-                description = program['ppu_description']
-            else:
-                description = strings(NO_DESCRIPTION)
-
-            programs.append(Program(channel, program['pro_title'], self._parseDate(program['pg_start']), self._parseDate(program['pg_stop']), description))
-
-        return programs
-    
     def _parseDate(self, dateString):
         t = time.strptime(dateString[:19], '%Y-%m-%dT%H:%M:%S')
         return datetime.datetime(t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec)
@@ -551,36 +547,30 @@ class YouSeeTvSource(Source):
             c = Channel(id = channel['id'], title = channel['name'], logo = channel['logo'])
             if self.playbackUsingYouSeeWebTv:
                 c.streamUrl = 'plugin://plugin.video.yousee.tv/?channel=' + str(c.id)
-            data.append(c)
-            data.extend(self.getProgramListFromExternal(c, date))
+            yield c
+
+            for program in self.ysApi.programs(c.id, tvdate = date):
+                description = program['description']
+                if description is None:
+                    description = strings(NO_DESCRIPTION)
+
+                imagePrefix = program['imageprefix']
+
+                p = Program(
+                    c,
+                    program['title'],
+                    self._parseDate(program['begin']),
+                    self._parseDate(program['end']),
+                    description,
+                    imagePrefix + program['images_sixteenbynine']['large'],
+                    imagePrefix + program['images_sixteenbynine']['small'],
+                )
+                yield p
+
 
             if progress_callback:
                 if not progress_callback(100.0 / len(channels) * idx):
                     return
-
-        return data
-
-    def getProgramListFromExternal(self, channel, date):
-        programs = list()
-        for program in self.ysApi.programs(channel.id, tvdate = date):
-            description = program['description']
-            if description is None:
-                description = strings(NO_DESCRIPTION)
-
-            imagePrefix = program['imageprefix']
-
-            p = Program(
-                channel,
-                program['title'],
-                self._parseDate(program['begin']),
-                self._parseDate(program['end']),
-                description,
-                imagePrefix + program['images_sixteenbynine']['large'],
-                imagePrefix + program['images_sixteenbynine']['small'],
-            )
-            programs.append(p)
-
-        return programs
 
     def _parseDate(self, dateString):
         return datetime.datetime.fromtimestamp(dateString)
