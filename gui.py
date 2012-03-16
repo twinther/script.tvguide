@@ -139,12 +139,8 @@ class TVGuide(xbmcgui.WindowXML):
 
     @buggalo.buggalo_try_except({'method' : 'TVGuide.onAction'})
     def onAction(self, action):
-        if action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK]:
-            self.close()
-            return
-
         if self.mode == MODE_TV:
-            if action.getId() == KEY_CONTEXT_MENU:
+            if action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK, KEY_CONTEXT_MENU]:
                 self.onRedrawEPG(self.channelIdx, self.viewStartDate)
 
             elif action.getId() == ACTION_PAGE_UP:
@@ -160,6 +156,10 @@ class TVGuide(xbmcgui.WindowXML):
             if action.getId() == ACTION_SHOW_INFO:
                 self._hideOsd()
 
+            elif action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK, KEY_CONTEXT_MENU]:
+                self._hideOsd()
+                self.onRedrawEPG(self.channelIdx, self.viewStartDate)
+
             elif action.getId() == ACTION_SELECT_ITEM:
                 if self.source.isPlayable(self.osdChannel):
                     self._playChannel(self.osdChannel)
@@ -174,12 +174,12 @@ class TVGuide(xbmcgui.WindowXML):
                 self._showOsd()
 
             elif action.getId() == ACTION_UP:
-                self.osdChannel = self.source.getNextChannel(self.osdChannel)
+                self.osdChannel = self.source.getPreviousChannel(self.osdChannel)
                 self.osdProgram = self.source.getCurrentProgram(self.osdChannel)
                 self._showOsd()
 
             elif action.getId() == ACTION_DOWN:
-                self.osdChannel = self.source.getPreviousChannel(self.osdChannel)
+                self.osdChannel = self.source.getNextChannel(self.osdChannel)
                 self.osdProgram = self.source.getCurrentProgram(self.osdChannel)
                 self._showOsd()
 
@@ -196,7 +196,11 @@ class TVGuide(xbmcgui.WindowXML):
                     self._showOsd()
 
         elif self.mode == MODE_EPG:
-            if action.getId() == KEY_CONTEXT_MENU:
+            if action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK]:
+                self.close()
+                return
+
+            elif action.getId() == KEY_CONTEXT_MENU:
                 if self.source.isPlaying():
                     self._hideEpg()
 
@@ -393,7 +397,8 @@ class TVGuide(xbmcgui.WindowXML):
         self.currentChannel = channel
         wasPlaying = self.source.isPlaying()
         self.source.play(channel)
-        if not wasPlaying:
+        xbmc.sleep(1000)
+        if not wasPlaying and self.source.isPlaying():
             self._hideEpg()
 
         self.osdProgram = self.source.getCurrentProgram(self.currentChannel)

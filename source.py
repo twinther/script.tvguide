@@ -95,6 +95,10 @@ class SourcePlayer(xbmc.Player):
         if self.callbackHandler:
             self.callbackHandler.onPlayBackStopped()
 
+    def onPlayBackEnded(self):
+        if self.callbackHandler:
+            self.callbackHandler.onPlayBackStopped()
+
 class SourceException(Exception):
     pass
 
