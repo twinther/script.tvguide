@@ -1,4 +1,4 @@
-[B]Version 1.3.0 - 2012-xx-xx[/B]
+[B]Version 1.2.90 - 2012-03-16[/B]
 - Added French translation
 - Use script.module.buggalo for error reporting
 - Cache EPG data to local SQLite database (based on work by timpinkawa)
