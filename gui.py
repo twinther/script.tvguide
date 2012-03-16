@@ -96,6 +96,7 @@ class TVGuide(xbmcgui.WindowXML):
     C_MAIN_LOADING = 4200
     C_MAIN_LOADING_PROGRESS = 4201
     C_MAIN_LOADING_TIME_LEFT = 4202
+    C_MAIN_LOADING_CANCEL = 4203
     C_MAIN_MOUSE_CONTROLS = 4300
     C_MAIN_MOUSE_HOME = 4301
     C_MAIN_MOUSE_LEFT = 4302
@@ -135,17 +136,28 @@ class TVGuide(xbmcgui.WindowXML):
         self.viewStartDate = datetime.datetime.today()
         self.viewStartDate -= datetime.timedelta(minutes = self.viewStartDate.minute % 30)
 
+    def close(self):
+        if self.source:
+            self.source.close()
+        super(TVGuide, self).close()
+
     @buggalo.buggalo_try_except({'method' : 'TVGuide.onInit'})
     def onInit(self):
         self.getControl(self.C_MAIN_MOUSE_CONTROLS).setVisible(True)
         self.getControl(self.C_MAIN_OSD).setVisible(False)
         self.getControl(self.C_MAIN_LOADING).setVisible(False)
         self.getControl(self.C_MAIN_LOADING_TIME_LEFT).setLabel(strings(BACKGROUND_UPDATE_IN_PROGRESS))
+        self.setFocus(self.getControl(self.C_MAIN_LOADING_CANCEL))
 
         SourceInitializer(self).run()
 
     @buggalo.buggalo_try_except({'method' : 'TVGuide.onAction'})
     def onAction(self, action):
+        if not self.source:
+            if action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK]:
+                self.close()
+            return
+
         if self.mode == MODE_TV:
             if action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK, KEY_CONTEXT_MENU]:
                 self.onRedrawEPG(self.channelIdx, self.viewStartDate, autoFocus=True)
@@ -263,7 +275,11 @@ class TVGuide(xbmcgui.WindowXML):
 
     @buggalo.buggalo_try_except({'method' : 'TVGuide.onClick'})
     def onClick(self, controlId):
-        if controlId == self.C_MAIN_MOUSE_HOME:
+        if controlId == self.C_MAIN_LOADING_CANCEL:
+            self.close()
+            return
+
+        elif controlId == self.C_MAIN_MOUSE_HOME:
             self.viewStartDate = datetime.datetime.today()
             self.viewStartDate -= datetime.timedelta(minutes = self.viewStartDate.minute % 30)
             self.onRedrawEPG(self.channelIdx, self.viewStartDate, autoFocus=True)
@@ -478,6 +494,7 @@ class TVGuide(xbmcgui.WindowXML):
 
         self.getControl(self.C_MAIN_LOADING_TIME_LEFT).setLabel(strings(CALCULATING_REMAINING_TIME))
         self.getControl(self.C_MAIN_LOADING).setVisible(False)
+        self.setFocus(self.getControl(self.C_MAIN_LOADING_CANCEL))
 
         # move timebar to current time
         timeDelta = datetime.datetime.today() - self.viewStartDate

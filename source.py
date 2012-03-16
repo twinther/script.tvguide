@@ -134,7 +134,8 @@ class Source(object):
             xbmcgui.Dialog().ok(ADDON.getAddonInfo('name'), strings(DANISH_LIVE_TV_MISSING_1),
                 strings(DANISH_LIVE_TV_MISSING_2), strings(DANISH_LIVE_TV_MISSING_3))
 
-    def __del__(self):
+    def close(self):
+        self.conn.rollback() # rollback any non-commit'ed changes to avoid database lock
         self.conn.close()
 
     def wasSettingsChanged(self, addon):
@@ -400,7 +401,7 @@ class Source(object):
     def setCustomStreamUrl(self, channel, stream_url):
         c = self.conn.cursor()
         c.execute("DELETE FROM custom_stream_url WHERE channel=?", [channel.id])
-        c.execute("INSERT INTO custom_stream_url(channel, stream_url) VALUES(?, ?)", [channel.id, stream_url])
+        c.execute("INSERT INTO custom_stream_url(channel, stream_url) VALUES(?, ?)", [channel.id, stream_url.decode('utf-8', 'ignore')])
         self.conn.commit()
         c.close()
 
@@ -431,12 +432,14 @@ class Source(object):
     def play(self, channel):
         customStreamUrl = self.getCustomStreamUrl(channel)
         if customStreamUrl:
+            customStreamUrl = customStreamUrl.encode('utf-8', 'ignore')
             xbmc.log("Playing custom stream url: %s" % customStreamUrl)
             self.player.play(item = customStreamUrl, windowed=True)
 
         elif channel.isPlayable():
-            xbmc.log("Playing : %s" % channel.streamUrl)
-            self.player.play(item = channel.streamUrl, windowed=True)
+            streamUrl = channel.streamUrl.encode('utf-8', 'ignore')
+            xbmc.log("Playing : %s" % streamUrl)
+            self.player.play(item = streamUrl, windowed=True)
 
     def _createTables(self):
         c = self.conn.cursor()

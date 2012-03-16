@@ -399,11 +399,24 @@
                     <posx>70</posx>
                     <posy>50</posy>
                     <width>600</width>
-                    <height>55</height>
+                    <height>50</height>
                     <label>...</label>
                     <textcolor>ffffffff</textcolor>
                     <font>font13</font>
                     <aligny>center</aligny>
+                </control>
+                <control type="button" id="4203">
+                    <posx>70</posx>
+                    <posy>100</posy>
+                    <width>150</width>
+                    <height>50</height>
+                    <label>$ADDON[script.tvguide 30008]</label>
+                    <textcolor>ffffffff</textcolor>
+                    <font>font13</font>
+                    <aligny>center</aligny>
+                    <align>center</align>
+                    <texturefocus>tvguide-program-grey-focus.png</texturefocus>
+                    <texturenofocus>tvguide-program-grey.png</texturenofocus>
                 </control>
             </control>
 
