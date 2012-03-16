@@ -5,6 +5,9 @@
     <string id="30002">Calculating remaning time...</string>
     <string id="30003">Approximately %d seconds left...</string>
     <string id="30004">Loading of data already in progress...</string>
+    <string id="30005">Mouse control</string>
+    <string id="30006">Now</string>
+    <string id="30007">[B]Tip![/B] You can also use the scroll wheel</string>
 
     <string id="30100">General</string>
     <string id="30101">Source</string>
@@ -23,6 +26,7 @@
     <string id="30114">Startup</string>
     <string id="30115">- clear cache first</string>
     <string id="30116">Search for channel logos in</string>
+    <string id="30117">ONTV Pro URL</string>
 
     <string id="30150">Oops, sorry about that!</string>
     <string id="30151">It was not possible to load program data,</string>

@@ -17,6 +17,7 @@
 #  the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
 #  http://www.gnu.org/copyleft/gpl.html
 #
+import StringIO
 import os
 import simplejson
 import datetime
@@ -29,7 +30,6 @@ import ysapi
 import xbmc
 import xbmcgui
 import xbmcvfs
-import pickle
 from sqlite3 import dbapi2 as sqlite3
 
 STREAM_DR1 = 'plugin://plugin.video.dr.dk.live/?playChannel=1'
@@ -41,7 +41,7 @@ STREAM_DR_HD = 'plugin://plugin.video.dr.dk.live/?playChannel=6'
 STREAM_24_NORDJYSKE = 'plugin://plugin.video.dr.dk.live/?playChannel=200'
 
 SETTINGS_TO_CHECK = ['source', 'youseetv.category', 'youseewebtv.playback', 'danishlivetv.playback', 'xmltv.file',
-                     'xmltv.logo.folder']
+                     'xmltv.logo.folder', 'ontv.url']
 
 class Channel(object):
     def __init__(self, id, title, logo = None, streamUrl = None, visible = True, weight = -1):
@@ -140,14 +140,19 @@ class Source(object):
     def wasSettingsChanged(self, addon):
         settingsChanged = False
         noRows = True
+        count = 0
 
         c = self.conn.cursor()
         c.execute('SELECT * FROM settings')
         for row in c:
+            count += 1
             noRows = False
             key = row['key']
             if SETTINGS_TO_CHECK.count(key) and row['value'] != addon.getSetting(key):
                 settingsChanged = True
+
+        if count != len(SETTINGS_TO_CHECK):
+            settingsChanged = True
 
         if settingsChanged or noRows:
             for key in SETTINGS_TO_CHECK:
@@ -175,6 +180,8 @@ class Source(object):
         c = self.conn.cursor()
         try:
             xbmc.log('[script.tvguide] Updating caches...', xbmc.LOGDEBUG)
+            if progress_callback:
+                progress_callback(0)
 
             if self.settingsChanged:
                 c.execute('DELETE FROM channels WHERE source=?', [self.KEY])
@@ -384,7 +391,7 @@ class Source(object):
 
 
     def _downloadUrl(self, url):
-        u = urllib2.urlopen(url)
+        u = urllib2.urlopen(url, timeout=30)
         content = u.read()
         u.close()
             
@@ -545,7 +552,6 @@ class YouSeeTvSource(Source):
                 strings(YOUSEE_WEBTV_MISSING_2), strings(YOUSEE_WEBTV_MISSING_3))
 
     def getDataFromExternal(self, date, progress_callback = None):
-        data = list()
         channels = self.ysApi.channelsInCategory(self.channelCategory)
         for idx, channel in enumerate(channels):
             c = Channel(id = channel['id'], title = channel['name'], logo = channel['logo'])
@@ -634,24 +640,16 @@ class XMLTVSource(Source):
     }
 
     def __init__(self, addon, cachePath, playbackCallbackHandler):
-        self.logoFolder = addon.getSetting('xmltv.logo.folder')
-        self.time = time.time()
-
         super(XMLTVSource, self).__init__(addon, cachePath, playbackCallbackHandler)
-
+        self.logoFolder = addon.getSetting('xmltv.logo.folder')
         self.xmlTvFile = addon.getSetting('xmltv.file')
         #self.xmlTvFile = os.path.join(self.cachePath, '%s.xmltv' % self.KEY)
         #if xbmcvfs.exists(addon.getSetting('xmltv.file')):
         #    xbmc.log('[script.tvguide] Caching XMLTV file...')
         #    xbmcvfs.copy(addon.getSetting('xmltv.file'), self.xmlTvFile)
 
-        # calculate nearest hour
-        self.time -= self.time % 3600
-
     def getDataFromExternal(self, date, progress_callback = None):
-        size = os.path.getsize(self.xmlTvFile)
-        f = open(self.xmlTvFile, "rb")
-        context = ElementTree.iterparse(f, events=("start", "end"))
+        context, f, size = self._loadXml()
         event, root = context.next()
         elements_parsed = 0
 
@@ -661,9 +659,13 @@ class XMLTVSource(Source):
                 if elem.tag == "programme":
                     channel = elem.get("channel")
                     description = elem.findtext("desc")
+                    iconElement = elem.find("icon")
+                    icon = None
+                    if iconElement is not None:
+                        icon = iconElement.get("src")
                     if not description:
                         description = strings(NO_DESCRIPTION)
-                    result = Program(channel, elem.findtext('title'), self._parseDate(elem.get('start')), self._parseDate(elem.get('stop')), description)
+                    result = Program(channel, elem.findtext('title'), self._parseDate(elem.get('start')), self._parseDate(elem.get('stop')), description, imageSmall=icon)
 
                 elif elem.tag == "channel":
                     id = elem.get("id")
@@ -705,12 +707,10 @@ class XMLTVSource(Source):
         return self._isChannelListCacheExpired()
 
     def _loadXml(self):
-        f = open(self.xmlTvFile)
-        xml = f.read()
-        f.close()
-
-        return ElementTree.fromstring(xml)
-
+        size = os.path.getsize(self.xmlTvFile)
+        f = open(self.xmlTvFile, "rb")
+        context = ElementTree.iterparse(f, events=("start", "end"))
+        return context, f, size
 
     def _parseDate(self, dateString):
         dateStringWithoutTimeZone = dateString[:-6]
@@ -718,12 +718,38 @@ class XMLTVSource(Source):
         return datetime.datetime(t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec)
 
 
+class ONTVSource(XMLTVSource):
+    KEY = 'ontv'
+
+    STREAMS = {
+        'www.ontv.dk/tv/1' : STREAM_DR1,
+        'www.ontv.dk/tv/2' : STREAM_DR2,
+        'www.ontv.dk/tv/10153' : STREAM_DR_RAMASJANG,
+        'www.ontv.dk/tv/10154' : STREAM_DR_K,
+        'www.ontv.dk/tv/10155' : STREAM_DR_HD
+    }
+
+    def __init__(self, addon, cachePath, playbackCallbackHandler):
+        super(ONTVSource, self).__init__(addon, cachePath, playbackCallbackHandler)
+        self.ontvUrl = addon.getSetting('ontv.url')
+
+    def _isChannelListCacheExpired(self):
+        return Source._isChannelListCacheExpired(self)
+
+    def _loadXml(self):
+        xml = self._downloadUrl(self.ontvUrl)
+        io = StringIO.StringIO(xml)
+        context = ElementTree.iterparse(io)
+        return context, io, len(xml)
+
+
 def instantiateSource(addon, playbackCallbackHandler):
     SOURCES = {
         'YouSee.tv' : YouSeeTvSource,
         'DR.dk' : DrDkSource,
         'TVTID.dk' : TvTidSource,
-        'XMLTV' : XMLTVSource
+        'XMLTV' : XMLTVSource,
+        'ONTV.dk' : ONTVSource
     }
 
     cachePath = xbmc.translatePath(ADDON.getAddonInfo('profile'))

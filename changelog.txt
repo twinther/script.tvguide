@@ -1,3 +1,7 @@
+[B]Version 1.2.91 - 2012-03-xx[/B]
+- Added new source for ONTV.dk Pro customers
+- Added slide-out controls to ease navigation with mouse
+
 [B]Version 1.2.90 - 2012-03-16[/B]
 - Added French translation
 - Use script.module.buggalo for error reporting

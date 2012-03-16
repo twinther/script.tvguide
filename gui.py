@@ -96,7 +96,13 @@ class TVGuide(xbmcgui.WindowXML):
     C_MAIN_LOADING = 4200
     C_MAIN_LOADING_PROGRESS = 4201
     C_MAIN_LOADING_TIME_LEFT = 4202
-    C_MAIN_SCROLLBAR = 4300
+    C_MAIN_MOUSE_CONTROLS = 4300
+    C_MAIN_MOUSE_HOME = 4301
+    C_MAIN_MOUSE_LEFT = 4302
+    C_MAIN_MOUSE_UP = 4303
+    C_MAIN_MOUSE_DOWN = 4304
+    C_MAIN_MOUSE_RIGHT = 4305
+    C_MAIN_MOUSE_CHANNELS = 4306
     C_MAIN_BACKGROUND = 4600
     C_MAIN_EPG = 5000
     C_MAIN_OSD = 6000
@@ -131,6 +137,7 @@ class TVGuide(xbmcgui.WindowXML):
 
     @buggalo.buggalo_try_except({'method' : 'TVGuide.onInit'})
     def onInit(self):
+        self.getControl(self.C_MAIN_MOUSE_CONTROLS).setVisible(True)
         self.getControl(self.C_MAIN_OSD).setVisible(False)
         self.getControl(self.C_MAIN_LOADING).setVisible(False)
         self.getControl(self.C_MAIN_LOADING_TIME_LEFT).setLabel(strings(BACKGROUND_UPDATE_IN_PROGRESS))
@@ -200,6 +207,10 @@ class TVGuide(xbmcgui.WindowXML):
                 self.close()
                 return
 
+            elif action.getId() == ACTION_MOUSE_MOVE:
+                self.getControl(self.C_MAIN_MOUSE_CONTROLS).setVisible(False)
+                return
+
             elif action.getId() == KEY_CONTEXT_MENU:
                 if self.source.isPlaying():
                     self._hideEpg()
@@ -245,13 +256,36 @@ class TVGuide(xbmcgui.WindowXML):
             elif action.getId() in [KEY_CONTEXT_MENU, ACTION_PREVIOUS_MENU] and controlInFocus is not None:
                 program = self._getProgramFromControlId(controlInFocus.getId())
                 if program is not None:
-                    self._showContextMenu(program, controlInFocus)
+                    self._showContextMenu(program)
 
             if control is not None:
                 self.setFocus(control)
 
     @buggalo.buggalo_try_except({'method' : 'TVGuide.onClick'})
     def onClick(self, controlId):
+        if controlId == self.C_MAIN_MOUSE_HOME:
+            self.viewStartDate = datetime.datetime.today()
+            self.viewStartDate -= datetime.timedelta(minutes = self.viewStartDate.minute % 30)
+            self.onRedrawEPG(self.channelIdx, self.viewStartDate, autoFocus=True)
+            return
+        elif controlId == self.C_MAIN_MOUSE_LEFT:
+            self.viewStartDate -= datetime.timedelta(hours = 2)
+            self.onRedrawEPG(self.channelIdx, self.viewStartDate, autoFocus=True)
+            return
+        elif controlId == self.C_MAIN_MOUSE_UP:
+            self._moveUp(count = CHANNELS_PER_PAGE)
+            self.onRedrawEPG(self.channelIdx, self.viewStartDate, autoFocus=True)
+            return
+        elif controlId == self.C_MAIN_MOUSE_DOWN:
+            self._moveDown(count = CHANNELS_PER_PAGE)
+            self.onRedrawEPG(self.channelIdx, self.viewStartDate, autoFocus=True)
+            return
+        elif controlId == self.C_MAIN_MOUSE_RIGHT:
+            self.viewStartDate += datetime.timedelta(hours = 2)
+            self.onRedrawEPG(self.channelIdx, self.viewStartDate, autoFocus=True)
+            return
+
+
         program = self._getProgramFromControlId(controlId)
         if program is None:
             return
@@ -259,9 +293,9 @@ class TVGuide(xbmcgui.WindowXML):
         if self.source.isPlayable(program.channel):
             self._playChannel(program.channel)
         else:
-            self._showContextMenu(program, self.getControl(controlId))
+            self._showContextMenu(program)
 
-    def _showContextMenu(self, program, control):
+    def _showContextMenu(self, program):
         d = PopupMenu(self.source, program, not program.notificationScheduled)
         d.doModal()
         buttonClicked = d.buttonClicked
@@ -273,8 +307,6 @@ class TVGuide(xbmcgui.WindowXML):
             else:
                 self.notification.addProgram(program)
 
-            (left, top) = control.getPosition()
-            y = top + (control.getHeight() / 2)
             self.onRedrawEPG(self.channelIdx, self.viewStartDate, autoFocus = True)
 
         elif buttonClicked == PopupMenu.C_POPUP_CHOOSE_STRM:
