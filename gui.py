@@ -141,7 +141,7 @@ class TVGuide(xbmcgui.WindowXML):
     def onAction(self, action):
         if self.mode == MODE_TV:
             if action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK, KEY_CONTEXT_MENU]:
-                self.onRedrawEPG(self.channelIdx, self.viewStartDate)
+                self.onRedrawEPG(self.channelIdx, self.viewStartDate, autoFocus=True)
 
             elif action.getId() == ACTION_PAGE_UP:
                 self._channelUp()
@@ -158,7 +158,7 @@ class TVGuide(xbmcgui.WindowXML):
 
             elif action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK, KEY_CONTEXT_MENU]:
                 self._hideOsd()
-                self.onRedrawEPG(self.channelIdx, self.viewStartDate)
+                self.onRedrawEPG(self.channelIdx, self.viewStartDate, autoFocus=True)
 
             elif action.getId() == ACTION_SELECT_ITEM:
                 if self.source.isPlayable(self.osdChannel):
@@ -241,7 +241,7 @@ class TVGuide(xbmcgui.WindowXML):
             elif action.getId() == KEY_HOME:
                 self.viewStartDate = datetime.datetime.today()
                 self.viewStartDate -= datetime.timedelta(minutes = self.viewStartDate.minute % 30)
-                self.onRedrawEPG(self.channelIdx, self.viewStartDate)
+                self.onRedrawEPG(self.channelIdx, self.viewStartDate, autoFocus=True)
             elif action.getId() in [KEY_CONTEXT_MENU, ACTION_PREVIOUS_MENU] and controlInFocus is not None:
                 program = self._getProgramFromControlId(controlInFocus.getId())
                 if program is not None:
@@ -275,8 +275,7 @@ class TVGuide(xbmcgui.WindowXML):
 
             (left, top) = control.getPosition()
             y = top + (control.getHeight() / 2)
-            self.onRedrawEPG(self.channelIdx, self.viewStartDate)
-            self.setFocus(self._findControlOnRight(left, y))
+            self.onRedrawEPG(self.channelIdx, self.viewStartDate, autoFocus = True)
 
         elif buttonClicked == PopupMenu.C_POPUP_CHOOSE_STRM:
             filename = xbmcgui.Dialog().browse(1, ADDON.getLocalizedString(30304), 'video', '.strm')
@@ -291,7 +290,7 @@ class TVGuide(xbmcgui.WindowXML):
             d = ChannelsMenu(self.source)
             d.doModal()
             del d
-            self.onRedrawEPG(self.channelIdx, self.viewStartDate)
+            self.onRedrawEPG(self.channelIdx, self.viewStartDate, autoFocus=True)
 
     @buggalo.buggalo_try_except({'method' : 'TVGuide.onFocus'})
     def onFocus(self, controlId):
@@ -431,7 +430,7 @@ class TVGuide(xbmcgui.WindowXML):
             self.removeControl(self.getControl(id))
         self.controlToProgramMap.clear()
 
-    def onRedrawEPG(self, channelStart, startTime, scrollEvent = False):
+    def onRedrawEPG(self, channelStart, startTime, scrollEvent = False, autoFocus = False):
         if self.redrawingEPG:
             return # ignore redraw request while redrawing
 
@@ -442,7 +441,6 @@ class TVGuide(xbmcgui.WindowXML):
 
         if not scrollEvent:
             for controlId in self.controlToProgramMap.keys():
-                print '%d - %s' % (controlId, str(self.getControl(controlId)))
                 self.removeControl(self.getControl(controlId))
             self.controlToProgramMap.clear()
 
@@ -569,6 +567,11 @@ class TVGuide(xbmcgui.WindowXML):
         if scrollEvent:
             xbmc.sleep(100)
 
+        if autoFocus:
+            control = self._findControlBelow(self.focusY)
+            if control:
+                self.setFocus(control)
+
         self.getControl(self.C_MAIN_LOADING).setVisible(True)
         self.redrawingEPG = False
 
@@ -582,10 +585,7 @@ class TVGuide(xbmcgui.WindowXML):
         self.notification = Notification(self.source, ADDON.getAddonInfo('path'))
 
         self.getControl(self.C_MAIN_IMAGE).setImage('tvguide-logo-%s.png' % self.source.KEY)
-        self.onRedrawEPG(0, self.viewStartDate)
-        control = self._findControlBelow(self.focusY)
-        if control:
-            self.setFocus(control)
+        self.onRedrawEPG(0, self.viewStartDate, autoFocus=True)
 
     def onSourceProgressUpdate(self, percentageComplete):
         progressControl = self.getControl(self.C_MAIN_LOADING_PROGRESS)
@@ -611,10 +611,7 @@ class TVGuide(xbmcgui.WindowXML):
 
     def onPlayBackStopped(self):
         self._hideOsd()
-        self.onRedrawEPG(self.channelIdx, self.viewStartDate)
-        control = self._findControlBelow(self.focusY)
-        if control:
-            self.setFocus(control)
+        self.onRedrawEPG(self.channelIdx, self.viewStartDate, autoFocus=True)
 
     def _secondsToXposition(self, seconds):
         return CELL_WIDTH_CHANNELS + (seconds * CELL_WIDTH / 1800)
