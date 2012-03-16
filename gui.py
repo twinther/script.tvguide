@@ -48,6 +48,7 @@ ACTION_PREV_ITEM = 15
 
 ACTION_MOUSE_WHEEL_UP = 104
 ACTION_MOUSE_WHEEL_DOWN = 105
+ACTION_MOUSE_MOVE = 107
 
 KEY_NAV_BACK = 92
 KEY_CONTEXT_MENU = 117
@@ -128,142 +129,133 @@ class TVGuide(xbmcgui.WindowXML):
         self.viewStartDate = datetime.datetime.today()
         self.viewStartDate -= datetime.timedelta(minutes = self.viewStartDate.minute % 30)
 
+    @buggalo.buggalo_try_except({'method' : 'TVGuide.onInit'})
     def onInit(self):
-        try:
-            self.getControl(self.C_MAIN_OSD).setVisible(False)
-            self.getControl(self.C_MAIN_LOADING).setVisible(False)
-            self.getControl(self.C_MAIN_LOADING_TIME_LEFT).setLabel(strings(BACKGROUND_UPDATE_IN_PROGRESS))
+        self.getControl(self.C_MAIN_OSD).setVisible(False)
+        self.getControl(self.C_MAIN_LOADING).setVisible(False)
+        self.getControl(self.C_MAIN_LOADING_TIME_LEFT).setLabel(strings(BACKGROUND_UPDATE_IN_PROGRESS))
 
-            SourceInitializer(self).run()
-        except Exception:
-            buggalo.onExceptionRaised()
+        SourceInitializer(self).run()
 
+    @buggalo.buggalo_try_except({'method' : 'TVGuide.onAction'})
     def onAction(self, action):
-        try:
-            if action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK]:
-                self.close()
-                return
+        if action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK]:
+            self.close()
+            return
 
-            if self.mode == MODE_TV:
-                if action.getId() == KEY_CONTEXT_MENU:
-                    self.onRedrawEPG(self.channelIdx, self.viewStartDate)
+        if self.mode == MODE_TV:
+            if action.getId() == KEY_CONTEXT_MENU:
+                self.onRedrawEPG(self.channelIdx, self.viewStartDate)
 
-                elif action.getId() == ACTION_PAGE_UP:
-                    self._channelUp()
+            elif action.getId() == ACTION_PAGE_UP:
+                self._channelUp()
 
-                elif action.getId() == ACTION_PAGE_DOWN:
-                    self._channelDown()
+            elif action.getId() == ACTION_PAGE_DOWN:
+                self._channelDown()
 
-                elif action.getId() == ACTION_SHOW_INFO:
-                    self._showOsd()
+            elif action.getId() == ACTION_SHOW_INFO:
+                self._showOsd()
 
-            elif self.mode == MODE_OSD:
-                if action.getId() == ACTION_SHOW_INFO:
+        elif self.mode == MODE_OSD:
+            if action.getId() == ACTION_SHOW_INFO:
+                self._hideOsd()
+
+            elif action.getId() == ACTION_SELECT_ITEM:
+                if self.source.isPlayable(self.osdChannel):
+                    self._playChannel(self.osdChannel)
                     self._hideOsd()
 
-                elif action.getId() == ACTION_SELECT_ITEM:
-                    if self.source.isPlayable(self.osdChannel):
-                        self._playChannel(self.osdChannel)
-                        self._hideOsd()
+            elif action.getId() == ACTION_PAGE_UP:
+                self._channelUp()
+                self._showOsd()
 
-                elif action.getId() == ACTION_PAGE_UP:
-                    self._channelUp()
+            elif action.getId() == ACTION_PAGE_DOWN:
+                self._channelDown()
+                self._showOsd()
+
+            elif action.getId() == ACTION_UP:
+                self.osdChannel = self.source.getNextChannel(self.osdChannel)
+                self.osdProgram = self.source.getCurrentProgram(self.osdChannel)
+                self._showOsd()
+
+            elif action.getId() == ACTION_DOWN:
+                self.osdChannel = self.source.getPreviousChannel(self.osdChannel)
+                self.osdProgram = self.source.getCurrentProgram(self.osdChannel)
+                self._showOsd()
+
+            elif action.getId() == ACTION_LEFT:
+                previousProgram = self.source.getPreviousProgram(self.osdProgram)
+                if previousProgram:
+                    self.osdProgram = previousProgram
                     self._showOsd()
 
-                elif action.getId() == ACTION_PAGE_DOWN:
-                    self._channelDown()
+            elif action.getId() == ACTION_RIGHT:
+                nextProgram = self.source.getNextProgram(self.osdProgram)
+                if nextProgram:
+                    self.osdProgram = nextProgram
                     self._showOsd()
 
-                elif action.getId() == ACTION_UP:
-                    self.osdChannel = self.source.getNextChannel(self.osdChannel)
-                    self.osdProgram = self.source.getCurrentProgram(self.osdChannel)
-                    self._showOsd()
+        elif self.mode == MODE_EPG:
+            if action.getId() == KEY_CONTEXT_MENU:
+                if self.source.isPlaying():
+                    self._hideEpg()
 
-                elif action.getId() == ACTION_DOWN:
-                    self.osdChannel = self.source.getPreviousChannel(self.osdChannel)
-                    self.osdProgram = self.source.getCurrentProgram(self.osdChannel)
-                    self._showOsd()
+            control = None
+            controlInFocus = None
+            try:
+                controlInFocus = self.getFocus()
+                (left, top) = controlInFocus.getPosition()
+                currentX = left + (controlInFocus.getWidth() / 2)
+                currentY = top + (controlInFocus.getHeight() / 2)
+                self.focusY = top
+            except Exception:
+                currentX = None
+                currentY = None
 
-                elif action.getId() == ACTION_LEFT:
-                    previousProgram = self.source.getPreviousProgram(self.osdProgram)
-                    if previousProgram:
-                        self.osdProgram = previousProgram
-                        self._showOsd()
-
-                elif action.getId() == ACTION_RIGHT:
-                    nextProgram = self.source.getNextProgram(self.osdProgram)
-                    if nextProgram:
-                        self.osdProgram = nextProgram
-                        self._showOsd()
-
-            elif self.mode == MODE_EPG:
-                if action.getId() == KEY_CONTEXT_MENU:
-                    if self.source.isPlaying():
-                        self._hideEpg()
-
-                control = None
-                controlInFocus = None
-                try:
-                    controlInFocus = self.getFocus()
-                    (left, top) = controlInFocus.getPosition()
-                    currentX = left + (controlInFocus.getWidth() / 2)
-                    currentY = top + (controlInFocus.getHeight() / 2)
-                    self.focusY = top
-                except Exception:
-                    currentX = None
-                    currentY = None
-
-                if action.getId() == ACTION_LEFT:
-                    control = self._left(currentX, currentY)
-                elif action.getId() == ACTION_RIGHT:
-                    control = self._right(currentX, currentY)
-                elif action.getId() == ACTION_UP:
-                    control = self._up(currentY)
-                elif action.getId() == ACTION_DOWN:
-                    control = self._down(currentY)
-                elif action.getId() == ACTION_NEXT_ITEM:
-                    control= self._nextDay( currentY)
-                elif action.getId() == ACTION_PREV_ITEM:
-                    control= self._previousDay(currentY)
-                elif action.getId() == ACTION_PAGE_UP:
-                    control = self._moveUp(CHANNELS_PER_PAGE)
-                elif action.getId() == ACTION_PAGE_DOWN:
-                    control = self._moveDown(CHANNELS_PER_PAGE)
-                elif action.getId() == ACTION_MOUSE_WHEEL_UP:
-                    self._moveUp(scrollEvent = True)
-                    return
-                elif action.getId() == ACTION_MOUSE_WHEEL_DOWN:
-                    self._moveDown(scrollEvent = True)
-                    return
-                elif action.getId() == KEY_HOME:
-                    self.viewStartDate = datetime.datetime.today()
-                    self.viewStartDate -= datetime.timedelta(minutes = self.viewStartDate.minute % 30)
-                    self.onRedrawEPG(self.channelIdx, self.viewStartDate)
-                elif action.getId() in [KEY_CONTEXT_MENU, ACTION_PREVIOUS_MENU] and controlInFocus is not None:
-                    program = self._getProgramFromControlId(controlInFocus.getId())
-                    if program is not None:
-                        self._showContextMenu(program, controlInFocus)
-
-                if control is not None:
-                    self.setFocus(control)
-
-        except Exception:
-            buggalo.onExceptionRaised()
-
-
-    def onClick(self, controlId):
-        try:
-            program = self._getProgramFromControlId(controlId)
-            if program is None:
+            if action.getId() == ACTION_LEFT:
+                control = self._left(currentX, currentY)
+            elif action.getId() == ACTION_RIGHT:
+                control = self._right(currentX, currentY)
+            elif action.getId() == ACTION_UP:
+                control = self._up(currentY)
+            elif action.getId() == ACTION_DOWN:
+                control = self._down(currentY)
+            elif action.getId() == ACTION_NEXT_ITEM:
+                control= self._nextDay( currentY)
+            elif action.getId() == ACTION_PREV_ITEM:
+                control= self._previousDay(currentY)
+            elif action.getId() == ACTION_PAGE_UP:
+                control = self._moveUp(CHANNELS_PER_PAGE)
+            elif action.getId() == ACTION_PAGE_DOWN:
+                control = self._moveDown(CHANNELS_PER_PAGE)
+            elif action.getId() == ACTION_MOUSE_WHEEL_UP:
+                self._moveUp(scrollEvent = True)
                 return
+            elif action.getId() == ACTION_MOUSE_WHEEL_DOWN:
+                self._moveDown(scrollEvent = True)
+                return
+            elif action.getId() == KEY_HOME:
+                self.viewStartDate = datetime.datetime.today()
+                self.viewStartDate -= datetime.timedelta(minutes = self.viewStartDate.minute % 30)
+                self.onRedrawEPG(self.channelIdx, self.viewStartDate)
+            elif action.getId() in [KEY_CONTEXT_MENU, ACTION_PREVIOUS_MENU] and controlInFocus is not None:
+                program = self._getProgramFromControlId(controlInFocus.getId())
+                if program is not None:
+                    self._showContextMenu(program, controlInFocus)
 
-            if self.source.isPlayable(program.channel):
-                self._playChannel(program.channel)
-            else:
-                self._showContextMenu(program, self.getControl(controlId))
+            if control is not None:
+                self.setFocus(control)
 
-        except Exception:
-            buggalo.onExceptionRaised()
+    @buggalo.buggalo_try_except({'method' : 'TVGuide.onClick'})
+    def onClick(self, controlId):
+        program = self._getProgramFromControlId(controlId)
+        if program is None:
+            return
+
+        if self.source.isPlayable(program.channel):
+            self._playChannel(program.channel)
+        else:
+            self._showContextMenu(program, self.getControl(controlId))
 
     def _showContextMenu(self, program, control):
         d = PopupMenu(self.source, program, not program.notificationScheduled)
@@ -297,36 +289,33 @@ class TVGuide(xbmcgui.WindowXML):
             del d
             self.onRedrawEPG(self.channelIdx, self.viewStartDate)
 
+    @buggalo.buggalo_try_except({'method' : 'TVGuide.onFocus'})
     def onFocus(self, controlId):
         try:
-            try:
-                controlInFocus = self.getControl(controlId)
-            except Exception:
-                return
-
-            program = self._getProgramFromControlId(controlId)
-            if program is None:
-                return
-
-            (left, top) = controlInFocus.getPosition()
-            if left > self.focusX or left + controlInFocus.getWidth() < self.focusX:
-                self.focusX = left
-
-            self.getControl(self.C_MAIN_TITLE).setLabel('[B]%s[/B]' % program.title)
-            self.getControl(self.C_MAIN_TIME).setLabel('[B]%s - %s[/B]' % (program.startDate.strftime('%H:%M'), program.endDate.strftime('%H:%M')))
-            self.getControl(self.C_MAIN_DESCRIPTION).setText(program.description)
-
-            if program.channel.logo is not None:
-                self.getControl(self.C_MAIN_LOGO).setImage(program.channel.logo)
-
-            if program.imageSmall is not None:
-                self.getControl(self.C_MAIN_IMAGE).setImage(program.imageSmall)
-
-            if ADDON.getSetting('program.background.enabled') == 'true' and program.imageLarge is not None:
-                self.getControl(self.C_MAIN_BACKGROUND).setImage(program.imageLarge)
-
+            controlInFocus = self.getControl(controlId)
         except Exception:
-            buggalo.onExceptionRaised()
+            return
+
+        program = self._getProgramFromControlId(controlId)
+        if program is None:
+            return
+
+        (left, top) = controlInFocus.getPosition()
+        if left > self.focusX or left + controlInFocus.getWidth() < self.focusX:
+            self.focusX = left
+
+        self.getControl(self.C_MAIN_TITLE).setLabel('[B]%s[/B]' % program.title)
+        self.getControl(self.C_MAIN_TIME).setLabel('[B]%s - %s[/B]' % (program.startDate.strftime('%H:%M'), program.endDate.strftime('%H:%M')))
+        self.getControl(self.C_MAIN_DESCRIPTION).setText(program.description)
+
+        if program.channel.logo is not None:
+            self.getControl(self.C_MAIN_LOGO).setImage(program.channel.logo)
+
+        if program.imageSmall is not None:
+            self.getControl(self.C_MAIN_IMAGE).setImage(program.imageSmall)
+
+        if ADDON.getSetting('program.background.enabled') == 'true' and program.imageLarge is not None:
+            self.getControl(self.C_MAIN_BACKGROUND).setImage(program.imageLarge)
 
     def _left(self, currentX, currentY):
         control = self._findControlOnLeft(currentX, currentY)
@@ -447,9 +436,12 @@ class TVGuide(xbmcgui.WindowXML):
         self.getControl(self.C_MAIN_EPG).setVisible(True)
 
         if not scrollEvent:
-            for controlId in self.controlToProgramMap:
+            for controlId in self.controlToProgramMap.keys():
+                print '%d - %s' % (controlId, str(self.getControl(controlId)))
                 self.removeControl(self.getControl(controlId))
             self.controlToProgramMap.clear()
+
+        self.getControl(self.C_MAIN_LOADING_TIME_LEFT).setLabel(strings(CALCULATING_REMAINING_TIME))
         self.getControl(self.C_MAIN_LOADING).setVisible(False)
 
         # move timebar to current time
@@ -483,7 +475,7 @@ class TVGuide(xbmcgui.WindowXML):
             elif channelStart > len(channels) - CHANNELS_PER_PAGE:
                 channelStart = len(channels) - CHANNELS_PER_PAGE
 
-            for controlId in self.controlToProgramMap:
+            for controlId in self.controlToProgramMap.keys():
                 self.removeControl(self.getControl(controlId))
             self.controlToProgramMap.clear()
 
@@ -497,6 +489,7 @@ class TVGuide(xbmcgui.WindowXML):
         self.channelIdx = channelStart
 
         controlsToAdd = list()
+        controls = list()
         viewChannels = channels[channelStart : channelEnd]
         try:
             programs = self.source.getProgramList(viewChannels, self.viewStartDate, self.onSourceProgressUpdate)
@@ -561,6 +554,7 @@ class TVGuide(xbmcgui.WindowXML):
                 )
 
                 controlsToAdd.append([control, program])
+                controls.append(control)
 
         # add program controls
         for control, program in controlsToAdd:
@@ -584,7 +578,9 @@ class TVGuide(xbmcgui.WindowXML):
 
         self.getControl(self.C_MAIN_IMAGE).setImage('tvguide-logo-%s.png' % self.source.KEY)
         self.onRedrawEPG(0, self.viewStartDate)
-        self.setFocus(self._findControlBelow(self.focusY))
+        control = self._findControlBelow(self.focusY)
+        if control:
+            self.setFocus(control)
 
     def onSourceProgressUpdate(self, percentageComplete):
         progressControl = self.getControl(self.C_MAIN_LOADING_PROGRESS)
@@ -611,7 +607,9 @@ class TVGuide(xbmcgui.WindowXML):
     def onPlayBackStopped(self):
         self._hideOsd()
         self.onRedrawEPG(self.channelIdx, self.viewStartDate)
-        self.setFocus(self._findControlBelow(self.focusY))
+        control = self._findControlBelow(self.focusY)
+        if control:
+            self.setFocus(control)
 
     def _secondsToXposition(self, seconds):
         return CELL_WIDTH_CHANNELS + (seconds * CELL_WIDTH / 1800)
@@ -717,63 +715,56 @@ class PopupMenu(xbmcgui.WindowXMLDialog):
         self.showRemind = showRemind
         self.buttonClicked = None
 
+    @buggalo.buggalo_try_except({'method' : 'PopupMenu.onInit'})
     def onInit(self):
-        try:
-            playControl = self.getControl(self.C_POPUP_PLAY)
-            remindControl = self.getControl(self.C_POPUP_REMIND)
-            channelLogoControl = self.getControl(self.C_POPUP_CHANNEL_LOGO)
-            channelTitleControl = self.getControl(self.C_POPUP_CHANNEL_TITLE)
-            programTitleControl = self.getControl(self.C_POPUP_PROGRAM_TITLE)
+        playControl = self.getControl(self.C_POPUP_PLAY)
+        remindControl = self.getControl(self.C_POPUP_REMIND)
+        channelLogoControl = self.getControl(self.C_POPUP_CHANNEL_LOGO)
+        channelTitleControl = self.getControl(self.C_POPUP_CHANNEL_TITLE)
+        programTitleControl = self.getControl(self.C_POPUP_PROGRAM_TITLE)
 
-            playControl.setLabel(strings(WATCH_CHANNEL, self.program.channel.title))
-            if not self.source.isPlayable(self.program.channel):
-                playControl.setEnabled(False)
-                self.setFocusId(self.C_POPUP_CHOOSE_STRM)
-            if self.source.getCustomStreamUrl(self.program.channel):
-                chooseStrmControl = self.getControl(self.C_POPUP_CHOOSE_STRM)
-                chooseStrmControl.setLabel(strings(REMOVE_STRM_FILE))
+        playControl.setLabel(strings(WATCH_CHANNEL, self.program.channel.title))
+        if not self.source.isPlayable(self.program.channel):
+            playControl.setEnabled(False)
+            self.setFocusId(self.C_POPUP_CHOOSE_STRM)
+        if self.source.getCustomStreamUrl(self.program.channel):
+            chooseStrmControl = self.getControl(self.C_POPUP_CHOOSE_STRM)
+            chooseStrmControl.setLabel(strings(REMOVE_STRM_FILE))
 
-            if self.program.channel.logo is not None:
-                channelLogoControl.setImage(self.program.channel.logo)
-                channelTitleControl.setVisible(False)
-            else:
-                channelTitleControl.setLabel(self.program.channel.title)
-                channelLogoControl.setVisible(False)
+        if self.program.channel.logo is not None:
+            channelLogoControl.setImage(self.program.channel.logo)
+            channelTitleControl.setVisible(False)
+        else:
+            channelTitleControl.setLabel(self.program.channel.title)
+            channelLogoControl.setVisible(False)
 
-            programTitleControl.setLabel(self.program.title)
+        programTitleControl.setLabel(self.program.title)
 
-            if self.showRemind:
-                remindControl.setLabel(strings(REMIND_PROGRAM))
-            else:
-                remindControl.setLabel(strings(DONT_REMIND_PROGRAM))
+        if self.showRemind:
+            remindControl.setLabel(strings(REMIND_PROGRAM))
+        else:
+            remindControl.setLabel(strings(DONT_REMIND_PROGRAM))
 
-        except Exception:
-            buggalo.onExceptionRaised()
-
+    @buggalo.buggalo_try_except({'method' : 'PopupMenu.onAction'})
     def onAction(self, action):
-        try:
-            if action.getId() in [ACTION_PARENT_DIR, ACTION_PREVIOUS_MENU, KEY_NAV_BACK, KEY_CONTEXT_MENU]:
-                self.close()
-                return
-        except Exception:
-            buggalo.onExceptionRaised()
+        if action.getId() in [ACTION_PARENT_DIR, ACTION_PREVIOUS_MENU, KEY_NAV_BACK, KEY_CONTEXT_MENU]:
+            self.close()
+            return
 
+    @buggalo.buggalo_try_except({'method' : 'PopupMenu.onClick'})
     def onClick(self, controlId):
-        try:
-            if controlId == self.C_POPUP_CHOOSE_STRM and self.source.getCustomStreamUrl(self.program.channel):
-                self.source.deleteCustomStreamUrl(self.program.channel)
-                chooseStrmControl = self.getControl(self.C_POPUP_CHOOSE_STRM)
-                chooseStrmControl.setLabel(strings(CHOOSE_STRM_FILE))
+        if controlId == self.C_POPUP_CHOOSE_STRM and self.source.getCustomStreamUrl(self.program.channel):
+            self.source.deleteCustomStreamUrl(self.program.channel)
+            chooseStrmControl = self.getControl(self.C_POPUP_CHOOSE_STRM)
+            chooseStrmControl.setLabel(strings(CHOOSE_STRM_FILE))
 
-                if not self.source.isPlayable(self.program.channel):
-                    playControl = self.getControl(self.C_POPUP_PLAY)
-                    playControl.setEnabled(False)
+            if not self.source.isPlayable(self.program.channel):
+                playControl = self.getControl(self.C_POPUP_PLAY)
+                playControl.setEnabled(False)
 
-            else:
-                self.buttonClicked = controlId
-                self.close()
-        except Exception:
-            buggalo.onExceptionRaised()
+        else:
+            self.buttonClicked = controlId
+            self.close()
 
     def onFocus(self, controlId):
         pass
@@ -798,71 +789,64 @@ class ChannelsMenu(xbmcgui.WindowXMLDialog):
         self.source = source
         self.channelList = source._retrieveChannelListFromDatabase(False)
 
+    @buggalo.buggalo_try_except({'method' : 'ChannelsMenu.onInit'})
     def onInit(self):
-        try:
-            self.updateChannelList()
-            self.setFocusId(self.C_CHANNELS_LIST)
-        except Exception:
-            buggalo.onExceptionRaised()
+        self.updateChannelList()
+        self.setFocusId(self.C_CHANNELS_LIST)
 
+    @buggalo.buggalo_try_except({'method' : 'ChannelsMenu.onAction'})
     def onAction(self, action):
-        try:
-            if action.getId() in [ACTION_PARENT_DIR, ACTION_PREVIOUS_MENU, KEY_NAV_BACK, KEY_CONTEXT_MENU]:
-                self.close()
-                return
+        if action.getId() in [ACTION_PARENT_DIR, ACTION_PREVIOUS_MENU, KEY_NAV_BACK, KEY_CONTEXT_MENU]:
+            self.close()
+            return
 
-            if self.getFocusId() == self.C_CHANNELS_LIST and action.getId() == ACTION_LEFT:
-                listControl = self.getControl(self.C_CHANNELS_LIST)
-                idx = listControl.getSelectedPosition()
-                buttonControl = self.getControl(self.C_CHANNELS_SELECTION)
-                buttonControl.setLabel('[B]%s[/B]' % self.channelList[idx].title)
+        if self.getFocusId() == self.C_CHANNELS_LIST and action.getId() == ACTION_LEFT:
+            listControl = self.getControl(self.C_CHANNELS_LIST)
+            idx = listControl.getSelectedPosition()
+            buttonControl = self.getControl(self.C_CHANNELS_SELECTION)
+            buttonControl.setLabel('[B]%s[/B]' % self.channelList[idx].title)
 
-                self.getControl(self.C_CHANNELS_SELECTION_VISIBLE).setVisible(False)
-                self.setFocusId(self.C_CHANNELS_SELECTION)
+            self.getControl(self.C_CHANNELS_SELECTION_VISIBLE).setVisible(False)
+            self.setFocusId(self.C_CHANNELS_SELECTION)
 
-            elif self.getFocusId() == self.C_CHANNELS_SELECTION and action.getId() in [ACTION_RIGHT, ACTION_SELECT_ITEM]:
-                self.getControl(self.C_CHANNELS_SELECTION_VISIBLE).setVisible(True)
-                xbmc.sleep(350)
-                self.setFocusId(self.C_CHANNELS_LIST)
+        elif self.getFocusId() == self.C_CHANNELS_SELECTION and action.getId() in [ACTION_RIGHT, ACTION_SELECT_ITEM]:
+            self.getControl(self.C_CHANNELS_SELECTION_VISIBLE).setVisible(True)
+            xbmc.sleep(350)
+            self.setFocusId(self.C_CHANNELS_LIST)
 
-            elif self.getFocusId() == self.C_CHANNELS_SELECTION and action.getId() == ACTION_UP:
-                listControl = self.getControl(self.C_CHANNELS_LIST)
-                idx = listControl.getSelectedPosition()
-                self.swapChannels(idx, idx - 1)
-                listControl.selectItem(idx - 1)
+        elif self.getFocusId() == self.C_CHANNELS_SELECTION and action.getId() == ACTION_UP:
+            listControl = self.getControl(self.C_CHANNELS_LIST)
+            idx = listControl.getSelectedPosition()
+            self.swapChannels(idx, idx - 1)
+            listControl.selectItem(idx - 1)
 
-            elif self.getFocusId() == self.C_CHANNELS_SELECTION and action.getId() == ACTION_DOWN:
-                listControl = self.getControl(self.C_CHANNELS_LIST)
-                idx = listControl.getSelectedPosition()
-                self.swapChannels(idx, idx + 1)
-                listControl.selectItem(idx + 1)
+        elif self.getFocusId() == self.C_CHANNELS_SELECTION and action.getId() == ACTION_DOWN:
+            listControl = self.getControl(self.C_CHANNELS_LIST)
+            idx = listControl.getSelectedPosition()
+            self.swapChannels(idx, idx + 1)
+            listControl.selectItem(idx + 1)
 
-        except Exception:
-            buggalo.onExceptionRaised()
-
+    @buggalo.buggalo_try_except({'method' : 'ChannelsMenu.onClick'})
     def onClick(self, controlId):
-        try:
-            if controlId == self.C_CHANNELS_LIST:
-                listControl = self.getControl(self.C_CHANNELS_LIST)
-                item = listControl.getSelectedItem()
-                channel = self.channelList[int(item.getProperty('idx'))]
-                channel.visible = not channel.visible
+        if controlId == self.C_CHANNELS_LIST:
+            listControl = self.getControl(self.C_CHANNELS_LIST)
+            item = listControl.getSelectedItem()
+            channel = self.channelList[int(item.getProperty('idx'))]
+            channel.visible = not channel.visible
 
-                if channel.visible:
-                    iconImage = 'tvguide-channel-visible.png'
-                else:
-                    iconImage = 'tvguide-channel-hidden.png'
-                item.setIconImage(iconImage)
+            if channel.visible:
+                iconImage = 'tvguide-channel-visible.png'
+            else:
+                iconImage = 'tvguide-channel-hidden.png'
+            item.setIconImage(iconImage)
 
-            elif controlId == self.C_CHANNELS_SAVE:
-                self.source._storeChannelListInDatabase(self.channelList)
-                self.close()
+        elif controlId == self.C_CHANNELS_SAVE:
+            self.source._storeChannelListInDatabase(self.channelList)
+            self.close()
 
-            elif controlId == self.C_CHANNELS_CANCEL:
-                self.close()
+        elif controlId == self.C_CHANNELS_CANCEL:
+            self.close()
 
-        except Exception:
-            buggalo.onExceptionRaised()
 
     def onFocus(self, controlId):
         pass
