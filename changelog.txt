@@ -2,6 +2,7 @@
 - Added new source for ONTV.dk Pro customers
 - Added slide-out controls to ease navigation with mouse
 - Fixed problem with international characters in (custom) stream URLs
+- Changed notifications to notify both 5 mins before program start and on program start
 
 [B]Version 1.2.90 - 2012-03-16[/B]
 - Added French translation

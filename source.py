@@ -541,7 +541,6 @@ class YouSeeTvSource(Source):
         super(YouSeeTvSource, self).__init__(addon, cachePath, playbackCallbackHandler)
         self.date = datetime.datetime.today()
         self.channelCategory = addon.getSetting('youseetv.category')
-        print self.channelCategory
         self.ysApi = ysapi.YouSeeTVGuideApi()
         self.playbackUsingYouSeeWebTv = False
 
