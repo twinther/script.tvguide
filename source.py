@@ -26,7 +26,7 @@ import urllib2
 from xml.etree import ElementTree
 from strings import *
 import ysapi
-
+import buggalo
 import xbmc
 import xbmcgui
 import xbmcvfs
@@ -112,6 +112,11 @@ class Source(object):
 
     def __init__(self, addon, cachePath, playbackCallbackHandler):
         self.cachePath = cachePath
+
+        buggalo.addExtraData('source', self.KEY)
+        for key in SETTINGS_TO_CHECK:
+            buggalo.addExtraData('setting: %s' % key, ADDON.getSetting(key))
+
         try:
             self.conn = sqlite3.connect(os.path.join(self.cachePath, self.SOURCE_DB), detect_types=sqlite3.PARSE_DECLTYPES)
             self.conn.execute('PRAGMA foreign_keys = ON')
