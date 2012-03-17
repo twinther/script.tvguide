@@ -103,7 +103,7 @@ class TVGuide(xbmcgui.WindowXML):
     C_MAIN_MOUSE_UP = 4303
     C_MAIN_MOUSE_DOWN = 4304
     C_MAIN_MOUSE_RIGHT = 4305
-    C_MAIN_MOUSE_CHANNELS = 4306
+    C_MAIN_MOUSE_EXIT = 4306
     C_MAIN_BACKGROUND = 4600
     C_MAIN_EPG = 5000
     C_MAIN_OSD = 6000
@@ -275,7 +275,7 @@ class TVGuide(xbmcgui.WindowXML):
 
     @buggalo.buggalo_try_except({'method' : 'TVGuide.onClick'})
     def onClick(self, controlId):
-        if controlId == self.C_MAIN_LOADING_CANCEL:
+        if controlId in [self.C_MAIN_LOADING_CANCEL, self.C_MAIN_MOUSE_EXIT]:
             self.close()
             return
 
@@ -290,11 +290,9 @@ class TVGuide(xbmcgui.WindowXML):
             return
         elif controlId == self.C_MAIN_MOUSE_UP:
             self._moveUp(count = CHANNELS_PER_PAGE)
-            self.onRedrawEPG(self.channelIdx, self.viewStartDate, autoFocus=True)
             return
         elif controlId == self.C_MAIN_MOUSE_DOWN:
             self._moveDown(count = CHANNELS_PER_PAGE)
-            self.onRedrawEPG(self.channelIdx, self.viewStartDate, autoFocus=True)
             return
         elif controlId == self.C_MAIN_MOUSE_RIGHT:
             self.viewStartDate += datetime.timedelta(hours = 2)

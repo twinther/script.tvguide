@@ -541,6 +541,22 @@
                     <texturefocus>tvguide-program-grey-focus.png</texturefocus>
                     <texturenofocus>tvguide-program-grey.png</texturenofocus>
                 </control>
+
+                <control type="button" id="4306">
+                    <description>exit</description>
+                    <posx>1220</posx>
+                    <posy>10</posy>
+                    <width>50</width>
+                    <height>50</height>
+                    <textcolor>ffffffff</textcolor>
+                    <font>font13</font>
+                    <label>X</label>
+                    <aligny>center</aligny>
+                    <align>center</align>
+                    <texturefocus>tvguide-program-grey-focus.png</texturefocus>
+                    <texturenofocus>tvguide-program-grey.png</texturenofocus>
+                </control>
+
             </control>
 
         </control><!-- id="5000" -->
