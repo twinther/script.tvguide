@@ -38,7 +38,6 @@ STREAM_DR_UPDATE = 'plugin://plugin.video.dr.dk.live/?playChannel=3'
 STREAM_DR_K = 'plugin://plugin.video.dr.dk.live/?playChannel=4'
 STREAM_DR_RAMASJANG = 'plugin://plugin.video.dr.dk.live/?playChannel=5'
 STREAM_DR_HD = 'plugin://plugin.video.dr.dk.live/?playChannel=6'
-STREAM_24_NORDJYSKE = 'plugin://plugin.video.dr.dk.live/?playChannel=200'
 
 SETTINGS_TO_CHECK = ['source', 'youseetv.category', 'youseewebtv.playback', 'danishlivetv.playback', 'xmltv.file',
                      'xmltv.logo.folder', 'ontv.url']
@@ -105,6 +104,9 @@ class SourceException(Exception):
 class SourceUpdateInProgressException(SourceException):
     pass
 
+class SourceUpdateCanceledException(SourceException):
+    pass
+
 class Source(object):
     KEY = "undefined"
     STREAMS = {}
@@ -112,13 +114,13 @@ class Source(object):
 
     def __init__(self, addon, cachePath, playbackCallbackHandler):
         self.cachePath = cachePath
-
+        self.updateInProgress = False
         buggalo.addExtraData('source', self.KEY)
         for key in SETTINGS_TO_CHECK:
             buggalo.addExtraData('setting: %s' % key, ADDON.getSetting(key))
 
         try:
-            self.conn = sqlite3.connect(os.path.join(self.cachePath, self.SOURCE_DB), detect_types=sqlite3.PARSE_DECLTYPES)
+            self.conn = sqlite3.connect(os.path.join(self.cachePath, self.SOURCE_DB), detect_types=sqlite3.PARSE_DECLTYPES, check_same_thread = False)
             self.conn.execute('PRAGMA foreign_keys = ON')
             self.conn.row_factory = sqlite3.Row
             self._createTables()
@@ -140,7 +142,7 @@ class Source(object):
                 strings(DANISH_LIVE_TV_MISSING_2), strings(DANISH_LIVE_TV_MISSING_3))
 
     def close(self):
-        self.conn.rollback() # rollback any non-commit'ed changes to avoid database lock
+        #self.conn.rollback() # rollback any non-commit'ed changes to avoid database lock
         self.conn.close()
 
     def wasSettingsChanged(self, addon):
@@ -182,7 +184,11 @@ class Source(object):
         """
         raise SourceException('getDataFromExternal not implemented!')
 
+    def isCacheExpired(self, date = datetime.datetime.now()):
+        return self.settingsChanged or self._isChannelListCacheExpired() or self._isProgramListCacheExpired(date)
+
     def updateChannelAndProgramListCaches(self, date = datetime.datetime.now(), progress_callback = None, clearExistingProgramList = True):
+        self.updateInProgress = True
         c = self.conn.cursor()
         try:
             xbmc.log('[script.tvguide] Updating caches...', xbmc.LOGDEBUG)
@@ -191,10 +197,13 @@ class Source(object):
 
             if self.settingsChanged:
                 c.execute('DELETE FROM channels WHERE source=?', [self.KEY])
+                c.execute('DELETE FROM programs WHERE source=?', [self.KEY])
+                c.execute("DELETE FROM sources_updates WHERE source=?", [self.KEY])
             self.settingsChanged = False # only want to update once due to changed settings
 
             if clearExistingProgramList:
                 c.execute('DELETE FROM programs WHERE source=?', [self.KEY])
+                c.execute("DELETE FROM sources_updates WHERE source=?", [self.KEY])
 
             imported = 0
             for item in self.getDataFromExternal(date, progress_callback):
@@ -227,10 +236,16 @@ class Source(object):
 
             # programs updated
             dateStr = date.strftime('%Y-%m-%d')
-            c.execute("INSERT OR IGNORE INTO sources_updates(source, date, programs_updated) VALUES(?, ?, ?)", [self.KEY, dateStr, datetime.datetime.now()])
-            if not c.rowcount:
-                c.execute("UPDATE sources_updates SET programs_updated=? WHERE source=? AND date=?", [datetime.datetime.now(), self.KEY, dateStr])
+            c.execute("DELETE FROM sources_updates WHERE source=? AND date=?", [self.KEY, dateStr])
+            c.execute("INSERT INTO sources_updates(source, date, programs_updated) VALUES(?, ?, ?)", [self.KEY, dateStr, datetime.datetime.now()])
 
+            self.conn.commit()
+
+        except SourceUpdateCanceledException:
+            # force source update on next load
+            c.execute('UPDATE sources SET channels_updated=? WHERE id=?', [datetime.datetime.fromtimestamp(0), self.KEY])
+            c.execute("DELETE FROM sources_updates WHERE source=?", [self.KEY])
+            c.execute('DELETE FROM programs WHERE source=?', [self.KEY])
             self.conn.commit()
 
         except Exception, ex:
@@ -242,12 +257,12 @@ class Source(object):
             tb.print_exception(type, value, traceback)
 
             # invalidate cached data
-            #noinspection PyTypeChecker
             c.execute('UPDATE sources SET channels_updated=? WHERE id=?', [datetime.datetime.fromtimestamp(0), self.KEY])
             self.conn.commit()
 
             raise SourceException(ex)
         finally:
+            self.updateInProgress = False
             c.close()
 
     def getChannel(self, id):
@@ -275,11 +290,7 @@ class Source(object):
             idx = len(channels) - 1
         return channels[idx]
 
-    def getChannelList(self, progress_callback = None):
-        # check if data is up-to-date in database
-        if self.settingsChanged or self._isChannelListCacheExpired():
-            self.updateChannelAndProgramListCaches(progress_callback = progress_callback)
-
+    def getChannelList(self):
         # cache channelList in memory
         if not self.channelList:
             self.channelList = self._retrieveChannelListFromDatabase()
@@ -356,12 +367,7 @@ class Source(object):
 
         return previousProgram
 
-    def getProgramList(self, channels, startTime, progress_callback = None):
-        if self.settingsChanged or self._isProgramListCacheExpired(startTime):
-            self.updateChannelAndProgramListCaches(startTime, progress_callback, clearExistingProgramList = False)
-        return self._retrieveProgramListFromDatabase(channels, startTime)
-
-    def _retrieveProgramListFromDatabase(self, channels, startTime):
+    def getProgramList(self, channels, startTime):
         """
 
         @param channels:
@@ -478,7 +484,6 @@ class Source(object):
 
 
         # make sure we have a record in sources for this Source
-        #noinspection PyTypeChecker
         c.execute("INSERT OR IGNORE INTO sources(id, channels_updated) VALUES(?, ?)", [self.KEY, datetime.datetime.fromtimestamp(0)])
 
         self.conn.commit()
@@ -523,7 +528,7 @@ class DrDkSource(Source):
 
             if progress_callback:
                 if not progress_callback(100.0 / len(channels) * idx):
-                    return
+                    raise SourceUpdateCanceledException()
 
     def _parseDate(self, dateString):
         t = time.strptime(dateString[:19], '%Y-%m-%dT%H:%M:%S')
@@ -587,7 +592,7 @@ class YouSeeTvSource(Source):
 
             if progress_callback:
                 if not progress_callback(100.0 / len(channels) * idx):
-                    return
+                    raise SourceUpdateCanceledException()
 
     def _parseDate(self, dateString):
         return datetime.datetime.fromtimestamp(dateString)
@@ -635,7 +640,7 @@ class TvTidSource(Source):
 
             if progress_callback:
                 if not progress_callback(100.0 / len(channels) * idx):
-                    return
+                    raise SourceUpdateCanceledException()
 
 
 class XMLTVSource(Source):
@@ -692,7 +697,7 @@ class XMLTVSource(Source):
                     elements_parsed += 1
                     if progress_callback and elements_parsed % 500 == 0:
                         if not progress_callback(100.0 / size * f.tell()):
-                            return
+                            raise SourceUpdateCanceledException()
                     yield result
 
             root.clear()

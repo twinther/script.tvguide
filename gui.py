@@ -74,7 +74,7 @@ class SourceInitializer(threading.Thread):
         self.sourceInitializedHandler = sourceInitializedHandler
 
     def run(self):
-        while not xbmc.abortRequested:
+        while not xbmc.abortRequested and not self.sourceInitializedHandler.isClosing:
             try:
                 source = src.instantiateSource(ADDON, self.sourceInitializedHandler)
                 xbmc.log("[script.tvguide] Using source: %s" % str(type(source)), xbmc.LOGDEBUG)
@@ -83,6 +83,31 @@ class SourceInitializer(threading.Thread):
             except src.SourceUpdateInProgressException, ex:
                 xbmc.log('[script.tvguide] database update in progress...: %s' % str(ex), xbmc.LOGDEBUG)
                 xbmc.sleep(1000)
+
+
+class SourceUpdater(threading.Thread):
+    def __init__(self, sourceUpdatedHandler, source, channelStart, startTime, scrollEvent, autoFocus, progressCallback):
+        """
+
+        @param sourceUpdatedHandler:
+        @type sourceUpdatedHandler: TVGuide
+        """
+        super(SourceUpdater, self).__init__()
+        self.sourceUpdatedHandler = sourceUpdatedHandler
+        self.source = source
+        self.channelStart = channelStart
+        self.startTime = startTime
+        self.scrollEvent = scrollEvent
+        self.autoFocus = autoFocus
+        self.progressCallback = progressCallback
+
+    def run(self):
+        try:
+            self.source.updateChannelAndProgramListCaches(self.startTime, self.progressCallback, clearExistingProgramList = False)
+            self.sourceUpdatedHandler.onRedrawEPG(self.channelStart, self.startTime, self.scrollEvent, self.autoFocus)
+        except src.SourceException:
+            self.sourceUpdatedHandler.onEPGLoadError()
+
 
 
 class TVGuide(xbmcgui.WindowXML):
@@ -121,6 +146,7 @@ class TVGuide(xbmcgui.WindowXML):
         self.source = None
         self.notification = None
         self.redrawingEPG = False
+        self.isClosing = False
         self.controlToProgramMap = dict()
         self.focusX = CELL_WIDTH_CHANNELS
         self.focusY = 0
@@ -137,19 +163,22 @@ class TVGuide(xbmcgui.WindowXML):
         self.viewStartDate -= datetime.timedelta(minutes = self.viewStartDate.minute % 30)
 
     def close(self):
-        if self.source:
-            self.source.close()
-        super(TVGuide, self).close()
+        if not self.isClosing:
+            self.isClosing = True
+            if self.source:
+                while self.source.updateInProgress:
+                    xbmc.sleep(500)
+                self.source.close()
+            super(TVGuide, self).close()
 
     @buggalo.buggalo_try_except({'method' : 'TVGuide.onInit'})
     def onInit(self):
-        self.getControl(self.C_MAIN_MOUSE_CONTROLS).setVisible(True)
-        self.getControl(self.C_MAIN_OSD).setVisible(False)
-        self.getControl(self.C_MAIN_LOADING).setVisible(False)
+        self._hideControl(self.C_MAIN_MOUSE_CONTROLS)
+        self._showControl(self.C_MAIN_OSD, self.C_MAIN_LOADING)
         self.getControl(self.C_MAIN_LOADING_TIME_LEFT).setLabel(strings(BACKGROUND_UPDATE_IN_PROGRESS))
         self.setFocus(self.getControl(self.C_MAIN_LOADING_CANCEL))
 
-        SourceInitializer(self).run()
+        SourceInitializer(self).start()
 
     @buggalo.buggalo_try_except({'method' : 'TVGuide.onAction'})
     def onAction(self, action):
@@ -220,7 +249,7 @@ class TVGuide(xbmcgui.WindowXML):
                 return
 
             elif action.getId() == ACTION_MOUSE_MOVE:
-                self.getControl(self.C_MAIN_MOUSE_CONTROLS).setVisible(False)
+                self._showControl(self.C_MAIN_MOUSE_CONTROLS)
                 return
 
             elif action.getId() == KEY_CONTEXT_MENU:
@@ -310,6 +339,7 @@ class TVGuide(xbmcgui.WindowXML):
             self._showContextMenu(program)
 
     def _showContextMenu(self, program):
+        self._hideControl(self.C_MAIN_MOUSE_CONTROLS)
         d = PopupMenu(self.source, program, not program.notificationScheduled)
         d.doModal()
         buttonClicked = d.buttonClicked
@@ -337,6 +367,9 @@ class TVGuide(xbmcgui.WindowXML):
             d.doModal()
             del d
             self.onRedrawEPG(self.channelIdx, self.viewStartDate, autoFocus=True)
+
+        elif buttonClicked == PopupMenu.C_POPUP_QUIT:
+            self.close()
 
     @buggalo.buggalo_try_except({'method' : 'TVGuide.onFocus'})
     def onFocus(self, controlId):
@@ -463,36 +496,25 @@ class TVGuide(xbmcgui.WindowXML):
                 self.getControl(self.C_MAIN_OSD_CHANNEL_LOGO).setImage('')
 
         self.mode = MODE_OSD
-        self.getControl(self.C_MAIN_OSD).setVisible(True)
+        self._hideControl(self.C_MAIN_OSD)
 
     def _hideOsd(self):
         self.mode = MODE_TV
-        self.getControl(self.C_MAIN_OSD).setVisible(False)
+        self._showControl(self.C_MAIN_OSD)
 
     def _hideEpg(self):
-        self.getControl(self.C_MAIN_EPG).setVisible(False)
+        self._hideControl(self.C_MAIN_EPG)
         self.mode = MODE_TV
         for id in self.controlToProgramMap.keys():
             self.removeControl(self.getControl(id))
         self.controlToProgramMap.clear()
 
     def onRedrawEPG(self, channelStart, startTime, scrollEvent = False, autoFocus = False):
-        if self.redrawingEPG:
+        if self.redrawingEPG or self.source.updateInProgress or self.isClosing:
             return # ignore redraw request while redrawing
 
-        self.redrawingEPG = True
-
         self.mode = MODE_EPG
-        self.getControl(self.C_MAIN_EPG).setVisible(True)
-
-        if not scrollEvent:
-            for controlId in self.controlToProgramMap.keys():
-                self.removeControl(self.getControl(controlId))
-            self.controlToProgramMap.clear()
-
-        self.getControl(self.C_MAIN_LOADING_TIME_LEFT).setLabel(strings(CALCULATING_REMAINING_TIME))
-        self.getControl(self.C_MAIN_LOADING).setVisible(False)
-        self.setFocus(self.getControl(self.C_MAIN_LOADING_CANCEL))
+        self._hideControl(self.C_MAIN_EPG)
 
         # move timebar to current time
         timeDelta = datetime.datetime.today() - self.viewStartDate
@@ -500,6 +522,21 @@ class TVGuide(xbmcgui.WindowXML):
         (x, y) = c.getPosition()
         c.setVisible(timeDelta.days == 0)
         c.setPosition(self._secondsToXposition(timeDelta.seconds), y)
+
+        # show Loading screen
+        self.getControl(self.C_MAIN_LOADING_TIME_LEFT).setLabel(strings(CALCULATING_REMAINING_TIME))
+        self._showControl(self.C_MAIN_LOADING)
+        self.setFocus(self.getControl(self.C_MAIN_LOADING_CANCEL))
+
+        # remove existing controls
+        for controlId in self.controlToProgramMap.keys():
+            self.removeControl(self.getControl(controlId))
+            self.controlToProgramMap.clear()
+
+        if self.source.isCacheExpired(startTime):
+            self.redrawingEPG = False
+            SourceUpdater(self, self.source, channelStart, startTime, scrollEvent, autoFocus, self.onSourceProgressUpdate).start()
+            return
 
         # date and time row
         self.getControl(self.C_MAIN_DATE).setLabel(self.viewStartDate.strftime('%a, %d. %b'))
@@ -509,31 +546,16 @@ class TVGuide(xbmcgui.WindowXML):
 
         # channels
         try:
-            channels = self.source.getChannelList(self.onSourceProgressUpdate)
+            channels = self.source.getChannelList()
         except src.SourceException:
             self.onEPGLoadError()
             self.redrawingEPG = False
             return
 
-        if scrollEvent:
-            if (channelStart < 0 and self.channelIdx == 0) or (channelStart > len(channels) - CHANNELS_PER_PAGE and self.channelIdx == len(channels) - CHANNELS_PER_PAGE):
-                self.getControl(self.C_MAIN_LOADING).setVisible(True)
-                self.redrawingEPG = False
-                return
-            elif channelStart < 0:
-                channelStart = 0
-            elif channelStart > len(channels) - CHANNELS_PER_PAGE:
-                channelStart = len(channels) - CHANNELS_PER_PAGE
-
-            for controlId in self.controlToProgramMap.keys():
-                self.removeControl(self.getControl(controlId))
-            self.controlToProgramMap.clear()
-
-        else:
-            if channelStart < 0:
-                channelStart = len(channels) - 1
-            elif channelStart > len(channels) - 1:
-                channelStart = 0
+        if channelStart < 0:
+            channelStart = len(channels) - 1
+        elif channelStart > len(channels) - 1:
+            channelStart = 0
 
         channelEnd = channelStart + CHANNELS_PER_PAGE
         self.channelIdx = channelStart
@@ -542,7 +564,7 @@ class TVGuide(xbmcgui.WindowXML):
         controls = list()
         viewChannels = channels[channelStart : channelEnd]
         try:
-            programs = self.source.getProgramList(viewChannels, self.viewStartDate, self.onSourceProgressUpdate)
+            programs = self.source.getProgramList(viewChannels, self.viewStartDate)
         except src.SourceException:
             self.onEPGLoadError()
             self.redrawingEPG = False
@@ -619,11 +641,11 @@ class TVGuide(xbmcgui.WindowXML):
             if control:
                 self.setFocus(control)
 
-        self.getControl(self.C_MAIN_LOADING).setVisible(True)
+        self._hideControl(self.C_MAIN_LOADING)
         self.redrawingEPG = False
 
     def onEPGLoadError(self):
-        self.getControl(self.C_MAIN_LOADING).setVisible(True)
+        self._hideControl(self.C_MAIN_LOADING)
         xbmcgui.Dialog().ok(strings(LOAD_ERROR_TITLE), strings(LOAD_ERROR_LINE1), strings(LOAD_ERROR_LINE2))
         self.close()
 
@@ -654,7 +676,7 @@ class TVGuide(xbmcgui.WindowXML):
                     secondsLeft -= secondsLeft % 10
                 timeLeftControl.setLabel(strings(TIME_LEFT) % secondsLeft)
 
-        return not xbmc.abortRequested
+        return not xbmc.abortRequested and not self.isClosing
 
     def onPlayBackStopped(self):
         self._hideOsd()
@@ -737,12 +759,26 @@ class TVGuide(xbmcgui.WindowXML):
             return self.controlToProgramMap[controlId]
         return None
 
+    def _hideControl(self, *controlIds):
+        """
+        Visibility is inverted in skin
+        """
+        for controlId in controlIds:
+            self.getControl(controlId).setVisible(True)
+
+    def _showControl(self, *controlIds):
+        """
+        Visibility is inverted in skin
+        """
+        for controlId in controlIds:
+            self.getControl(controlId).setVisible(False)
 
 class PopupMenu(xbmcgui.WindowXMLDialog):
     C_POPUP_PLAY = 4000
     C_POPUP_CHOOSE_STRM = 4001
     C_POPUP_REMIND = 4002
     C_POPUP_CHANNELS = 4003
+    C_POPUP_QUIT = 4004
     C_POPUP_CHANNEL_LOGO = 4100
     C_POPUP_CHANNEL_TITLE = 4101
     C_POPUP_PROGRAM_TITLE = 4102
