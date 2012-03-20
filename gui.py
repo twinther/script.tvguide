@@ -160,7 +160,7 @@ class TVGuide(xbmcgui.WindowXML):
 
         # find nearest half hour
         self.viewStartDate = datetime.datetime.today()
-        self.viewStartDate -= datetime.timedelta(minutes = self.viewStartDate.minute % 30)
+        self.viewStartDate -= datetime.timedelta(minutes = self.viewStartDate.minute % 30, seconds = self.viewStartDate.second)
 
     def close(self):
         if not self.isClosing:
@@ -292,7 +292,7 @@ class TVGuide(xbmcgui.WindowXML):
                 return
             elif action.getId() == KEY_HOME:
                 self.viewStartDate = datetime.datetime.today()
-                self.viewStartDate -= datetime.timedelta(minutes = self.viewStartDate.minute % 30)
+                self.viewStartDate -= datetime.timedelta(minutes = self.viewStartDate.minute % 30, seconds = self.viewStartDate.second)
                 self.onRedrawEPG(self.channelIdx, self.viewStartDate, autoFocus=True)
             elif action.getId() in [KEY_CONTEXT_MENU, ACTION_PREVIOUS_MENU] and controlInFocus is not None:
                 program = self._getProgramFromControlId(controlInFocus.getId())
@@ -310,7 +310,7 @@ class TVGuide(xbmcgui.WindowXML):
 
         elif controlId == self.C_MAIN_MOUSE_HOME:
             self.viewStartDate = datetime.datetime.today()
-            self.viewStartDate -= datetime.timedelta(minutes = self.viewStartDate.minute % 30)
+            self.viewStartDate -= datetime.timedelta(minutes = self.viewStartDate.minute % 30, seconds = self.viewStartDate.second)
             self.onRedrawEPG(self.channelIdx, self.viewStartDate, autoFocus=True)
             return
         elif controlId == self.C_MAIN_MOUSE_LEFT:
@@ -539,9 +539,9 @@ class TVGuide(xbmcgui.WindowXML):
             return
 
         # date and time row
-        self.getControl(self.C_MAIN_DATE).setLabel(self.viewStartDate.strftime('%a, %d. %b'))
+        self.getControl(self.C_MAIN_DATE).setLabel(self.viewStartDate.strftime(xbmc.getRegion('dateshort')))
         for col in range(1, 5):
-            self.getControl(4000 + col).setLabel(startTime.strftime('%H:%M'))
+            self.getControl(4000 + col).setLabel(startTime.strftime(xbmc.getRegion('time')))
             startTime += HALF_HOUR
 
         # channels
