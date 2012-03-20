@@ -308,7 +308,10 @@ class TVGuide(xbmcgui.WindowXML):
             self.close()
             return
 
-        elif controlId == self.C_MAIN_MOUSE_HOME:
+        if self.isClosing:
+            return
+
+        if controlId == self.C_MAIN_MOUSE_HOME:
             self.viewStartDate = datetime.datetime.today()
             self.viewStartDate -= datetime.timedelta(minutes = self.viewStartDate.minute % 30, seconds = self.viewStartDate.second)
             self.onRedrawEPG(self.channelIdx, self.viewStartDate, autoFocus=True)
@@ -503,7 +506,7 @@ class TVGuide(xbmcgui.WindowXML):
         self._showControl(self.C_MAIN_OSD)
 
     def _hideEpg(self):
-        self._hideControl(self.C_MAIN_EPG)
+        self._showControl(self.C_MAIN_EPG)
         self.mode = MODE_TV
         for id in self.controlToProgramMap.keys():
             self.removeControl(self.getControl(id))
