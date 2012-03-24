@@ -21,6 +21,7 @@ import StringIO
 import os
 import simplejson
 import datetime
+import threading
 import time
 import urllib2
 from xml.etree import ElementTree
@@ -87,16 +88,21 @@ class Program(object):
 
 class SourcePlayer(xbmc.Player):
     def __init__(self, callbackHandler):
-        super(SourcePlayer, self).__init__(core = xbmc.PLAYER_CORE_AUTO)
+        super(SourcePlayer, self).__init__(core = xbmc.PLAYER_CORE_MPLAYER)
         self.callbackHandler = callbackHandler
 
+#    def onPlayBackStarted(self):
+#        print 'started'
+
     def onPlayBackStopped(self):
+        print 'yo'
         if self.callbackHandler:
             self.callbackHandler.onPlayBackStopped()
 
-    def onPlayBackEnded(self):
-        if self.callbackHandler:
-            self.callbackHandler.onPlayBackStopped()
+#    def onPlayBackEnded(self):
+#        print 'hey'
+#        if self.callbackHandler:
+#            self.callbackHandler.onPlayBackStopped()
 
 class SourceException(Exception):
     pass
@@ -129,7 +135,8 @@ class Source(object):
 
         self.playbackUsingDanishLiveTV = False
         self.channelList = list()
-        self.player = SourcePlayer(callbackHandler = playbackCallbackHandler)
+        self.player = xbmc.Player() #SourcePlayer(callbackHandler = playbackCallbackHandler)
+        self.callbackHandler = playbackCallbackHandler
         self.settingsChanged = self.wasSettingsChanged(addon)
 
         try:
@@ -440,6 +447,10 @@ class Source(object):
         return self.player.isPlaying()
 
     def play(self, channel):
+        threading.Timer(0.5, self.playThread, [channel]).start()
+
+    @buggalo.buggalo_try_except({'method' : 'source.playThread'})
+    def playThread(self, channel):
         customStreamUrl = self.getCustomStreamUrl(channel)
         if customStreamUrl:
             customStreamUrl = customStreamUrl.encode('utf-8', 'ignore')
@@ -450,6 +461,13 @@ class Source(object):
             streamUrl = channel.streamUrl.encode('utf-8', 'ignore')
             xbmc.log("Playing : %s" % streamUrl)
             self.player.play(item = streamUrl, windowed=True)
+
+        while True:
+            xbmc.sleep(250)
+            if not self.player.isPlaying():
+                break
+
+        self.callbackHandler.onPlayBackStopped()
 
     def _createTables(self):
         c = self.conn.cursor()
