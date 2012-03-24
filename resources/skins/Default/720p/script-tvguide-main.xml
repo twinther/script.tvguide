@@ -37,6 +37,15 @@
             <width>1280</width>
             <height>720</height>
 
+            <control type="button" id="5001">
+                <description>marker for EPG data view - should be hidden!</description>
+                <posx>180</posx>
+                <posy>60</posy>
+                <width>1080</width>
+                <height>450</height>
+                <visible>false</visible>
+            </control>
+
             <!-- Date and time row -->
             <control type="group">
                 <posx>0</posx>
@@ -303,12 +312,13 @@
             </control>
             <control type="image" id="4024">
                 <description>Channel logo</description>
-                <posx>640</posx>
+                <posx>540</posx>
                 <posy>518</posy>
                 <width>80</width>
                 <height>40</height>
                 <aspectratio>keep</aspectratio>
                 <fadetime>500</fadetime>
+                <visible>false</visible><!-- unused in default skin -->
             </control>
             <control type="label" id="4021">
                 <description>Program time</description>

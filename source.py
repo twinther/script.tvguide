@@ -189,6 +189,7 @@ class Source(object):
 
     def updateChannelAndProgramListCaches(self, date = datetime.datetime.now(), progress_callback = None, clearExistingProgramList = True):
         self.updateInProgress = True
+        dateStr = date.strftime('%Y-%m-%d')
         c = self.conn.cursor()
         try:
             xbmc.log('[script.tvguide] Updating caches...', xbmc.LOGDEBUG)
@@ -198,12 +199,17 @@ class Source(object):
             if self.settingsChanged:
                 c.execute('DELETE FROM channels WHERE source=?', [self.KEY])
                 c.execute('DELETE FROM programs WHERE source=?', [self.KEY])
-                c.execute("DELETE FROM sources_updates WHERE source=?", [self.KEY])
+                c.execute("DELETE FROM updates WHERE source=?", [self.KEY])
             self.settingsChanged = False # only want to update once due to changed settings
 
             if clearExistingProgramList:
-                c.execute('DELETE FROM programs WHERE source=?', [self.KEY])
-                c.execute("DELETE FROM sources_updates WHERE source=?", [self.KEY])
+                c.execute("DELETE FROM updates WHERE source=?", [self.KEY]) # cascades and deletes associated programs records
+            else:
+                c.execute("DELETE FROM updates WHERE source=? AND date=?", [self.KEY, dateStr]) # cascades and deletes associated programs records
+
+            # programs updated
+            c.execute("INSERT INTO updates(source, date, programs_updated) VALUES(?, ?, ?)", [self.KEY, dateStr, datetime.datetime.now()])
+            updatesId = c.lastrowid
 
             imported = 0
             for item in self.getDataFromExternal(date, progress_callback):
@@ -228,24 +234,17 @@ class Source(object):
                     else:
                         channel = program.channel
 
-                    c.execute('INSERT INTO programs(channel, title, start_date, end_date, description, image_large, image_small, source) VALUES(?, ?, ?, ?, ?, ?, ?, ?)',
-                        [channel, program.title, program.startDate, program.endDate, program.description, program.imageLarge, program.imageSmall, self.KEY])
+                    c.execute('INSERT INTO programs(channel, title, start_date, end_date, description, image_large, image_small, source, updates_id) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                        [channel, program.title, program.startDate, program.endDate, program.description, program.imageLarge, program.imageSmall, self.KEY, updatesId])
 
             # channels updated
             c.execute("UPDATE sources SET channels_updated=? WHERE id=?", [datetime.datetime.now(),self.KEY])
-
-            # programs updated
-            dateStr = date.strftime('%Y-%m-%d')
-            c.execute("DELETE FROM sources_updates WHERE source=? AND date=?", [self.KEY, dateStr])
-            c.execute("INSERT INTO sources_updates(source, date, programs_updated) VALUES(?, ?, ?)", [self.KEY, dateStr, datetime.datetime.now()])
-
             self.conn.commit()
 
         except SourceUpdateCanceledException:
             # force source update on next load
             c.execute('UPDATE sources SET channels_updated=? WHERE id=?', [datetime.datetime.fromtimestamp(0), self.KEY])
-            c.execute("DELETE FROM sources_updates WHERE source=?", [self.KEY])
-            c.execute('DELETE FROM programs WHERE source=?', [self.KEY])
+            c.execute("DELETE FROM updates WHERE source=?", [self.KEY]) # cascades and deletes associated programs records
             self.conn.commit()
 
         except Exception, ex:
@@ -395,7 +394,7 @@ class Source(object):
         # check if data is up-to-date in database
         dateStr = date.strftime('%Y-%m-%d')
         c = self.conn.cursor()
-        c.execute('SELECT programs_updated FROM sources_updates WHERE source=? AND date=?', [self.KEY, dateStr])
+        c.execute('SELECT programs_updated FROM updates WHERE source=? AND date=?', [self.KEY, dateStr])
         row = c.fetchone()
         expired = row is None or row['programs_updated'] < datetime.datetime.now() - datetime.timedelta(days = 1)
         c.close()
@@ -469,9 +468,9 @@ class Source(object):
 
             # For caching data
             c.execute('CREATE TABLE sources(id TEXT PRIMARY KEY, channels_updated TIMESTAMP)')
-            c.execute('CREATE TABLE sources_updates(source TEXT, date TEXT, programs_updated TIMESTAMP)')
+            c.execute('CREATE TABLE updates(id INTEGER PRIMARY KEY, source TEXT, date TEXT, programs_updated TIMESTAMP)')
             c.execute('CREATE TABLE channels(id TEXT, title TEXT, logo TEXT, stream_url TEXT, source TEXT, visible BOOLEAN, weight INTEGER, PRIMARY KEY (id, source), FOREIGN KEY(source) REFERENCES sources(id) ON DELETE CASCADE)')
-            c.execute('CREATE TABLE programs(channel TEXT, title TEXT, start_date TIMESTAMP, end_date TIMESTAMP, description TEXT, image_large TEXT, image_small TEXT, source TEXT, FOREIGN KEY(channel, source) REFERENCES channels(id, source) ON DELETE CASCADE)')
+            c.execute('CREATE TABLE programs(channel TEXT, title TEXT, start_date TIMESTAMP, end_date TIMESTAMP, description TEXT, image_large TEXT, image_small TEXT, source TEXT, updates_id INTEGER, FOREIGN KEY(channel, source) REFERENCES channels(id, source) ON DELETE CASCADE, FOREIGN KEY(updates_id) REFERENCES updates(id) ON DELETE CASCADE)')
             c.execute('CREATE INDEX program_list_idx ON programs(source, channel, start_date, end_date)')
             c.execute('CREATE INDEX start_date_idx ON programs(start_date)')
             c.execute('CREATE INDEX end_date_idx ON programs(end_date)')
