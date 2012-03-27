@@ -1,4 +1,4 @@
-[B]Version 1.2.91 - 2012-03-xx[/B]
+[B]Version 1.2.91 - 2012-03-27[/B]
 - Added new source for ONTV.dk Pro customers
 - Added slide-out controls to ease navigation with mouse
 - Fixed problem with international characters in (custom) stream URLs
