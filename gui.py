@@ -547,19 +547,13 @@ class TVGuide(xbmcgui.WindowXML):
     def _hideEpg(self):
         self._hideControl(self.C_MAIN_EPG)
         self.mode = MODE_TV
-
-        if self.hasRemoveControls:
-            controls = [elem.control for elem in self.controlAndProgramList]
-            self.removeControls(controls)
-        else:
-            for elem in self.controlAndProgramList:
-                self.removeControl(elem.control)
-        del self.controlAndProgramList[:]
+        self._clearEpg()
 
     def onRedrawEPG(self, channelStart, startTime, scrollEvent = False, focusFunction = None):
         if self.redrawingEPG or self.source.updateInProgress or self.isClosing:
             return # ignore redraw request while redrawing
 
+        self.redrawingEPG = True
         self.mode = MODE_EPG
         self._showControl(self.C_MAIN_EPG)
 
@@ -576,14 +570,7 @@ class TVGuide(xbmcgui.WindowXML):
         self.setFocus(self.getControl(self.C_MAIN_LOADING_CANCEL))
 
         # remove existing controls
-        if self.hasRemoveControls:
-            controls = [elem.control for elem in self.controlAndProgramList]
-            self.removeControls(controls)
-        else:
-            for elem in self.controlAndProgramList:
-                self.removeControl(elem.control)
-        del self.controlAndProgramList[:]
-
+        self._clearEpg()
         if self.source.isCacheExpired(startTime):
             self.redrawingEPG = False
             SourceUpdater(self, self.source, channelStart, startTime, scrollEvent, self.onSourceProgressUpdate).start()
@@ -600,7 +587,6 @@ class TVGuide(xbmcgui.WindowXML):
             channels = self.source.getChannelList()
         except src.SourceException:
             self.onEPGLoadError()
-            self.redrawingEPG = False
             return
 
         if channelStart < 0:
@@ -616,12 +602,10 @@ class TVGuide(xbmcgui.WindowXML):
             programs = self.source.getProgramList(viewChannels, self.viewStartDate)
         except src.SourceException:
             self.onEPGLoadError()
-            self.redrawingEPG = False
             return
 
         if programs is None:
             self.onEPGLoadError()
-            self.redrawingEPG = False
             return
 
         # set channel logo or text
@@ -679,9 +663,7 @@ class TVGuide(xbmcgui.WindowXML):
         # add program controls
         if focusFunction is None:
             focusFunction = self._findControlAt
-        print self.focusPoint
         focusControl = focusFunction(self.focusPoint)
-
         if self.hasAddControls:
             controls = [elem.control for elem in self.controlAndProgramList]
             self.addControls(controls)
@@ -693,13 +675,35 @@ class TVGuide(xbmcgui.WindowXML):
                 if elem.control == focusControl:
                     self.setFocus(focusControl)
 
-        if scrollEvent:
-            xbmc.sleep(100)
+
+        if focusControl is None and len(self.controlAndProgramList) > 0:
+            self.setFocus(self.controlAndProgramList[0].control)
 
         self._hideControl(self.C_MAIN_LOADING)
         self.redrawingEPG = False
 
+    def _clearEpg(self):
+        if self.hasRemoveControls:
+            controls = [elem.control for elem in self.controlAndProgramList]
+            try:
+                self.removeControls(controls)
+            except RuntimeError:
+                for elem in self.controlAndProgramList:
+                    try:
+                        self.removeControl(elem.control)
+                    except RuntimeError:
+                        pass # happens if we try to remove a control that doesn't exist
+        else:
+            for elem in self.controlAndProgramList:
+                try:
+                    self.removeControl(elem.control)
+                except RuntimeError:
+                    pass # happens if we try to remove a control that doesn't exist
+        del self.controlAndProgramList[:]
+
+
     def onEPGLoadError(self):
+        self.redrawingEPG = False
         self._hideControl(self.C_MAIN_LOADING)
         xbmcgui.Dialog().ok(strings(LOAD_ERROR_TITLE), strings(LOAD_ERROR_LINE1), strings(LOAD_ERROR_LINE2))
         self.close()
@@ -734,7 +738,6 @@ class TVGuide(xbmcgui.WindowXML):
         return not xbmc.abortRequested and not self.isClosing
 
     def onPlayBackStopped(self):
-        print 'onPlayBackStopped'
         xbmc.sleep(1000)
         if not self.source.isPlaying():
             self._hideControl(self.C_MAIN_OSD)

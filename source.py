@@ -232,7 +232,6 @@ class Source(object):
                     c.execute('INSERT OR IGNORE INTO channels(id, title, logo, stream_url, visible, weight, source) VALUES(?, ?, ?, ?, ?, (CASE ? WHEN -1 THEN (SELECT COALESCE(MAX(weight)+1, 0) FROM channels WHERE source=?) ELSE ? END), ?)', [channel.id, channel.title, channel.logo, channel.streamUrl, channel.visible, channel.weight, self.KEY, channel.weight, self.KEY])
                     if not c.rowcount:
                         c.execute('UPDATE channels SET title=?, logo=?, stream_url=?, visible=?, weight=(CASE ? WHEN -1 THEN (SELECT COALESCE(MAX(weight)+1, 0) FROM channels WHERE source=?) ELSE ? END) WHERE id=? AND source=?', [channel.title, channel.logo, channel.streamUrl, channel.visible, channel.weight, self.KEY, channel.weight, channel.id, self.KEY])
-                    self.conn.commit()
 
                 elif isinstance(item, Program):
                     program = item
@@ -333,7 +332,8 @@ class Source(object):
         lastUpdated = c.fetchone()['channels_updated']
         c.close()
 
-        return lastUpdated < datetime.datetime.now() - datetime.timedelta(days = 1)
+        today = datetime.datetime.now()
+        return lastUpdated.day != today.day
 
     def getCurrentProgram(self, channel):
         """
@@ -403,7 +403,8 @@ class Source(object):
         c = self.conn.cursor()
         c.execute('SELECT programs_updated FROM updates WHERE source=? AND date=?', [self.KEY, dateStr])
         row = c.fetchone()
-        expired = row is None or row['programs_updated'] < datetime.datetime.now() - datetime.timedelta(days = 1)
+        today = datetime.datetime.now()
+        expired = row is None or row['programs_updated'].day != today.day
         c.close()
         return expired
 
@@ -671,11 +672,17 @@ class XMLTVSource(Source):
     def __init__(self, addon, cachePath, playbackCallbackHandler):
         super(XMLTVSource, self).__init__(addon, cachePath, playbackCallbackHandler)
         self.logoFolder = addon.getSetting('xmltv.logo.folder')
-        self.xmlTvFile = addon.getSetting('xmltv.file')
-        #self.xmlTvFile = os.path.join(self.cachePath, '%s.xmltv' % self.KEY)
-        #if xbmcvfs.exists(addon.getSetting('xmltv.file')):
-        #    xbmc.log('[script.tvguide] Caching XMLTV file...')
-        #    xbmcvfs.copy(addon.getSetting('xmltv.file'), self.xmlTvFile)
+
+        self.xmlTvFile = os.path.join(self.cachePath, '%s.xmltv' % self.KEY)
+        tempFile = os.path.join(self.cachePath, '%s.xmltv.tmp' % self.KEY)
+        if xbmcvfs.exists(addon.getSetting('xmltv.file')):
+            xbmc.log('[script.tvguide] Caching XMLTV file...')
+            xbmcvfs.copy(addon.getSetting('xmltv.file'), tempFile)
+
+            # if xmlTvFile doesn't exists or the file size is different from tempFile
+            # we copy the tempFile to xmlTvFile which in turn triggers a reload in self._isChannelListCacheExpired(..)
+            if not os.path.exists(self.xmlTvFile) or os.path.getsize(self.xmlTvFile) != os.path.getsize(tempFile):
+                os.rename(tempFile, self.xmlTvFile)
 
     def getDataFromExternal(self, date, progress_callback = None):
         context, f, size = self._loadXml()
