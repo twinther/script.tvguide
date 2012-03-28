@@ -29,9 +29,11 @@ from notification import Notification
 from strings import *
 import buggalo
 
-MODE_EPG = 1
-MODE_TV = 2
-MODE_OSD = 3
+DEBUG = False
+
+MODE_EPG = 'EPG'
+MODE_TV = 'TV'
+MODE_OSD = 'OSD'
 
 ACTION_LEFT = 1
 ACTION_RIGHT = 2
@@ -63,6 +65,9 @@ TEXTURE_BUTTON_NOFOCUS = os.path.join(xbmc.translatePath(ADDON.getAddonInfo('pat
 TEXTURE_BUTTON_FOCUS = os.path.join(xbmc.translatePath(ADDON.getAddonInfo('path')), 'resources', 'skins', 'Default', 'media', 'tvguide-program-grey-focus.png')
 TEXTURE_BUTTON_NOFOCUS_NOTIFY = os.path.join(xbmc.translatePath(ADDON.getAddonInfo('path')), 'resources', 'skins', 'Default', 'media', 'tvguide-program-red.png')
 TEXTURE_BUTTON_FOCUS_NOTIFY = os.path.join(xbmc.translatePath(ADDON.getAddonInfo('path')), 'resources', 'skins', 'Default', 'media', 'tvguide-program-red-focus.png')
+
+def debug(s):
+    if DEBUG: xbmc.log(str(s), xbmc.LOGDEBUG)
 
 class SourceInitializer(threading.Thread):
     def __init__(self, sourceInitializedHandler):
@@ -214,125 +219,128 @@ class TVGuide(xbmcgui.WindowXML):
             if action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK]:
                 self.close()
             return
+        debug('Mode is: %s' % self.mode)
 
         if self.mode == MODE_TV:
-            if action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK, KEY_CONTEXT_MENU]:
-                self.onRedrawEPG(self.channelIdx, self.viewStartDate)
-
-            elif action.getId() == ACTION_PAGE_UP:
-                self._channelUp()
-
-            elif action.getId() == ACTION_PAGE_DOWN:
-                self._channelDown()
-
-            elif action.getId() == ACTION_SHOW_INFO:
-                self._showOsd()
-
+            self.onActionTVMode(action)
         elif self.mode == MODE_OSD:
-            if action.getId() == ACTION_SHOW_INFO:
-                self._hideOsd()
-
-            elif action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK, KEY_CONTEXT_MENU]:
-                self._hideOsd()
-                self.onRedrawEPG(self.channelIdx, self.viewStartDate)
-
-            elif action.getId() == ACTION_SELECT_ITEM:
-                if self.source.isPlayable(self.osdChannel):
-                    self._playChannel(self.osdChannel)
-                    self._hideOsd()
-
-            elif action.getId() == ACTION_PAGE_UP:
-                self._channelUp()
-                self._showOsd()
-
-            elif action.getId() == ACTION_PAGE_DOWN:
-                self._channelDown()
-                self._showOsd()
-
-            elif action.getId() == ACTION_UP:
-                self.osdChannel = self.source.getPreviousChannel(self.osdChannel)
-                self.osdProgram = self.source.getCurrentProgram(self.osdChannel)
-                self._showOsd()
-
-            elif action.getId() == ACTION_DOWN:
-                self.osdChannel = self.source.getNextChannel(self.osdChannel)
-                self.osdProgram = self.source.getCurrentProgram(self.osdChannel)
-                self._showOsd()
-
-            elif action.getId() == ACTION_LEFT:
-                previousProgram = self.source.getPreviousProgram(self.osdProgram)
-                if previousProgram:
-                    self.osdProgram = previousProgram
-                    self._showOsd()
-
-            elif action.getId() == ACTION_RIGHT:
-                nextProgram = self.source.getNextProgram(self.osdProgram)
-                if nextProgram:
-                    self.osdProgram = nextProgram
-                    self._showOsd()
-
+            self.onActionOSDMode(action)
         elif self.mode == MODE_EPG:
-            if action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK]:
-                self.close()
-                return
+            self.onActionEPGMode(action)
 
-            elif action.getId() == ACTION_MOUSE_MOVE:
-                self._showControl(self.C_MAIN_MOUSE_CONTROLS)
-                return
+    def onActionTVMode(self, action):
+        if action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK, KEY_CONTEXT_MENU]:
+            self.onRedrawEPG(self.channelIdx, self.viewStartDate)
 
-            elif action.getId() == KEY_CONTEXT_MENU:
-                if self.source.isPlaying():
-                    self._hideEpg()
+        elif action.getId() == ACTION_PAGE_UP:
+            self._channelUp()
 
-            control = None
-            try:
-                controlInFocus = self.getFocus()
-                (left, top) = controlInFocus.getPosition()
-                currentFocus = Point()
-                currentFocus.x = left + (controlInFocus.getWidth() / 2)
-                currentFocus.y = top + (controlInFocus.getHeight() / 2)
-            except Exception, ex:
-                print str(ex)
-                control = self._findControlAt(self.focusPoint)
-                if control is None and len(self.controlAndProgramList) > 0:
-                    control = self.controlAndProgramList[0].control
-                if control is not None:
-                    self.setFocus(control)
-                return
+        elif action.getId() == ACTION_PAGE_DOWN:
+            self._channelDown()
 
-            if action.getId() == ACTION_LEFT:
-                control = self._left(currentFocus)
-            elif action.getId() == ACTION_RIGHT:
-                control = self._right(currentFocus)
-            elif action.getId() == ACTION_UP:
-                control = self._up(currentFocus)
-            elif action.getId() == ACTION_DOWN:
-                control = self._down(currentFocus)
-            elif action.getId() == ACTION_NEXT_ITEM:
-                control= self._nextDay()
-            elif action.getId() == ACTION_PREV_ITEM:
-                control= self._previousDay()
-            elif action.getId() == ACTION_PAGE_UP:
-                control = self._moveUp(CHANNELS_PER_PAGE)
-            elif action.getId() == ACTION_PAGE_DOWN:
-                control = self._moveDown(CHANNELS_PER_PAGE)
-            elif action.getId() == ACTION_MOUSE_WHEEL_UP:
-                self._moveUp(scrollEvent = True)
-                return
-            elif action.getId() == ACTION_MOUSE_WHEEL_DOWN:
-                self._moveDown(scrollEvent = True)
-                return
-            elif action.getId() == KEY_HOME:
-                self.viewStartDate = datetime.datetime.today()
-                self.viewStartDate -= datetime.timedelta(minutes = self.viewStartDate.minute % 30, seconds = self.viewStartDate.second)
-                self.onRedrawEPG(self.channelIdx, self.viewStartDate)
-            elif action.getId() in [KEY_CONTEXT_MENU, ACTION_PREVIOUS_MENU] and controlInFocus is not None:
-                program = self._getProgramFromControl(controlInFocus)
-                if program is not None:
-                    self._showContextMenu(program)
+        elif action.getId() == ACTION_SHOW_INFO:
+            self._showOsd()
 
+    def onActionOSDMode(self, action):
+        if action.getId() == ACTION_SHOW_INFO:
+            self._hideOsd()
+
+        elif action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK, KEY_CONTEXT_MENU]:
+            self._hideOsd()
+            self.onRedrawEPG(self.channelIdx, self.viewStartDate)
+
+        elif action.getId() == ACTION_SELECT_ITEM:
+            if self.source.isPlayable(self.osdChannel):
+                self._playChannel(self.osdChannel)
+                self._hideOsd()
+
+        elif action.getId() == ACTION_PAGE_UP:
+            self._channelUp()
+            self._showOsd()
+
+        elif action.getId() == ACTION_PAGE_DOWN:
+            self._channelDown()
+            self._showOsd()
+
+        elif action.getId() == ACTION_UP:
+            self.osdChannel = self.source.getPreviousChannel(self.osdChannel)
+            self.osdProgram = self.source.getCurrentProgram(self.osdChannel)
+            self._showOsd()
+
+        elif action.getId() == ACTION_DOWN:
+            self.osdChannel = self.source.getNextChannel(self.osdChannel)
+            self.osdProgram = self.source.getCurrentProgram(self.osdChannel)
+            self._showOsd()
+
+        elif action.getId() == ACTION_LEFT:
+            previousProgram = self.source.getPreviousProgram(self.osdProgram)
+            if previousProgram:
+                self.osdProgram = previousProgram
+                self._showOsd()
+
+        elif action.getId() == ACTION_RIGHT:
+            nextProgram = self.source.getNextProgram(self.osdProgram)
+            if nextProgram:
+                self.osdProgram = nextProgram
+                self._showOsd()
+
+    def onActionEPGMode(self, action):
+        if action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK]:
+            self.close()
+            return
+
+        elif action.getId() == ACTION_MOUSE_MOVE:
+            self._showControl(self.C_MAIN_MOUSE_CONTROLS)
+            return
+
+        elif action.getId() == KEY_CONTEXT_MENU:
+            if self.source.isPlaying():
+                self._hideEpg()
+
+        control = None
+        try:
+            controlInFocus = self.getFocus()
+            (left, top) = controlInFocus.getPosition()
+            currentFocus = Point()
+            currentFocus.x = left + (controlInFocus.getWidth() / 2)
+            currentFocus.y = top + (controlInFocus.getHeight() / 2)
+        except Exception, ex:
+            control = self._findControlAt(self.focusPoint)
+            if control is None and len(self.controlAndProgramList) > 0:
+                control = self.controlAndProgramList[0].control
             if control is not None:
                 self.setFocus(control)
+            return
+
+        if action.getId() == ACTION_LEFT:
+            control = self._left(currentFocus)
+        elif action.getId() == ACTION_RIGHT:
+            control = self._right(currentFocus)
+        elif action.getId() == ACTION_UP:
+            control = self._up(currentFocus)
+        elif action.getId() == ACTION_DOWN:
+            control = self._down(currentFocus)
+        elif action.getId() == ACTION_NEXT_ITEM:
+            control= self._nextDay()
+        elif action.getId() == ACTION_PREV_ITEM:
+            control= self._previousDay()
+        elif action.getId() == ACTION_PAGE_UP:
+            control = self._moveUp(CHANNELS_PER_PAGE)
+        elif action.getId() == ACTION_PAGE_DOWN:
+            control = self._moveDown(CHANNELS_PER_PAGE)
+        elif action.getId() == ACTION_MOUSE_WHEEL_UP:
+            self._moveUp(scrollEvent = True)
+        elif action.getId() == ACTION_MOUSE_WHEEL_DOWN:
+            self._moveDown(scrollEvent = True)
+        elif action.getId() == KEY_HOME:
+            self.viewStartDate = datetime.datetime.today()
+            self.viewStartDate -= datetime.timedelta(minutes = self.viewStartDate.minute % 30, seconds = self.viewStartDate.second)
+            self.onRedrawEPG(self.channelIdx, self.viewStartDate)
+        elif action.getId() in [KEY_CONTEXT_MENU, ACTION_PREVIOUS_MENU] and controlInFocus is not None:
+            program = self._getProgramFromControl(controlInFocus)
+            if program is not None:
+                self._showContextMenu(program)
+
 
     @buggalo.buggalo_try_except({'method' : 'TVGuide.onClick'})
     def onClick(self, controlId):
@@ -406,6 +414,17 @@ class TVGuide(xbmcgui.WindowXML):
         elif buttonClicked == PopupMenu.C_POPUP_QUIT:
             self.close()
 
+    def setFocus(self, control):
+        debug('setFocus %d' % control.getId())
+        if control.getId() != self.C_MAIN_LOADING_CANCEL:
+            (left, top) = control.getPosition()
+            if left > self.focusPoint.x or left + control.getWidth() < self.focusPoint.x:
+                self.focusPoint.x = left
+            self.focusPoint.y = top + (control.getHeight() / 2)
+            debug('New focus at %s' % self.focusPoint)
+
+        super(TVGuide, self).setFocus(control)
+
     @buggalo.buggalo_try_except({'method' : 'TVGuide.onFocus'})
     def onFocus(self, controlId):
         try:
@@ -416,11 +435,6 @@ class TVGuide(xbmcgui.WindowXML):
         program = self._getProgramFromControl(controlInFocus)
         if program is None:
             return
-
-        (left, top) = controlInFocus.getPosition()
-        if left > self.focusPoint.x or left + controlInFocus.getWidth() < self.focusPoint.x:
-            self.focusPoint.x = left
-        self.focusPoint.y = top + (controlInFocus.getHeight() / 2)
 
         self.getControl(self.C_MAIN_TITLE).setLabel('[B]%s[/B]' % program.title)
         self.getControl(self.C_MAIN_TIME).setLabel('[B]%s - %s[/B]' % (program.startDate.strftime(xbmc.getRegion('time')), program.endDate.strftime(xbmc.getRegion('time'))))
@@ -438,42 +452,38 @@ class TVGuide(xbmcgui.WindowXML):
     def _left(self, currentFocus):
         control = self._findControlOnLeft(currentFocus)
         if control is not None:
-            return control
+            self.setFocus(control)
         elif control is None:
             self.viewStartDate -= datetime.timedelta(hours = 2)
             self.focusPoint.x = self.epgView.right
             self.onRedrawEPG(self.channelIdx, self.viewStartDate, focusFunction=self._findControlOnLeft)
-            return None
 
     def _right(self, currentFocus):
         control = self._findControlOnRight(currentFocus)
         if control is not None:
-            return control
+            self.setFocus(control)
         elif control is None:
             self.viewStartDate += datetime.timedelta(hours = 2)
             self.focusPoint.x = self.epgView.left
             self.onRedrawEPG(self.channelIdx, self.viewStartDate, focusFunction=self._findControlOnRight)
-            return None
 
     def _up(self, currentFocus):
         currentFocus.x = self.focusPoint.x
         control = self._findControlAbove(currentFocus)
         if control is not None:
-            return control
+            self.setFocus(control)
         elif control is None:
             self.focusPoint.y = self.epgView.bottom
             self.onRedrawEPG(self.channelIdx - CHANNELS_PER_PAGE, self.viewStartDate, focusFunction=self._findControlAbove)
-            return None
 
     def _down(self, currentFocus):
         currentFocus.x = self.focusPoint.x
         control = self._findControlBelow(currentFocus)
         if control is not None:
-            return control
+            self.setFocus(control)
         elif control is None:
             self.focusPoint.y = self.epgView.top
             self.onRedrawEPG(self.channelIdx + CHANNELS_PER_PAGE, self.viewStartDate, focusFunction=self._findControlBelow)
-            return None
 
     def _nextDay(self):
         self.viewStartDate += datetime.timedelta(days = 1)
@@ -489,7 +499,6 @@ class TVGuide(xbmcgui.WindowXML):
         else:
             self.focusPoint.y = self.epgView.bottom
             self.onRedrawEPG(self.channelIdx - count, self.viewStartDate, focusFunction = self._findControlAbove)
-        return None
 
     def _moveDown(self, count = 1, scrollEvent = False):
         if scrollEvent:
@@ -497,7 +506,6 @@ class TVGuide(xbmcgui.WindowXML):
         else:
             self.focusPoint.y = self.epgView.top
             self.onRedrawEPG(self.channelIdx + count, self.viewStartDate, focusFunction=self._findControlBelow)
-        return None
 
     def _channelUp(self):
         channel = self.source.getNextChannel(self.currentChannel)
@@ -551,7 +559,9 @@ class TVGuide(xbmcgui.WindowXML):
 
     def onRedrawEPG(self, channelStart, startTime, scrollEvent = False, focusFunction = None):
         if self.redrawingEPG or self.source.updateInProgress or self.isClosing:
+            debug('onRedrawEPG - already redrawing')
             return # ignore redraw request while redrawing
+        debug('onRedrawEPG')
 
         self.redrawingEPG = True
         self.mode = MODE_EPG
