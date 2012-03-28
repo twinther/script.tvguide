@@ -665,13 +665,17 @@ class XMLTVSource(Source):
     KEY = 'xmltv'
 
     STREAMS = {
-        'DR1.dr.dk' : STREAM_DR1,
-        'www.ontv.dk/tv/1' : STREAM_DR1
+        'www.ontv.dk/tv/1' : STREAM_DR1,
+        'www.ontv.dk/tv/2' : STREAM_DR2,
+        'www.ontv.dk/tv/10153' : STREAM_DR_RAMASJANG,
+        'www.ontv.dk/tv/10154' : STREAM_DR_K,
+        'www.ontv.dk/tv/10155' : STREAM_DR_HD
     }
 
     def __init__(self, addon, cachePath, playbackCallbackHandler):
         super(XMLTVSource, self).__init__(addon, cachePath, playbackCallbackHandler)
         self.logoFolder = addon.getSetting('xmltv.logo.folder')
+        self.xmlTvFileLastChecked = datetime.datetime.fromtimestamp(0)
 
         self.xmlTvFile = os.path.join(self.cachePath, '%s.xmltv' % self.KEY)
         tempFile = os.path.join(self.cachePath, '%s.xmltv.tmp' % self.KEY)
@@ -729,7 +733,13 @@ class XMLTVSource(Source):
     def _isChannelListCacheExpired(self):
         """
         Check if xmlTvFile was modified, otherwise cache is not expired.
+        Only check filesystem once every 5 minutes
         """
+        delta = datetime.datetime.now() - self.xmlTvFileLastChecked
+        print str(delta.seconds)
+        if delta.seconds < 300:
+            return False
+
         c = self.conn.cursor()
         c.execute('SELECT channels_updated FROM sources WHERE id=?', [self.KEY])
         lastUpdated = c.fetchone()['channels_updated']
@@ -756,14 +766,6 @@ class XMLTVSource(Source):
 
 class ONTVSource(XMLTVSource):
     KEY = 'ontv'
-
-    STREAMS = {
-        'www.ontv.dk/tv/1' : STREAM_DR1,
-        'www.ontv.dk/tv/2' : STREAM_DR2,
-        'www.ontv.dk/tv/10153' : STREAM_DR_RAMASJANG,
-        'www.ontv.dk/tv/10154' : STREAM_DR_K,
-        'www.ontv.dk/tv/10155' : STREAM_DR_HD
-    }
 
     def __init__(self, addon, cachePath, playbackCallbackHandler):
         super(ONTVSource, self).__init__(addon, cachePath, playbackCallbackHandler)
