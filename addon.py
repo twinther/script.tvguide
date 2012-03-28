@@ -18,8 +18,6 @@
 #  http://www.gnu.org/copyleft/gpl.html
 #
 import buggalo
-import xbmcgui
-import source as src
 import gui
 
 buggalo.SUBMIT_URL = 'http://tommy.winther.nu/exception/submit.php'
