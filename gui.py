@@ -297,37 +297,39 @@ class TVGuide(xbmcgui.WindowXML):
             if self.source.isPlaying():
                 self._hideEpg()
 
-        control = None
+        controlInFocus = None
+        currentFocus = self.focusPoint
         try:
             controlInFocus = self.getFocus()
-            (left, top) = controlInFocus.getPosition()
-            currentFocus = Point()
-            currentFocus.x = left + (controlInFocus.getWidth() / 2)
-            currentFocus.y = top + (controlInFocus.getHeight() / 2)
-        except Exception, ex:
+            if controlInFocus in [elem.control for elem in self.controlAndProgramList]:
+                (left, top) = controlInFocus.getPosition()
+                currentFocus = Point()
+                currentFocus.x = left + (controlInFocus.getWidth() / 2)
+                currentFocus.y = top + (controlInFocus.getHeight() / 2)
+        except Exception:
             control = self._findControlAt(self.focusPoint)
             if control is None and len(self.controlAndProgramList) > 0:
                 control = self.controlAndProgramList[0].control
             if control is not None:
                 self.setFocus(control)
-            return
+                return
 
         if action.getId() == ACTION_LEFT:
-            control = self._left(currentFocus)
+            self._left(currentFocus)
         elif action.getId() == ACTION_RIGHT:
-            control = self._right(currentFocus)
+            self._right(currentFocus)
         elif action.getId() == ACTION_UP:
-            control = self._up(currentFocus)
+            self._up(currentFocus)
         elif action.getId() == ACTION_DOWN:
-            control = self._down(currentFocus)
+            self._down(currentFocus)
         elif action.getId() == ACTION_NEXT_ITEM:
-            control= self._nextDay()
+            self._nextDay()
         elif action.getId() == ACTION_PREV_ITEM:
-            control= self._previousDay()
+            self._previousDay()
         elif action.getId() == ACTION_PAGE_UP:
-            control = self._moveUp(CHANNELS_PER_PAGE)
+            self._moveUp(CHANNELS_PER_PAGE)
         elif action.getId() == ACTION_PAGE_DOWN:
-            control = self._moveDown(CHANNELS_PER_PAGE)
+            self._moveDown(CHANNELS_PER_PAGE)
         elif action.getId() == ACTION_MOUSE_WHEEL_UP:
             self._moveUp(scrollEvent = True)
         elif action.getId() == ACTION_MOUSE_WHEEL_DOWN:
@@ -416,7 +418,8 @@ class TVGuide(xbmcgui.WindowXML):
 
     def setFocus(self, control):
         debug('setFocus %d' % control.getId())
-        if control.getId() != self.C_MAIN_LOADING_CANCEL:
+        if control in [elem.control for elem in self.controlAndProgramList]:
+            debug('Focus before %s' % self.focusPoint)
             (left, top) = control.getPosition()
             if left > self.focusPoint.x or left + control.getWidth() < self.focusPoint.x:
                 self.focusPoint.x = left
@@ -468,6 +471,7 @@ class TVGuide(xbmcgui.WindowXML):
             self.onRedrawEPG(self.channelIdx, self.viewStartDate, focusFunction=self._findControlOnRight)
 
     def _up(self, currentFocus):
+        debug('_up')
         currentFocus.x = self.focusPoint.x
         control = self._findControlAbove(currentFocus)
         if control is not None:
@@ -678,11 +682,13 @@ class TVGuide(xbmcgui.WindowXML):
             controls = [elem.control for elem in self.controlAndProgramList]
             self.addControls(controls)
             if focusControl is not None:
+                debug('onRedrawEPG - setFocus %d' % focusControl.getId())
                 self.setFocus(focusControl)
         else:
             for elem in self.controlAndProgramList:
                 self.addControl(elem.control)
                 if elem.control == focusControl:
+                    debug('onRedrawEPG - setFocus %d' % focusControl.getId())
                     self.setFocus(focusControl)
 
 
@@ -811,7 +817,6 @@ class TVGuide(xbmcgui.WindowXML):
 
     def _findControlAbove(self, point):
         nearestControl = None
-
         for elem in self.controlAndProgramList:
             control = elem.control
             (leftEdge, top) = control.getPosition()

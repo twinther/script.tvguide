@@ -1,3 +1,6 @@
+[B]Version 1.2.92 - 2012-xx-xx[/B]
+- Finally fixed small annoying problems related to focus
+
 [B]Version 1.2.91 - 2012-03-27[/B]
 - Added new source for ONTV.dk Pro customers
 - Added slide-out controls to ease navigation with mouse
