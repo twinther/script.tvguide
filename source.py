@@ -85,25 +85,6 @@ class Program(object):
         return 'Program(channel=%s, title=%s, startDate=%s, endDate=%s, description=%s, imageLarge=%s, imageSmall=%s)' % \
             (self.channel, self.title, self.startDate, self.endDate, self.description, self.imageLarge, self.imageSmall)
 
-
-class SourcePlayer(xbmc.Player):
-    def __init__(self, callbackHandler):
-        super(SourcePlayer, self).__init__(core = xbmc.PLAYER_CORE_MPLAYER)
-        self.callbackHandler = callbackHandler
-
-#    def onPlayBackStarted(self):
-#        print 'started'
-
-    def onPlayBackStopped(self):
-        print 'yo'
-        if self.callbackHandler:
-            self.callbackHandler.onPlayBackStopped()
-
-#    def onPlayBackEnded(self):
-#        print 'hey'
-#        if self.callbackHandler:
-#            self.callbackHandler.onPlayBackStopped()
-
 class SourceException(Exception):
     pass
 
@@ -118,7 +99,7 @@ class Source(object):
     STREAMS = {}
     SOURCE_DB = 'source.db'
 
-    def __init__(self, addon, cachePath, playbackCallbackHandler):
+    def __init__(self, addon, cachePath):
         self.cachePath = cachePath
         self.updateInProgress = False
         buggalo.addExtraData('source', self.KEY)
@@ -135,8 +116,7 @@ class Source(object):
 
         self.playbackUsingDanishLiveTV = False
         self.channelList = list()
-        self.player = xbmc.Player() #SourcePlayer(callbackHandler = playbackCallbackHandler)
-        self.callbackHandler = playbackCallbackHandler
+        self.player = xbmc.Player()
         self.settingsChanged = self.wasSettingsChanged(addon)
 
         try:
@@ -231,7 +211,7 @@ class Source(object):
                         channel.streamUrl = self.STREAMS[channel.id]
                     c.execute('INSERT OR IGNORE INTO channels(id, title, logo, stream_url, visible, weight, source) VALUES(?, ?, ?, ?, ?, (CASE ? WHEN -1 THEN (SELECT COALESCE(MAX(weight)+1, 0) FROM channels WHERE source=?) ELSE ? END), ?)', [channel.id, channel.title, channel.logo, channel.streamUrl, channel.visible, channel.weight, self.KEY, channel.weight, self.KEY])
                     if not c.rowcount:
-                        c.execute('UPDATE channels SET title=?, logo=?, stream_url=?, visible=?, weight=(CASE ? WHEN -1 THEN (SELECT COALESCE(MAX(weight)+1, 0) FROM channels WHERE source=?) ELSE ? END) WHERE id=? AND source=?', [channel.title, channel.logo, channel.streamUrl, channel.visible, channel.weight, self.KEY, channel.weight, channel.id, self.KEY])
+                        c.execute('UPDATE channels SET title=?, logo=?, stream_url=?, visible=?, weight=(CASE ? WHEN -1 THEN weight ELSE ? END) WHERE id=? AND source=?', [channel.title, channel.logo, channel.streamUrl, channel.visible, channel.weight, channel.weight, channel.id, self.KEY])
 
                 elif isinstance(item, Program):
                     program = item
@@ -307,7 +287,7 @@ class Source(object):
         for idx, channel in enumerate(channelList):
             c.execute('INSERT OR IGNORE INTO channels(id, title, logo, stream_url, visible, weight, source) VALUES(?, ?, ?, ?, ?, (CASE ? WHEN -1 THEN (SELECT COALESCE(MAX(weight)+1, 0) FROM channels WHERE source=?) ELSE ? END), ?)', [channel.id, channel.title, channel.logo, channel.streamUrl, channel.visible, channel.weight, self.KEY, channel.weight, self.KEY])
             if not c.rowcount:
-                c.execute('UPDATE channels SET title=?, logo=?, stream_url=?, visible=?, weight=(CASE ? WHEN -1 THEN (SELECT COALESCE(MAX(weight)+1, 0) FROM channels WHERE source=?) ELSE ? END) WHERE id=? AND source=?', [channel.title, channel.logo, channel.streamUrl, channel.visible, channel.weight, self.KEY, channel.weight, channel.id, self.KEY])
+                c.execute('UPDATE channels SET title=?, logo=?, stream_url=?, visible=?, weight=(CASE ? WHEN -1 THEN weight ELSE ? END) WHERE id=? AND source=?', [channel.title, channel.logo, channel.streamUrl, channel.visible, channel.weight, channel.weight, channel.id, self.KEY])
 
         c.execute("UPDATE sources SET channels_updated=? WHERE id=?", [datetime.datetime.now(), self.KEY])
         self.channelList = None
@@ -447,11 +427,11 @@ class Source(object):
     def isPlaying(self):
         return self.player.isPlaying()
 
-    def play(self, channel):
-        threading.Timer(0.5, self.playThread, [channel]).start()
+    def play(self, channel, playBackStoppedHandler):
+        threading.Timer(0.5, self.playInThread, [channel, playBackStoppedHandler]).start()
 
     @buggalo.buggalo_try_except({'method' : 'source.playThread'})
-    def playThread(self, channel):
+    def playInThread(self, channel, playBackStoppedHandler):
         customStreamUrl = self.getCustomStreamUrl(channel)
         if customStreamUrl:
             customStreamUrl = customStreamUrl.encode('utf-8', 'ignore')
@@ -468,7 +448,7 @@ class Source(object):
             if not self.player.isPlaying():
                 break
 
-        self.callbackHandler.onPlayBackStopped()
+        playBackStoppedHandler.onPlayBackStopped()
 
     def _createTables(self):
         c = self.conn.cursor()
@@ -522,8 +502,8 @@ class DrDkSource(Source):
         'dr.dk/mas/whatson/channel/TV' : STREAM_DR_HD
     }
 
-    def __init__(self, addon, cachePath, playbackCallbackHandler):
-        super(DrDkSource, self).__init__(addon, cachePath, playbackCallbackHandler)
+    def __init__(self, addon, cachePath):
+        super(DrDkSource, self).__init__(addon, cachePath)
 
     def getDataFromExternal(self, date, progress_callback = None):
         jsonChannels = simplejson.loads(self._downloadUrl(self.CHANNELS_URL))
@@ -565,8 +545,8 @@ class YouSeeTvSource(Source):
         503 : STREAM_DR_HD
     }
 
-    def __init__(self, addon, cachePath, playbackCallbackHandler):
-        super(YouSeeTvSource, self).__init__(addon, cachePath, playbackCallbackHandler)
+    def __init__(self, addon, cachePath):
+        super(YouSeeTvSource, self).__init__(addon, cachePath)
         self.date = datetime.datetime.today()
         self.channelCategory = addon.getSetting('youseetv.category')
         self.ysApi = ysapi.YouSeeTVGuideApi()
@@ -632,8 +612,8 @@ class TvTidSource(Source):
         26005640 : STREAM_DR_HD
     }
 
-    def __init__(self, addon, cachePath, playbackCallbackHandler):
-        super(TvTidSource, self).__init__(addon, cachePath, playbackCallbackHandler)
+    def __init__(self, addon, cachePath):
+        super(TvTidSource, self).__init__(addon, cachePath)
 
     def getDataFromExternal(self, date, progress_callback = None):
         response = self._downloadUrl(self.CHANNELS_URL)
@@ -672,8 +652,8 @@ class XMLTVSource(Source):
         'www.ontv.dk/tv/10155' : STREAM_DR_HD
     }
 
-    def __init__(self, addon, cachePath, playbackCallbackHandler):
-        super(XMLTVSource, self).__init__(addon, cachePath, playbackCallbackHandler)
+    def __init__(self, addon, cachePath):
+        super(XMLTVSource, self).__init__(addon, cachePath)
         self.logoFolder = addon.getSetting('xmltv.logo.folder')
         self.xmlTvFileLastChecked = datetime.datetime.fromtimestamp(0)
 
@@ -767,8 +747,8 @@ class XMLTVSource(Source):
 class ONTVSource(XMLTVSource):
     KEY = 'ontv'
 
-    def __init__(self, addon, cachePath, playbackCallbackHandler):
-        super(ONTVSource, self).__init__(addon, cachePath, playbackCallbackHandler)
+    def __init__(self, addon, cachePath):
+        super(ONTVSource, self).__init__(addon, cachePath)
         self.ontvUrl = addon.getSetting('ontv.url')
 
     def _isChannelListCacheExpired(self):
@@ -781,7 +761,7 @@ class ONTVSource(XMLTVSource):
         return context, io, len(xml)
 
 
-def instantiateSource(addon, playbackCallbackHandler):
+def instantiateSource(addon):
     SOURCES = {
         'YouSee.tv' : YouSeeTvSource,
         'DR.dk' : DrDkSource,
@@ -795,7 +775,11 @@ def instantiateSource(addon, playbackCallbackHandler):
     if not os.path.exists(cachePath):
         os.makedirs(cachePath)
 
-    s = SOURCES[addon.getSetting('source')]
-    return s(addon, cachePath, playbackCallbackHandler)
+    try:
+        activeSource = SOURCES[addon.getSetting('source')]
+    except KeyError:
+        activeSource = SOURCES['YouSee.tv']
+
+    return activeSource(addon, cachePath)
 
 
