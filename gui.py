@@ -74,10 +74,11 @@ class SourceInitializer(threading.Thread):
         super(SourceInitializer, self).__init__()
         self.sourceInitializedHandler = sourceInitializedHandler
 
+    @buggalo.buggalo_try_except({'method' : 'SourceInitializer.run'})
     def run(self):
         while not xbmc.abortRequested and not self.sourceInitializedHandler.isClosing:
             try:
-                source = src.instantiateSource(ADDON, self.sourceInitializedHandler)
+                source = src.instantiateSource(ADDON)
                 xbmc.log("[script.tvguide] Using source: %s" % str(type(source)), xbmc.LOGDEBUG)
                 self.sourceInitializedHandler.onSourceInitialized(source)
                 break
@@ -101,6 +102,7 @@ class SourceUpdater(threading.Thread):
         self.scrollEvent = scrollEvent
         self.progressCallback = progressCallback
 
+    @buggalo.buggalo_try_except({'method' : 'SourceUpdater.run'})
     def run(self):
         try:
             self.source.updateChannelAndProgramListCaches(self.startTime, self.progressCallback, clearExistingProgramList = False)
@@ -524,7 +526,7 @@ class TVGuide(xbmcgui.WindowXML):
     def _playChannel(self, channel):
         self.currentChannel = channel
         wasPlaying = self.source.isPlaying()
-        self.source.play(channel)
+        self.source.play(channel, self)
         for retry in range(0, 10):
             xbmc.sleep(100)
             if self.source.isPlaying():

@@ -23,7 +23,7 @@ import xbmc
 import source as src
 
 ADDON = xbmcaddon.Addon(id = 'script.tvguide')
-source = src.instantiateSource(ADDON, None)
+source = src.instantiateSource(ADDON)
 if ADDON.getSetting('cache.data.on.xbmc.startup') == 'true':
     try:
         channelList = None
