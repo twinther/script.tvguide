@@ -53,5 +53,10 @@
     <string id="30403">TV guiden er indstillet til at streame TV via Danish</string>
     <string id="30404">Live TV, men denne addon er ikke installeret.</string>
     <string id="30405">Streaming via denne addon deaktiveres nu.</string>
+
+    <string id="30500">[B]Rediger kanaler og synlighed[/B]</string>
+    <string id="30501">Flyt op og ned for at ændre placering.[CR]Vælg eller flyt til venstre for at gemme[CR]placeringen.</string>
+    <string id="30502">Gem</string>
+    <string id="30503">Annuller</string>
 </strings>
  
