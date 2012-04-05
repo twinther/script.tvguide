@@ -481,6 +481,7 @@ class Source(object):
             c.execute("CREATE TABLE notifications(channel TEXT, program_title TEXT, source TEXT, FOREIGN KEY(channel, source) REFERENCES channels(id, source) ON DELETE CASCADE)")
 
         if version < [1,3, 1]:
+            # Recreate tables with FOREIGN KEYS as DEFERRABLE INITIALLY DEFERRED
             c.execute('UPDATE version SET major=1, minor=3, patch=1')
             c.execute('DROP TABLE channels')
             c.execute('DROP TABLE programs')
@@ -675,6 +676,8 @@ class XMLTVSource(Source):
             # if xmlTvFile doesn't exists or the file size is different from tempFile
             # we copy the tempFile to xmlTvFile which in turn triggers a reload in self._isChannelListCacheExpired(..)
             if not os.path.exists(self.xmlTvFile) or os.path.getsize(self.xmlTvFile) != os.path.getsize(tempFile):
+                if os.path.exists(self.xmlTvFile):
+                    os.unlink(self.xmlTvFile)
                 os.rename(tempFile, self.xmlTvFile)
 
     def getDataFromExternal(self, date, progress_callback = None):
