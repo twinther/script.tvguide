@@ -68,6 +68,7 @@
                     <font>font13</font>
                     <align>center</align>
                     <aligny>center</aligny>
+                    <include>Red_Textcolor</include>
                 </control>
                 <control type="label" id="4001">
                     <description>1st half hour column</description>
@@ -361,15 +362,11 @@
                 <posy>0</posy>
                 <width>2</width>
                 <height>515</height>
-                <texture>timebar.png</texture>
+                <texture>tvguide-timebar.png</texture>
             </control>
 
             <control type="label" id="4200">
                 <description>visibility marker for loading group</description>
-                <posx>540</posx>
-                <posy>250</posy>
-                <width>300</width>
-                <height>55</height>
             </control>
             <control type="group">
                 <posx>340</posx>
@@ -385,7 +382,7 @@
                     <posy>0</posy>
                     <width>55</width>
                     <height>55</height>
-                    <texture>loading.gif</texture>
+                    <texture>tvguide-loading.gif</texture>
                 </control>
                 <control type="label">
                     <description>loading splash</description>
