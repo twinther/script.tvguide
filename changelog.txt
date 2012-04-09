@@ -1,4 +1,4 @@
-[B]Version 1.3.3 - 2012-xx-xx[/B]
+[B]Version 1.3.3 - 2012-04-09[/B]
 - Fixed minor problems in Rapier skin
 - Improved handling of configuration errors (fx if XMLTV source file was removed)
 - Improved handling of invalid XMLTV source data
