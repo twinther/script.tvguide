@@ -156,9 +156,10 @@ class Source(object):
 
         if settingsChanged or noRows:
             for key in SETTINGS_TO_CHECK:
-                c.execute('INSERT OR IGNORE INTO settings(key, value) VALUES (?, ?)', [key, addon.getSetting(key)])
+                value = addon.getSetting(key).decode('utf-8', 'ignore')
+                c.execute('INSERT OR IGNORE INTO settings(key, value) VALUES (?, ?)', [key, value])
                 if not c.rowcount:
-                    c.execute('UPDATE settings SET value=? WHERE key=?', [addon.getSetting(key), key])
+                    c.execute('UPDATE settings SET value=? WHERE key=?', [value, key])
             self.conn.commit()
 
         c.close()
@@ -244,16 +245,22 @@ class Source(object):
             self.conn.commit()
 
         except Exception, ex:
-            self.conn.rollback()
-
             import traceback as tb
             import sys
             (type, value, traceback) = sys.exc_info()
             tb.print_exception(type, value, traceback)
 
-            # invalidate cached data
-            c.execute('UPDATE sources SET channels_updated=? WHERE id=?', [datetime.datetime.fromtimestamp(0), self.KEY])
-            self.conn.commit()
+            try:
+                self.conn.rollback()
+            except sqlite3.OperationalError:
+                pass # no transaction is active
+
+            try:
+                # invalidate cached data
+                c.execute('UPDATE sources SET channels_updated=? WHERE id=?', [datetime.datetime.fromtimestamp(0), self.KEY])
+                self.conn.commit()
+            except sqlite3.OperationalError:
+                pass # database is locked
 
             raise SourceException(ex)
         finally:
