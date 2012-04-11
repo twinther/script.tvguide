@@ -441,7 +441,10 @@ class TVGuide(xbmcgui.WindowXML):
 
         self.getControl(self.C_MAIN_TITLE).setLabel('[B]%s[/B]' % program.title)
         self.getControl(self.C_MAIN_TIME).setLabel('[B]%s - %s[/B]' % (program.startDate.strftime(xbmc.getRegion('time')), program.endDate.strftime(xbmc.getRegion('time'))))
-        self.getControl(self.C_MAIN_DESCRIPTION).setText(program.description)
+        if program.description:
+            self.getControl(self.C_MAIN_DESCRIPTION).setText(program.description)
+        else:
+            self.getControl(self.C_MAIN_DESCRIPTION).setText(strings(NO_DESCRIPTION))
 
         if program.channel.logo is not None:
             self.getControl(self.C_MAIN_LOGO).setImage(program.channel.logo)
