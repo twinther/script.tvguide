@@ -962,6 +962,7 @@ class ChannelsMenu(xbmcgui.WindowXMLDialog):
         super(ChannelsMenu, self).__init__()
         self.source = source
         self.channelList = source._retrieveChannelListFromDatabase(False)
+        self.swapInProgress = False
 
     @buggalo.buggalo_try_except({'method' : 'ChannelsMenu.onInit'})
     def onInit(self):
@@ -991,14 +992,14 @@ class ChannelsMenu(xbmcgui.WindowXMLDialog):
         elif self.getFocusId() == self.C_CHANNELS_SELECTION and action.getId() == ACTION_UP:
             listControl = self.getControl(self.C_CHANNELS_LIST)
             idx = listControl.getSelectedPosition()
-            self.swapChannels(idx, idx - 1)
-            listControl.selectItem(idx - 1)
+            if idx > 0:
+                self.swapChannels(idx, idx - 1)
 
         elif self.getFocusId() == self.C_CHANNELS_SELECTION and action.getId() == ACTION_DOWN:
             listControl = self.getControl(self.C_CHANNELS_LIST)
             idx = listControl.getSelectedPosition()
-            self.swapChannels(idx, idx + 1)
-            listControl.selectItem(idx + 1)
+            if idx < listControl.size() - 1:
+                self.swapChannels(idx, idx + 1)
 
     @buggalo.buggalo_try_except({'method' : 'ChannelsMenu.onClick'})
     def onClick(self, controlId):
@@ -1038,9 +1039,7 @@ class ChannelsMenu(xbmcgui.WindowXMLDialog):
             item.setProperty('idx', str(idx))
             listControl.addItem(item)
 
-    def updateListItem(self, idx, item = None):
-        if item is None:
-            item = xbmcgui.ListItem()
+    def updateListItem(self, idx, item):
         channel = self.channelList[idx]
         item.setLabel('%3d. %s' % (idx+1, channel.title))
 
@@ -1052,6 +1051,10 @@ class ChannelsMenu(xbmcgui.WindowXMLDialog):
         item.setProperty('idx', str(idx))
 
     def swapChannels(self, fromIdx, toIdx):
+        if self.swapInProgress:
+            return
+        self.swapInProgress = True
+
         c = self.channelList[fromIdx]
         self.channelList[fromIdx] = self.channelList[toIdx]
         self.channelList[toIdx] = c
@@ -1063,6 +1066,10 @@ class ChannelsMenu(xbmcgui.WindowXMLDialog):
         listControl = self.getControl(self.C_CHANNELS_LIST)
         self.updateListItem(fromIdx, listControl.getListItem(fromIdx))
         self.updateListItem(toIdx, listControl.getListItem(toIdx))
+
+        listControl.selectItem(toIdx)
+        xbmc.sleep(50)
+        self.swapInProgress = False
 
 
 
