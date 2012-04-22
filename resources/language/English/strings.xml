@@ -34,6 +34,10 @@
     <string id="30152">check settings or try again later...</string>
     <string id="30153">because the settings are invalid!</string>
 
+    <string id="30154">It looks like your current skin has a special</string>
+    <string id="30155">version of the TV Guide skin that is not up-to-date.</string>
+    <string id="30156">Please try with a different skin...</string>
+
     <string id="30200">on [B]%s[/B] in 5 minutes...</string>
     <string id="30201">on [B]%s[/B] is starting now...</string>
 

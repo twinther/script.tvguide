@@ -34,6 +34,10 @@
     <string id="30152">kontroller indstillingerne eller prøv igen senere...</string>
     <string id="30153">fordi indstillingerne er ugyldige!</string>
 
+    <string id="30154">Det ser ud til dit nuværende skin har en special</string>
+    <string id="30155">version af TV Guide skinnet som ikke er opdateret.</string>
+    <string id="30156">Prøv med et andet skin...</string>
+
     <string id="30200">på [B]%s[/B] om 5 minutter...</string>
     <string id="30201">på [B]%s[/B] starter nu...</string>
 

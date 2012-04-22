@@ -109,6 +109,22 @@ class SourceUpdater(threading.Thread):
             self.sourceUpdatedHandler.onEPGLoadError()
 
 
+class TimeBarMover(threading.Thread):
+    def __init__(self, gui):
+        """
+
+        @param gui:
+        @type gui: TVGuide
+        """
+        super(TimeBarMover, self).__init__()
+        self.gui = gui
+
+    @buggalo.buggalo_try_except({'method' : 'TimeBarMover.run'})
+    def run(self):
+        while not xbmc.abortRequested and not self.gui.isClosing:
+            self.gui.updateTimeBar()
+            xbmc.sleep(10000)
+
 class Point(object):
     def __init__(self):
         self.x = self.y = 0
@@ -184,6 +200,15 @@ class TVGuide(xbmcgui.WindowXML):
         self.viewStartDate = datetime.datetime.today()
         self.viewStartDate -= datetime.timedelta(minutes = self.viewStartDate.minute % 30, seconds = self.viewStartDate.second)
 
+    def getControl(self, controlId):
+        try:
+            return super(TVGuide, self).getControl(controlId)
+        except TypeError:
+            if not self.isClosing:
+                xbmcgui.Dialog().ok(buggalo.getRandomHeading(), strings(SKIN_ERROR_LINE1), strings(SKIN_ERROR_LINE2), strings(SKIN_ERROR_LINE3))
+                self.close()
+            return None
+
     def close(self):
         if not self.isClosing:
             self.isClosing = True
@@ -197,21 +222,23 @@ class TVGuide(xbmcgui.WindowXML):
     def onInit(self):
         self._hideControl(self.C_MAIN_MOUSE_CONTROLS, self.C_MAIN_OSD)
         self._showControl(self.C_MAIN_EPG, self.C_MAIN_LOADING)
-        self.getControl(self.C_MAIN_LOADING_TIME_LEFT).setLabel(strings(BACKGROUND_UPDATE_IN_PROGRESS))
-        self.setFocus(self.getControl(self.C_MAIN_LOADING_CANCEL))
+        self.setControlLabel(self.C_MAIN_LOADING_TIME_LEFT, strings(BACKGROUND_UPDATE_IN_PROGRESS))
+        self.setFocusId(self.C_MAIN_LOADING_CANCEL)
 
         control = self.getControl(self.C_MAIN_EPG_VIEW_MARKER)
-        left, top = control.getPosition()
-        self.focusPoint.x = left
-        self.focusPoint.y = top
-        self.epgView.left = left
-        self.epgView.top = top
-        self.epgView.right = left + control.getWidth()
-        self.epgView.bottom = top + control.getHeight()
-        self.epgView.width = control.getWidth()
-        self.epgView.cellHeight = control.getHeight() / CHANNELS_PER_PAGE
+        if control:
+            left, top = control.getPosition()
+            self.focusPoint.x = left
+            self.focusPoint.y = top
+            self.epgView.left = left
+            self.epgView.top = top
+            self.epgView.right = left + control.getWidth()
+            self.epgView.bottom = top + control.getHeight()
+            self.epgView.width = control.getWidth()
+            self.epgView.cellHeight = control.getHeight() / CHANNELS_PER_PAGE
 
         SourceInitializer(self).start()
+        TimeBarMover(self).start()
 
     @buggalo.buggalo_try_except({'method' : 'TVGuide.onAction'})
     def onAction(self, action):
@@ -416,6 +443,11 @@ class TVGuide(xbmcgui.WindowXML):
         elif buttonClicked == PopupMenu.C_POPUP_QUIT:
             self.close()
 
+    def setFocusId(self, controlId):
+        control = self.getControl(controlId)
+        if control:
+            self.setFocus(control)
+
     def setFocus(self, control):
         debug('setFocus %d' % control.getId())
         if control in [elem.control for elem in self.controlAndProgramList]:
@@ -439,21 +471,21 @@ class TVGuide(xbmcgui.WindowXML):
         if program is None:
             return
 
-        self.getControl(self.C_MAIN_TITLE).setLabel('[B]%s[/B]' % program.title)
-        self.getControl(self.C_MAIN_TIME).setLabel('[B]%s - %s[/B]' % (self.formatTime(program.startDate), self.formatTime(program.endDate)))
+        self.setControlLabel(self.C_MAIN_TITLE, '[B]%s[/B]' % program.title)
+        self.setControlLabel(self.C_MAIN_TIME, '[B]%s - %s[/B]' % (self.formatTime(program.startDate), self.formatTime(program.endDate)))
         if program.description:
-            self.getControl(self.C_MAIN_DESCRIPTION).setText(program.description)
+            description = program.description
         else:
-            self.getControl(self.C_MAIN_DESCRIPTION).setText(strings(NO_DESCRIPTION))
+            description = strings(NO_DESCRIPTION)
+        self.setControlText(self.C_MAIN_DESCRIPTION, description)
 
         if program.channel.logo is not None:
-            self.getControl(self.C_MAIN_LOGO).setImage(program.channel.logo)
-
+            self.setControlImage(self.C_MAIN_LOGO, program.channel.logo)
         if program.imageSmall is not None:
-            self.getControl(self.C_MAIN_IMAGE).setImage(program.imageSmall)
+            self.setControlImage(self.C_MAIN_IMAGE, program.imageSmall)
 
         if ADDON.getSetting('program.background.enabled') == 'true' and program.imageLarge is not None:
-            self.getControl(self.C_MAIN_BACKGROUND).setImage(program.imageLarge)
+            self.setControlImage(self.C_MAIN_BACKGROUND, program.imageLarge)
 
     def _left(self, currentFocus):
         control = self._findControlOnLeft(currentFocus)
@@ -474,7 +506,6 @@ class TVGuide(xbmcgui.WindowXML):
             self.onRedrawEPG(self.channelIdx, self.viewStartDate, focusFunction=self._findControlOnRight)
 
     def _up(self, currentFocus):
-        debug('_up')
         currentFocus.x = self.focusPoint.x
         control = self._findControlAbove(currentFocus)
         if control is not None:
@@ -543,14 +574,14 @@ class TVGuide(xbmcgui.WindowXML):
             self.osdChannel = self.currentChannel
 
         if self.osdProgram is not None:
-            self.getControl(self.C_MAIN_OSD_TITLE).setLabel('[B]%s[/B]' % self.osdProgram.title)
-            self.getControl(self.C_MAIN_OSD_TIME).setLabel('[B]%s - %s[/B]' % (self.formatTime(self.osdProgram.startDate), self.formatTime(self.osdProgram.endDate)))
-            self.getControl(self.C_MAIN_OSD_DESCRIPTION).setText(self.osdProgram.description)
-            self.getControl(self.C_MAIN_OSD_CHANNEL_TITLE).setLabel(self.osdChannel.title)
+            self.setControlLabel(self.C_MAIN_OSD_TITLE, '[B]%s[/B]' % self.osdProgram.title)
+            self.setControlLabel(self.C_MAIN_OSD_TIME, '[B]%s - %s[/B]' % (self.formatTime(self.osdProgram.startDate), self.formatTime(self.osdProgram.endDate)))
+            self.setControlText(self.C_MAIN_OSD_DESCRIPTION, self.osdProgram.description)
+            self.setControlLabel(self.C_MAIN_OSD_CHANNEL_TITLE, self.osdChannel.title)
             if self.osdProgram.channel.logo is not None:
-                self.getControl(self.C_MAIN_OSD_CHANNEL_LOGO).setImage(self.osdProgram.channel.logo)
+                self.setControlImage(self.C_MAIN_OSD_CHANNEL_LOGO, self.osdProgram.channel.logo)
             else:
-                self.getControl(self.C_MAIN_OSD_CHANNEL_LOGO).setImage('')
+                self.setControlImage(self.C_MAIN_OSD_CHANNEL_LOGO, '')
 
         self.mode = MODE_OSD
         self._showControl(self.C_MAIN_OSD)
@@ -573,18 +604,12 @@ class TVGuide(xbmcgui.WindowXML):
         self.redrawingEPG = True
         self.mode = MODE_EPG
         self._showControl(self.C_MAIN_EPG)
-
-        # move timebar to current time
-        timeDelta = datetime.datetime.today() - self.viewStartDate
-        c = self.getControl(self.C_MAIN_TIMEBAR)
-        (x, y) = c.getPosition()
-        c.setVisible(timeDelta.days == 0)
-        c.setPosition(self._secondsToXposition(timeDelta.seconds), y)
+        self.updateTimeBar()
 
         # show Loading screen
-        self.getControl(self.C_MAIN_LOADING_TIME_LEFT).setLabel(strings(CALCULATING_REMAINING_TIME))
+        self.setControlLabel(self.C_MAIN_LOADING_TIME_LEFT, strings(CALCULATING_REMAINING_TIME))
         self._showControl(self.C_MAIN_LOADING)
-        self.setFocus(self.getControl(self.C_MAIN_LOADING_CANCEL))
+        self.setFocusId(self.C_MAIN_LOADING_CANCEL)
 
         # remove existing controls
         self._clearEpg()
@@ -594,9 +619,9 @@ class TVGuide(xbmcgui.WindowXML):
             return
 
         # date and time row
-        self.getControl(self.C_MAIN_DATE).setLabel(self.formatDate(self.viewStartDate))
+        self.setControlLabel(self.C_MAIN_DATE, self.formatDate(self.viewStartDate))
         for col in range(1, 5):
-            self.getControl(4000 + col).setLabel(self.formatTime(startTime))
+            self.setControlLabel(4000 + col, self.formatTime(startTime))
             startTime += HALF_HOUR
 
         # channels
@@ -619,15 +644,15 @@ class TVGuide(xbmcgui.WindowXML):
         # set channel logo or text
         for idx in range(0, CHANNELS_PER_PAGE):
             if idx >= len(channelsToShow):
-                self.getControl(4110 + idx).setImage('')
-                self.getControl(4010 + idx).setLabel('')
+                self.setControlImage(4110 + idx, '')
+                self.setControlLabel(4010 + idx, '')
             else:
                 channel = channelsToShow[idx]
-                self.getControl(4010 + idx).setLabel(channel.title)
+                self.setControlLabel(4010 + idx, channel.title)
                 if channel.logo is not None:
-                    self.getControl(4110 + idx).setImage(channel.logo)
+                    self.setControlImage(4110 + idx, channel.logo)
                 else:
-                    self.getControl(4110 + idx).setImage('')
+                    self.setControlImage(4110 + idx, '')
 
         for program in programs:
             idx = channelsToShow.index(program.channel)
@@ -710,6 +735,14 @@ class TVGuide(xbmcgui.WindowXML):
                     pass # happens if we try to remove a control that doesn't exist
         del self.controlAndProgramList[:]
 
+    def updateTimeBar(self):
+        # move timebar to current time
+        timeDelta = datetime.datetime.today() - self.viewStartDate
+        control = self.getControl(self.C_MAIN_TIMEBAR)
+        if control:
+            (x, y) = control.getPosition()
+            control.setVisible(timeDelta.days == 0)
+            control.setPosition(self._secondsToXposition(timeDelta.seconds), y)
 
     def onEPGLoadError(self):
         self.redrawingEPG = False
@@ -727,28 +760,29 @@ class TVGuide(xbmcgui.WindowXML):
         self.source = source
         self.notification = Notification(self.source, ADDON.getAddonInfo('path'))
 
-        self.getControl(self.C_MAIN_IMAGE).setImage('tvguide-logo-%s.png' % self.source.KEY)
+        self.setControlImage(self.C_MAIN_IMAGE, 'tvguide-logo-%s.png' % self.source.KEY)
         self.onRedrawEPG(0, self.viewStartDate)
 
     def onSourceProgressUpdate(self, percentageComplete):
-        progressControl = self.getControl(self.C_MAIN_LOADING_PROGRESS)
-        timeLeftControl = self.getControl(self.C_MAIN_LOADING_TIME_LEFT)
+        control = self.getControl(self.C_MAIN_LOADING_PROGRESS)
         if percentageComplete < 1:
-            progressControl.setPercent(1)
+            if control:
+                control.setPercent(1)
             self.progressStartTime = datetime.datetime.now()
             self.progressPreviousPercentage = percentageComplete
         elif percentageComplete != self.progressPreviousPercentage:
-            progressControl.setPercent(percentageComplete)
+            if control:
+                control.setPercent(percentageComplete)
             self.progressPreviousPercentage = percentageComplete
             delta = datetime.datetime.now() - self.progressStartTime
 
             if percentageComplete < 20:
-                timeLeftControl.setLabel(strings(CALCULATING_REMAINING_TIME))
+                self.setControlLabel(self.C_MAIN_LOADING_TIME_LEFT, strings(CALCULATING_REMAINING_TIME))
             else:
                 secondsLeft = int(delta.seconds) / float(percentageComplete) * (100.0 - percentageComplete)
                 if secondsLeft > 30:
                     secondsLeft -= secondsLeft % 10
-                timeLeftControl.setLabel(strings(TIME_LEFT) % secondsLeft)
+                self.setControlLabel(self.C_MAIN_LOADING_TIME_LEFT, strings(TIME_LEFT) % secondsLeft)
 
         return not xbmc.abortRequested and not self.isClosing
 
@@ -853,14 +887,18 @@ class TVGuide(xbmcgui.WindowXML):
         Visibility is inverted in skin
         """
         for controlId in controlIds:
-            self.getControl(controlId).setVisible(True)
+            control = self.getControl(controlId)
+            if control:
+                control.setVisible(True)
 
     def _showControl(self, *controlIds):
         """
         Visibility is inverted in skin
         """
         for controlId in controlIds:
-            self.getControl(controlId).setVisible(False)
+            control = self.getControl(controlId)
+            if control:
+                control.setVisible(False)
 
     def formatTime(self, timestamp):
         format = xbmc.getRegion('time').replace(':%S', '')
@@ -869,6 +907,22 @@ class TVGuide(xbmcgui.WindowXML):
     def formatDate(self, timestamp):
         format = xbmc.getRegion('dateshort')
         return timestamp.strftime(format)
+
+    def setControlImage(self, controlId, image):
+        control = self.getControl(controlId)
+        if control:
+            control.setImage(image)
+
+    def setControlLabel(self, controlId, label):
+        control = self.getControl(controlId)
+        if control:
+            control.setLabel(label)
+
+    def setControlText(self, controlId, text):
+        control = self.getControl(controlId)
+        if control:
+            control.setText(text)
+
 
 class PopupMenu(xbmcgui.WindowXMLDialog):
     C_POPUP_PLAY = 4000
