@@ -440,7 +440,7 @@ class TVGuide(xbmcgui.WindowXML):
             return
 
         self.getControl(self.C_MAIN_TITLE).setLabel('[B]%s[/B]' % program.title)
-        self.getControl(self.C_MAIN_TIME).setLabel('[B]%s - %s[/B]' % (program.startDate.strftime(xbmc.getRegion('time')), program.endDate.strftime(xbmc.getRegion('time'))))
+        self.getControl(self.C_MAIN_TIME).setLabel('[B]%s - %s[/B]' % (self.formatTime(program.startDate), self.formatTime(program.endDate)))
         if program.description:
             self.getControl(self.C_MAIN_DESCRIPTION).setText(program.description)
         else:
@@ -544,7 +544,7 @@ class TVGuide(xbmcgui.WindowXML):
 
         if self.osdProgram is not None:
             self.getControl(self.C_MAIN_OSD_TITLE).setLabel('[B]%s[/B]' % self.osdProgram.title)
-            self.getControl(self.C_MAIN_OSD_TIME).setLabel('[B]%s - %s[/B]' % (self.osdProgram.startDate.strftime(xbmc.getRegion('time')), self.osdProgram.endDate.strftime(xbmc.getRegion('time'))))
+            self.getControl(self.C_MAIN_OSD_TIME).setLabel('[B]%s - %s[/B]' % (self.formatTime(self.osdProgram.startDate), self.formatTime(self.osdProgram.endDate)))
             self.getControl(self.C_MAIN_OSD_DESCRIPTION).setText(self.osdProgram.description)
             self.getControl(self.C_MAIN_OSD_CHANNEL_TITLE).setLabel(self.osdChannel.title)
             if self.osdProgram.channel.logo is not None:
@@ -594,9 +594,9 @@ class TVGuide(xbmcgui.WindowXML):
             return
 
         # date and time row
-        self.getControl(self.C_MAIN_DATE).setLabel(self.viewStartDate.strftime(xbmc.getRegion('dateshort')))
+        self.getControl(self.C_MAIN_DATE).setLabel(self.formatDate(self.viewStartDate))
         for col in range(1, 5):
-            self.getControl(4000 + col).setLabel(startTime.strftime(xbmc.getRegion('time')))
+            self.getControl(4000 + col).setLabel(self.formatTime(startTime))
             startTime += HALF_HOUR
 
         # channels
@@ -861,6 +861,14 @@ class TVGuide(xbmcgui.WindowXML):
         """
         for controlId in controlIds:
             self.getControl(controlId).setVisible(False)
+
+    def formatTime(self, timestamp):
+        format = xbmc.getRegion('time').replace(':%S', '')
+        return timestamp.strftime(format)
+
+    def formatDate(self, timestamp):
+        format = xbmc.getRegion('dateshort')
+        return timestamp.strftime(format)
 
 class PopupMenu(xbmcgui.WindowXMLDialog):
     C_POPUP_PLAY = 4000
