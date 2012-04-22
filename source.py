@@ -324,16 +324,19 @@ class Source(object):
         return channelList
 
     def _isChannelListCacheExpired(self):
-        c = self.conn.cursor()
-        c.execute('SELECT channels_updated FROM sources WHERE id=?', [self.KEY])
-        row = c.fetchone()
-        if not row:
-            return True
-        lastUpdated = row['channels_updated']
-        c.close()
+        try:
+            c = self.conn.cursor()
+            c.execute('SELECT channels_updated FROM sources WHERE id=?', [self.KEY])
+            row = c.fetchone()
+            if not row:
+                return True
+            lastUpdated = row['channels_updated']
+            c.close()
 
-        today = datetime.datetime.now()
-        return lastUpdated.day != today.day
+            today = datetime.datetime.now()
+            return lastUpdated.day != today.day
+        except TypeError:
+            return True
 
     def getCurrentProgram(self, channel):
         """
@@ -719,13 +722,16 @@ class XMLTVSource(Source):
         if delta.seconds < 300:
             return False
 
-        c = self.conn.cursor()
-        c.execute('SELECT channels_updated FROM sources WHERE id=?', [self.KEY])
-        row = c.fetchone()
-        if not row:
+        try:
+            c = self.conn.cursor()
+            c.execute('SELECT channels_updated FROM sources WHERE id=?', [self.KEY])
+            row = c.fetchone()
+            if not row:
+                return True
+            lastUpdated = row['channels_updated']
+            c.close()
+        except TypeError:
             return True
-        lastUpdated = row['channels_updated']
-        c.close()
 
         fileModified = datetime.datetime.fromtimestamp(os.path.getmtime(self.xmlTvFile))
         return fileModified > lastUpdated
