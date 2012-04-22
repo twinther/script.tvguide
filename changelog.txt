@@ -1,5 +1,6 @@
 [B]Version 1.3.5 - 2012-04-xx[/B]
 - Fixed key-repeat problem when re-ordering channels
+- Fixed problem with parsing some XMLTV dates
 
 [B]Version 1.3.4 - 2012-04-11[/B]
 - Minor fixed from buggalo error reports

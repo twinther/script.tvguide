@@ -751,9 +751,14 @@ class ONTVSource(Source):
 
 
 def parseXMLTVDate(dateString):
-    dateStringWithoutTimeZone = dateString[:-6]
-    t = time.strptime(dateStringWithoutTimeZone, '%Y%m%d%H%M%S')
-    return datetime.datetime(t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec)
+    if dateString is not None:
+        if dateString.find(' ') != -1:
+            # remove timezone information
+            dateString = dateString[:dateString.find(' ')]
+        t = time.strptime(dateString, '%Y%m%d%H%M%S')
+        return datetime.datetime(t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec)
+    else:
+        return None
 
 def parseXMLTV(context, f, size, logoFolder, progress_callback):
     event, root = context.next()
