@@ -39,6 +39,7 @@ STREAM_DR_UPDATE = 'plugin://plugin.video.dr.dk.live/?playChannel=3'
 STREAM_DR_K = 'plugin://plugin.video.dr.dk.live/?playChannel=4'
 STREAM_DR_RAMASJANG = 'plugin://plugin.video.dr.dk.live/?playChannel=5'
 STREAM_DR_HD = 'plugin://plugin.video.dr.dk.live/?playChannel=6'
+STREAM_KANAL_SPORT = 'plugin://plugin.video.dr.dk.live/?playChannel=203'
 
 SETTINGS_TO_CHECK = ['source', 'youseetv.category', 'youseewebtv.playback', 'danishlivetv.playback', 'xmltv.file',
                      'xmltv.logo.folder', 'ontv.url']
@@ -218,7 +219,8 @@ class Source(object):
                         channel.streamUrl = self.STREAMS[channel.id]
                     c.execute('INSERT OR IGNORE INTO channels(id, title, logo, stream_url, visible, weight, source) VALUES(?, ?, ?, ?, ?, (CASE ? WHEN -1 THEN (SELECT COALESCE(MAX(weight)+1, 0) FROM channels WHERE source=?) ELSE ? END), ?)', [channel.id, channel.title, channel.logo, channel.streamUrl, channel.visible, channel.weight, self.KEY, channel.weight, self.KEY])
                     if not c.rowcount:
-                        c.execute('UPDATE channels SET title=?, logo=?, stream_url=?, visible=?, weight=(CASE ? WHEN -1 THEN weight ELSE ? END) WHERE id=? AND source=?', [channel.title, channel.logo, channel.streamUrl, channel.visible, channel.weight, channel.weight, channel.id, self.KEY])
+                        c.execute('UPDATE channels SET title=?, logo=?, stream_url=?, visible=(CASE ? WHEN -1 THEN visible ELSE ? END), weight=(CASE ? WHEN -1 THEN weight ELSE ? END) WHERE id=? AND source=?',
+                            [channel.title, channel.logo, channel.streamUrl, channel.weight, channel.visible, channel.weight, channel.weight, channel.id, self.KEY])
 
                 elif isinstance(item, Program):
                     imported_programs += 1
@@ -534,7 +536,7 @@ class DrDkSource(Source):
         'dr.dk/external/ritzau/ channel/dru' : STREAM_DR_UPDATE,
         'dr.dk/mas/whatson/channel/TVR' : STREAM_DR_RAMASJANG,
         'dr.dk/mas/whatson/channel/TVK' : STREAM_DR_K,
-        'dr.dk/mas/whatson/channel/TV' : STREAM_DR_HD
+        'dr.dk/mas/whatson/channel/TVH' : STREAM_DR_HD
     }
 
     def __init__(self, addon, cachePath):
@@ -577,7 +579,8 @@ class YouSeeTvSource(Source):
         889 : STREAM_DR_UPDATE,
         505: STREAM_DR_RAMASJANG,
         504 : STREAM_DR_K,
-        503 : STREAM_DR_HD
+        503 : STREAM_DR_HD,
+        67 : STREAM_KANAL_SPORT
     }
 
     def __init__(self, addon, cachePath):
