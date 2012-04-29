@@ -67,8 +67,8 @@
     <!-- weeb.tv mod -->
     <string id="30800">Adres JSON-EPG</string>
     <string id="30801">Odtwarzaj kanały używając wtyczki Weeb.Tv</string>
-    <string id="30402">TV Guide jest skonfigurowany aby używać dodatku Weeb.Tv</string>
-    <string id="30403">który nie jest zainstalowany.</string>
-    <string id="30404">Odtwarzanie za pomocą tego dodatku zostało wyłączone.</string>
+    <string id="30802">TV Guide jest skonfigurowany aby używać dodatku Weeb.Tv</string>
+    <string id="30803">który nie jest zainstalowany.</string>
+    <string id="30804">Odtwarzanie za pomocą tego dodatku zostało wyłączone.</string>
 </strings>
 

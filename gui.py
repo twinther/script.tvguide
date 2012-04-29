@@ -180,6 +180,7 @@ class TVGuide(xbmcgui.WindowXML):
         self.redrawingEPG = False
         self.isClosing = False
         self.controlAndProgramList = list()
+        self.ignoreMissingControlIds = list()
         self.channelIdx = 0
         self.focusPoint = Point()
         self.epgView = EPGView()
@@ -203,8 +204,9 @@ class TVGuide(xbmcgui.WindowXML):
     def getControl(self, controlId):
         try:
             return super(TVGuide, self).getControl(controlId)
-        except TypeError: # it seems to be buggy while performing fast scrolling
-            return None
+        except TypeError:
+            if controlId in self.ignoreMissingControlIds:
+                return None
             if not self.isClosing:
                 xbmcgui.Dialog().ok(buggalo.getRandomHeading(), strings(SKIN_ERROR_LINE1), strings(SKIN_ERROR_LINE2), strings(SKIN_ERROR_LINE3))
                 self.close()
@@ -710,6 +712,7 @@ class TVGuide(xbmcgui.WindowXML):
                     debug('onRedrawEPG - setFocus %d' % focusControl.getId())
                     self.setFocus(focusControl)
 
+        self.ignoreMissingControlIds.extend([elem.control.getId() for elem in self.controlAndProgramList])
 
         if focusControl is None and len(self.controlAndProgramList) > 0:
             self.setFocus(self.controlAndProgramList[0].control)

@@ -67,8 +67,8 @@
     <!-- weeb.tv mod -->
     <string id="30800">JSON-EPG URL</string>
     <string id="30801">Play channels using the Weeb.Tv addon</string>
-    <string id="30402">TV Guide is configured to stream using Weeb.Tv</string>
-    <string id="30403">addon which is not installed.</string>
-    <string id="30404">Streaming using that addon is now disabled.</string>
+    <string id="30802">TV Guide is configured to stream using Weeb.Tv</string>
+    <string id="30803">addon which is not installed.</string>
+    <string id="30804">Streaming using that addon is now disabled.</string>
 </strings>
 
