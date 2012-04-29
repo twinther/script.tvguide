@@ -203,7 +203,8 @@ class TVGuide(xbmcgui.WindowXML):
     def getControl(self, controlId):
         try:
             return super(TVGuide, self).getControl(controlId)
-        except TypeError:
+        except TypeError: # it seems to be buggy while performing fast scrolling
+            return None
             if not self.isClosing:
                 xbmcgui.Dialog().ok(buggalo.getRandomHeading(), strings(SKIN_ERROR_LINE1), strings(SKIN_ERROR_LINE2), strings(SKIN_ERROR_LINE3))
                 self.close()

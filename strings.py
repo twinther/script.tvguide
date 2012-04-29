@@ -60,6 +60,10 @@ DANISH_LIVE_TV_MISSING_1 = 30403
 DANISH_LIVE_TV_MISSING_2 = 30404
 DANISH_LIVE_TV_MISSING_3 = 30405
 
+WEEBTV_WEBTV_MISSING_1 = 30802
+WEEBTV_WEBTV_MISSING_2 = 30803
+WEEBTV_WEBTV_MISSING_3 = 30804
+
 def strings(id, replacements = None):
     string = ADDON.getLocalizedString(id)
     if replacements is not None:

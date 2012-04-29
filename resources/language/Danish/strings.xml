@@ -63,5 +63,12 @@
     <string id="30501">Flyt op og ned for at ændre placering.[CR]Vælg eller flyt til venstre for at gemme[CR]placeringen.</string>
     <string id="30502">Gem</string>
     <string id="30503">Annuller</string>
+
+    <!-- weeb.tv mod -->
+    <string id="30800">JSON-EPG URL</string>
+    <string id="30801">Afspil kanaler via Weeb.Tv addon</string>
+    <string id="30402">TV guiden er indstillet til at streame TV Weeb.Tv,</string>
+    <string id="30403">men denne addon er ikke installeret.</string>
+    <string id="30404">Streaming via denne addon deaktiveres nu.</string>
 </strings>
  

@@ -42,7 +42,7 @@ STREAM_DR_HD = 'plugin://plugin.video.dr.dk.live/?playChannel=6'
 STREAM_KANAL_SPORT = 'plugin://plugin.video.dr.dk.live/?playChannel=203'
 
 SETTINGS_TO_CHECK = ['source', 'youseetv.category', 'youseewebtv.playback', 'danishlivetv.playback', 'xmltv.file',
-                     'xmltv.logo.folder', 'ontv.url']
+                     'xmltv.logo.folder', 'ontv.url', 'json.url']
 
 class Channel(object):
     def __init__(self, id, title, logo = None, streamUrl = None, visible = True, weight = -1):
@@ -165,6 +165,7 @@ class Source(object):
 
         c.close()
         print 'Settings changed: ' + str(settingsChanged)
+        #return True # Uncomment to force cache regeneration every run, for debug prp only
         return settingsChanged
 
     def getDataFromExternal(self, date, progress_callback = None):
@@ -759,6 +760,95 @@ class ONTVSource(Source):
         return self._isChannelListCacheExpired()
 
 
+class JSONSource(Source):
+    KEY = 'json-url'
+
+    def __init__(self, addon, cachePath):
+        super(JSONSource, self).__init__(addon, cachePath)
+        self.playbackUsingWeebTv = False
+        self.JSONURL = addon.getSetting('json.url')
+
+        if not addon.getSetting('json.url'):
+            raise SourceNotConfiguredException()
+                    
+        try:
+            if addon.getSetting('weebtv.playback') == 'true':
+                xbmcaddon.Addon(id = 'plugin.video.weeb.tv') # raises Exception if addon is not installed
+                self.playbackUsingWeebTv = True
+        except Exception:
+            ADDON.setSetting('weebtv.playback', 'false')
+            xbmcgui.Dialog().ok(ADDON.getAddonInfo('name'), strings(WEEBTV_WEBTV_MISSING_1),
+                strings(WEEBTV_WEBTV_MISSING_2), strings(WEEBTV_WEBTV_MISSING_3))
+
+    def getDataFromExternal(self, date, progress_callback = None):
+        url = self.JSONURL + '?d=' + date.strftime('%Y-%m-%d')
+        print 'Load JSON URL: ' + url
+        try:
+            r = urllib2.Request(url)
+            u = urllib2.urlopen(r)
+            json = u.read()
+            u.close()
+
+            channels = simplejson.loads(json)
+        except urllib2.URLError, e:
+            raise SourceException('Failed to fetch JSON: ' + str(e))
+        except Exception:
+            raise SourceException('Invalid JSON source (failed to parse output)')
+        
+        
+        for idx, ch in enumerate(channels):
+                try:
+                 print 'Parsing channel: ' + ch['n'].encode("utf-8","ignore")
+                except KeyError:
+                 print ch
+            #try:           
+                if ch.has_key('l') and ch['l'] is not None: # Channel logo
+                    ch['l'] = str(ch['l'])
+                else:
+                    ch['l'] = None
+                
+                c = Channel(id = ch['i'], title = ch['n'], logo = ch['l'])
+                
+                if self.playbackUsingWeebTv and ch.has_key('c') and ch['c'] is not None: # channel numeric id
+                    c.streamUrl = 'plugin://plugin.video.weeb.tv/?mode=2&action=1&cid=' + str(ch['c']) + '&title=' + str(ch['n'])
+                yield c
+                
+                print 'Found ' + str(len(ch['p'])) + ' programs'
+                if ch.has_key('p') and len(ch['p']) > 0:
+                    for pr in ch['p']:
+                        #print 'Parsing program: ' + pr['t'].encode("utf-8","ignore")
+                        if pr.has_key('d') and pr['d'] is not None: # program description
+                            description = pr['d']
+                        else:
+                            description = strings(NO_DESCRIPTION)
+
+                        if not pr.has_key('l'): # large program image
+                            pr['l'] = None
+                                                    
+                        if not pr.has_key('i'): # small program image aka icon
+                            pr['i'] = None
+                            
+                        p = Program(
+                            c,
+                            pr['t'],
+                            self._parseDate(pr['s']),
+                            self._parseDate(pr['e']),
+                            description,
+                            pr['l'],
+                            pr['i']
+                        )
+                        yield p
+            
+           
+                    if progress_callback:
+                        if not progress_callback(100.0 / len(channels) * idx):
+                            raise SourceUpdateCanceledException()
+            #except Exception:
+            #    raise SourceException('External JSON looks invalid, error detected in element ' + str(idx))
+              
+    def _parseDate(self, dateString):
+        return datetime.datetime.fromtimestamp(dateString)
+
 def parseXMLTVDate(dateString):
     if dateString is not None:
         if dateString.find(' ') != -1:
@@ -817,7 +907,8 @@ def instantiateSource(addon):
         'DR.dk' : DrDkSource,
         'TVTID.dk' : TvTidSource,
         'XMLTV' : XMLTVSource,
-        'ONTV.dk' : ONTVSource
+        'ONTV.dk' : ONTVSource,
+        'JSON-URL' : JSONSource
     }
 
     cachePath = xbmc.translatePath(ADDON.getAddonInfo('profile'))
