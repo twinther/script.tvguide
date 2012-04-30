@@ -64,6 +64,10 @@ WEEBTV_WEBTV_MISSING_1 = 30802
 WEEBTV_WEBTV_MISSING_2 = 30803
 WEEBTV_WEBTV_MISSING_3 = 30804
 
+DATABASE_SCHEMA_ERROR_1 = 30157
+DATABASE_SCHEMA_ERROR_2 = 30158
+DATABASE_SCHEMA_ERROR_3 = 30159
+
 def strings(id, replacements = None):
     string = ADDON.getLocalizedString(id)
     if replacements is not None:

@@ -123,7 +123,7 @@ class TimeBarMover(threading.Thread):
     def run(self):
         while not xbmc.abortRequested and not self.gui.isClosing:
             self.gui.updateTimeBar()
-            xbmc.sleep(3000)
+            xbmc.sleep(500)
 
 class Point(object):
     def __init__(self):

@@ -38,6 +38,10 @@
     <string id="30155">version af TV Guide skinnet som ikke er opdateret.</string>
     <string id="30156">Prøv med et andet skin...</string>
 
+    <string id="30157">Det ser ud til TV Guidens database er gået i stykker.</string>
+    <string id="30158">Database vil blive slettet og oprettet på ny.</string>
+    <string id="30159">Kanalopsætning, mv. går desværre tabt.</string>
+
     <string id="30200">på [B]%s[/B] om 5 minutter...</string>
     <string id="30201">på [B]%s[/B] starter nu...</string>
 

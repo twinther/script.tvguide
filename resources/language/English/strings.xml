@@ -38,6 +38,10 @@
     <string id="30155">version of the TV Guide skin that is not up-to-date.</string>
     <string id="30156">Please try with a different skin...</string>
 
+    <string id="30157">It looks like the TV Guide database is broken.</string>
+    <string id="30158">The database will be deleted and recreated.</string>
+    <string id="30159">Channel configuration, etc. is unfortunately lost.</string>
+
     <string id="30200">on [B]%s[/B] in 5 minutes...</string>
     <string id="30201">on [B]%s[/B] is starting now...</string>
 
