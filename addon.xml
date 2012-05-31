@@ -16,5 +16,6 @@
         <description lang="da">TV guiden giver dig et overblik over hvad der er på TV lige nu, så slipper du for at zappe væk fra XBMC![CR]EPG data kan indlæses fra YouSee.tv, DR.dk, TvTid.dk, XMLTV fil,  eller en ekstern JSON kilde.[CR][CR]Naviger med piletasterne og skift side med kanal + og -.[CR][CR]Har du kommentarer, ris eller ros til denne addon er du velkommen til at delta    ge i debatten på min blog på http://tommy.winther.nu</description>
         <description lang="pl">Program TV Guide pokazuje Ci co aktualnie leci w telewizji - teraz już nie musisz zmieniać kanału z XBMC![CR]Dane na temat EPG mogą być pobierane z YouSee.tv, DR.dk, TvTid.dk, pliuk XMLTV lub zewnętrznego źródła JSON.[CR][CR]Aby poruszać się po interfejsie użyj klawiszy strzałek, możesz także zmieniać kanały za pomocą + / -.[CR][CR]Jeśli masz jakiś komentarz lub sugestie dotyczące tego dodatku będę wdzięczny jeśli podzielisz się nimi z e mną na blogu http://tommy.winther.nu</description>
         <platform>all</platform>
+        <language></language>
     </extension>
 </addon>
