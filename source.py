@@ -481,9 +481,13 @@ class Source(object):
     def playInThread(self, channel, playBackStoppedHandler):
         customStreamUrl = self.getCustomStreamUrl(channel)
         if customStreamUrl:
-            customStreamUrl = customStreamUrl.encode('utf-8', 'ignore')
-            xbmc.log("Playing custom stream url: %s" % customStreamUrl)
-            self.player.play(item = customStreamUrl, windowed=True)
+            if customStreamUrl[0:9] == 'PlayMedia' or customStreamUrl[0:14] == 'ActivateWindow':
+                xbmc.log("Playing custom url using executebuiltin: %s" % customStreamUrl)
+                xbmc.executebuiltin(customStreamUrl)
+            else:
+                customStreamUrl = customStreamUrl.encode('utf-8', 'ignore')
+                xbmc.log("Playing custom stream url: %s" % customStreamUrl)
+                self.player.play(item = customStreamUrl, windowed=True)
 
         elif channel.isPlayable():
             streamUrl = channel.streamUrl.encode('utf-8', 'ignore')
@@ -726,6 +730,9 @@ class XMLTVSource(Source):
         xbmc.log('[script.tvguide] Caching XMLTV file...')
         xbmcvfs.copy(addon.getSetting('xmltv.file'), tempFile)
 
+        if not os.path.exists(tempFile):
+            raise SourceException('XML TV file was not cached, does it exist?')
+
         # if xmlTvFile doesn't exists or the file size is different from tempFile
         # we copy the tempFile to xmlTvFile which in turn triggers a reload in self._isChannelListCacheExpired(..)
         if not os.path.exists(self.xmlTvFile) or os.path.getsize(self.xmlTvFile) != os.path.getsize(tempFile):
@@ -904,7 +911,7 @@ def parseXMLTV(context, f, size, logoFolder, progress_callback):
                 title = elem.findtext("display-name")
                 logo = None
                 if logoFolder:
-                    logoFile = os.path.join(logoFolder, title + '.png')
+                    logoFile = os.path.join(logoFolder.encode('utf-8', 'ignore'), title.encode('utf-8', 'ignore') + '.png')
                     if xbmcvfs.exists(logoFile):
                         logo = logoFile
                 if not logo:

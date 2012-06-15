@@ -68,6 +68,19 @@
     <string id="30502">Save</string>
     <string id="30503">Cancel</string>
 
+    <string id="30600">[B]Setup stream[/B]</string>
+    <string id="30601">.strm file</string>
+    <string id="30602">Favourites</string>
+    <string id="30603">Addons</string>
+    <string id="30604">Preview stream</string>
+    <string id="30605">Save</string>
+    <string id="30606">Cancel</string>
+
+    <string id="30610">Browse...</string>
+    <string id="30611">Click Browse... below and navigate to your stream file. When you have chosen your file you can preview the stream to test if it works in XBMC.</string>
+
+    <string id="30620">Choose a favourite below. Only [I]PlayMedia[/I] favourites are supported.</string>
+
     <!-- weeb.tv mod -->
     <string id="30800">JSON-EPG URL</string>
     <string id="30801">Play channels using the Weeb.Tv addon</string>

@@ -19,6 +19,7 @@
 #
 import datetime
 import threading
+import os
 
 import xbmc
 import xbmcgui
@@ -27,6 +28,10 @@ import source as src
 from notification import Notification
 from strings import *
 import buggalo
+
+from xml.etree import ElementTree
+from xml.parsers.expat import ExpatError
+import ConfigParser
 
 DEBUG = False
 
@@ -63,6 +68,34 @@ ADDON = xbmcaddon.Addon(id = 'script.tvguide')
 
 def debug(s):
     if DEBUG: xbmc.log(str(s), xbmc.LOGDEBUG)
+
+def loadFavouritesXml():
+    entries = list()
+    path = xbmc.translatePath('special://userdata/favourites.xml')
+    if os.path.exists(path):
+        f = open(path)
+        xml = f.read()
+        f.close()
+
+        try:
+            doc = ElementTree.fromstring(xml)
+            for node in doc.findall('favourite'):
+                entries.append((node.get('name'), node.text))
+        except ExpatError:
+            pass
+
+    return entries
+
+def getAddonsParser():
+    """
+    @return ConfigParser.ConfigParser
+    """
+    path = os.path.join(ADDON.getAddonInfo('path'), 'resources', 'addons.ini')
+    parser = ConfigParser.ConfigParser()
+    parser.optionxform = lambda option: option
+    parser.read(path)
+    return parser
+
 
 class SourceInitializer(threading.Thread):
     def __init__(self, sourceInitializedHandler):
@@ -428,10 +461,10 @@ class TVGuide(xbmcgui.WindowXML):
 
             self.onRedrawEPG(self.channelIdx, self.viewStartDate)
 
-        elif buttonClicked == PopupMenu.C_POPUP_CHOOSE_STRM:
-            filename = xbmcgui.Dialog().browse(1, ADDON.getLocalizedString(30304), 'video', '.strm')
-            if filename:
-                self.source.setCustomStreamUrl(program.channel, filename)
+        elif buttonClicked == PopupMenu.C_POPUP_CHOOSE_STREAM:
+            d = StreamSetupDialog(self.source, program.channel)
+            d.doModal()
+            del d
 
         elif buttonClicked == PopupMenu.C_POPUP_PLAY:
             if self.source.isPlayable(program.channel):
@@ -928,9 +961,11 @@ class TVGuide(xbmcgui.WindowXML):
             control.setText(text)
 
 
+
+
 class PopupMenu(xbmcgui.WindowXMLDialog):
     C_POPUP_PLAY = 4000
-    C_POPUP_CHOOSE_STRM = 4001
+    C_POPUP_CHOOSE_STREAM = 4001
     C_POPUP_REMIND = 4002
     C_POPUP_CHANNELS = 4003
     C_POPUP_QUIT = 4004
@@ -966,9 +1001,9 @@ class PopupMenu(xbmcgui.WindowXMLDialog):
         playControl.setLabel(strings(WATCH_CHANNEL, self.program.channel.title))
         if not self.source.isPlayable(self.program.channel):
             playControl.setEnabled(False)
-            self.setFocusId(self.C_POPUP_CHOOSE_STRM)
+            self.setFocusId(self.C_POPUP_CHOOSE_STREAM)
         if self.source.getCustomStreamUrl(self.program.channel):
-            chooseStrmControl = self.getControl(self.C_POPUP_CHOOSE_STRM)
+            chooseStrmControl = self.getControl(self.C_POPUP_CHOOSE_STREAM)
             chooseStrmControl.setLabel(strings(REMOVE_STRM_FILE))
 
         if self.program.channel.logo is not None:
@@ -993,9 +1028,9 @@ class PopupMenu(xbmcgui.WindowXMLDialog):
 
     @buggalo.buggalo_try_except({'method' : 'PopupMenu.onClick'})
     def onClick(self, controlId):
-        if controlId == self.C_POPUP_CHOOSE_STRM and self.source.getCustomStreamUrl(self.program.channel):
+        if controlId == self.C_POPUP_CHOOSE_STREAM and self.source.getCustomStreamUrl(self.program.channel):
             self.source.deleteCustomStreamUrl(self.program.channel)
-            chooseStrmControl = self.getControl(self.C_POPUP_CHOOSE_STRM)
+            chooseStrmControl = self.getControl(self.C_POPUP_CHOOSE_STREAM)
             chooseStrmControl.setLabel(strings(CHOOSE_STRM_FILE))
 
             if not self.source.isPlayable(self.program.channel):
@@ -1008,7 +1043,6 @@ class PopupMenu(xbmcgui.WindowXMLDialog):
 
     def onFocus(self, controlId):
         pass
-
 
 class ChannelsMenu(xbmcgui.WindowXMLDialog):
     C_CHANNELS_LIST = 6000
@@ -1136,6 +1170,183 @@ class ChannelsMenu(xbmcgui.WindowXMLDialog):
         listControl.selectItem(toIdx)
         xbmc.sleep(50)
         self.swapInProgress = False
+
+
+
+class StreamSetupDialog(xbmcgui.WindowXMLDialog):
+    C_STREAM_STRM_TAB = 101
+    C_STREAM_FAVOURITES_TAB = 102
+    C_STREAM_ADDONS_TAB = 103
+    C_STREAM_STRM_BROWSE = 1001
+    C_STREAM_STRM_FILE_LABEL = 1005
+    C_STREAM_STRM_PREVIEW = 1002
+    C_STREAM_STRM_OK = 1003
+    C_STREAM_STRM_CANCEL = 1004
+    C_STREAM_FAVOURITES = 2001
+    C_STREAM_FAVOURITES_PREVIEW = 2002
+    C_STREAM_FAVOURITES_OK = 2003
+    C_STREAM_FAVOURITES_CANCEL = 2004
+    C_STREAM_ADDONS = 3001
+    C_STREAM_ADDONS_STREAMS = 3002
+    C_STREAM_ADDONS_NAME = 3003
+    C_STREAM_ADDONS_DESCRIPTION = 3004
+    C_STREAM_ADDONS_PREVIEW = 3005
+    C_STREAM_ADDONS_OK = 3006
+    C_STREAM_ADDONS_CANCEL = 3007
+
+    C_STREAM_VISIBILITY_MARKER = 100
+
+    VISIBLE_STRM = 'strm'
+    VISIBLE_FAVOURITES = 'favourites'
+    VISIBLE_ADDONS = 'addons'
+
+    def __new__(cls, source, channel):
+        return super(StreamSetupDialog, cls).__new__(cls, 'script-tvguide-streamsetup.xml', ADDON.getAddonInfo('path'))
+
+    def __init__(self, source, channel):
+        """
+        @type source: source.Source
+        @type channel:source.Channel
+        """
+        super(StreamSetupDialog, self).__init__()
+        self.source = source
+        self.channel = channel
+
+        self.addonsParser = getAddonsParser()
+        self.player = xbmc.Player()
+        self.previousAddonId = None
+        self.strmFile = None
+
+    def close(self):
+        if self.player.isPlaying():
+            self.player.stop()
+        super(StreamSetupDialog, self).close()
+
+    @buggalo.buggalo_try_except({'method' : 'StreamSetupDialog.onInit'})
+    def onInit(self):
+        self.getControl(self.C_STREAM_VISIBILITY_MARKER).setLabel(self.VISIBLE_STRM)
+
+        favourites = loadFavouritesXml()
+        items = list()
+        for label, value in favourites:
+            item = xbmcgui.ListItem(label)
+            item.setProperty('stream', value)
+            items.append(item)
+
+        listControl = self.getControl(StreamSetupDialog.C_STREAM_FAVOURITES)
+        listControl.addItems(items)
+
+        items = list()
+        for id in self.addonsParser.sections():
+            addon = xbmcaddon.Addon(id)
+            item = xbmcgui.ListItem(addon.getAddonInfo('name'), iconImage=addon.getAddonInfo('icon'))
+            item.setProperty('addon_id', id)
+            items.append(item)
+        listControl = self.getControl(StreamSetupDialog.C_STREAM_ADDONS)
+        listControl.addItems(items)
+        self.updateAddonInfo()
+
+
+    @buggalo.buggalo_try_except({'method' : 'StreamSetupDialog.onAction'})
+    def onAction(self, action):
+        print action.getId()
+
+        if action.getId() in [ACTION_PARENT_DIR, ACTION_PREVIOUS_MENU, KEY_NAV_BACK, KEY_CONTEXT_MENU]:
+            self.close()
+            return
+
+        elif self.getFocusId() == self.C_STREAM_ADDONS:
+            self.updateAddonInfo()
+
+
+    @buggalo.buggalo_try_except({'method' : 'StreamSetupDialog.onClick'})
+    def onClick(self, controlId):
+        if controlId == self.C_STREAM_STRM_BROWSE:
+            stream = xbmcgui.Dialog().browse(1, ADDON.getLocalizedString(30304), 'video', '.strm')
+            if stream:
+                self.source.setCustomStreamUrl(self.channel, stream)
+                self.getControl(self.C_STREAM_STRM_FILE_LABEL).setText(stream)
+                self.strmFile = stream
+
+        elif controlId == self.C_STREAM_ADDONS_OK:
+            listControl = self.getControl(self.C_STREAM_ADDONS_STREAMS)
+            item = listControl.getSelectedItem()
+            stream = item.getProperty('stream')
+            self.source.setCustomStreamUrl(self.channel, stream)
+            self.close()
+
+        elif controlId == self.C_STREAM_FAVOURITES_OK:
+            listControl = self.getControl(self.C_STREAM_FAVOURITES)
+            item = listControl.getSelectedItem()
+            stream = item.getProperty('stream')
+            self.source.setCustomStreamUrl(self.channel, stream)
+            self.close()
+
+        elif controlId == self.C_STREAM_STRM_OK:
+            self.source.setCustomStreamUrl(self.channel, self.strmFile)
+            self.close()
+
+        elif controlId in [self.C_STREAM_ADDONS_CANCEL, self.C_STREAM_FAVOURITES_CANCEL, self.C_STREAM_STRM_CANCEL]:
+            self.close()
+
+        elif controlId in [self.C_STREAM_ADDONS_PREVIEW, self.C_STREAM_FAVOURITES_PREVIEW, self.C_STREAM_STRM_PREVIEW]:
+            if self.player.isPlaying():
+                self.player.stop()
+                return
+
+            stream = None
+            visible = self.getControl(self.C_STREAM_VISIBILITY_MARKER).getLabel()
+            if visible == self.VISIBLE_ADDONS:
+                listControl = self.getControl(self.C_STREAM_ADDONS_STREAMS)
+                item = listControl.getSelectedItem()
+                stream = item.getProperty('stream')
+            elif visible == self.VISIBLE_FAVOURITES:
+                listControl = self.getControl(self.C_STREAM_FAVOURITES)
+                item = listControl.getSelectedItem()
+                stream = item.getProperty('stream')
+            elif visible == self.VISIBLE_STRM:
+                stream = self.strmFile
+
+            if stream is not None:
+                if stream[0:9] == 'PlayMedia':
+                    stream = stream[11:-2]
+
+                print stream
+                self.player.play(item = stream, windowed = True)
+
+    @buggalo.buggalo_try_except({'method' : 'StreamSetupDialog.onFocus'})
+    def onFocus(self, controlId):
+        if controlId == self.C_STREAM_STRM_TAB:
+            self.getControl(self.C_STREAM_VISIBILITY_MARKER).setLabel(self.VISIBLE_STRM)
+        elif controlId == self.C_STREAM_FAVOURITES_TAB:
+            self.getControl(self.C_STREAM_VISIBILITY_MARKER).setLabel(self.VISIBLE_FAVOURITES)
+        elif controlId == self.C_STREAM_ADDONS_TAB:
+            self.getControl(self.C_STREAM_VISIBILITY_MARKER).setLabel(self.VISIBLE_ADDONS)
+
+
+    def updateAddonInfo(self):
+        listControl = self.getControl(self.C_STREAM_ADDONS)
+        item = listControl.getSelectedItem()
+        if item is None:
+            return
+
+        if item.getProperty('addon_id') == self.previousAddonId:
+            return
+
+        self.previousAddonId = item.getProperty('addon_id')
+        addon = xbmcaddon.Addon(id = item.getProperty('addon_id'))
+        self.getControl(self.C_STREAM_ADDONS_NAME).setLabel('[B]%s[/B]' % addon.getAddonInfo('name'))
+        self.getControl(self.C_STREAM_ADDONS_DESCRIPTION).setText(addon.getAddonInfo('description'))
+
+        streams = self.addonsParser.items(item.getProperty('addon_id'))
+        items = list()
+        for (label, stream) in streams:
+            item = xbmcgui.ListItem(label)
+            item.setProperty('stream', stream)
+            items.append(item)
+        listControl = self.getControl(StreamSetupDialog.C_STREAM_ADDONS_STREAMS)
+        listControl.reset()
+        listControl.addItems(items)
 
 
 
