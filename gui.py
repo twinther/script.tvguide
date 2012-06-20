@@ -1229,6 +1229,13 @@ class StreamSetupDialog(xbmcgui.WindowXMLDialog):
         favourites = loadFavouritesXml()
         items = list()
         for label, value in favourites:
+            if value[0:11] == 'PlayMedia("':
+                value = value[11:-2]
+            elif value[0:10] == 'PlayMedia(':
+                value = value[10:-1]
+            else:
+                continue
+
             item = xbmcgui.ListItem(label)
             item.setProperty('stream', value)
             items.append(item)
@@ -1249,8 +1256,6 @@ class StreamSetupDialog(xbmcgui.WindowXMLDialog):
 
     @buggalo.buggalo_try_except({'method' : 'StreamSetupDialog.onAction'})
     def onAction(self, action):
-        print action.getId()
-
         if action.getId() in [ACTION_PARENT_DIR, ACTION_PREVIOUS_MENU, KEY_NAV_BACK, KEY_CONTEXT_MENU]:
             self.close()
             return
@@ -1292,6 +1297,9 @@ class StreamSetupDialog(xbmcgui.WindowXMLDialog):
         elif controlId in [self.C_STREAM_ADDONS_PREVIEW, self.C_STREAM_FAVOURITES_PREVIEW, self.C_STREAM_STRM_PREVIEW]:
             if self.player.isPlaying():
                 self.player.stop()
+                self.getControl(self.C_STREAM_ADDONS_PREVIEW).setLabel(strings(PREVIEW_STREAM))
+                self.getControl(self.C_STREAM_FAVOURITES_PREVIEW).setLabel(strings(PREVIEW_STREAM))
+                self.getControl(self.C_STREAM_STRM_PREVIEW).setLabel(strings(PREVIEW_STREAM))
                 return
 
             stream = None
@@ -1308,11 +1316,11 @@ class StreamSetupDialog(xbmcgui.WindowXMLDialog):
                 stream = self.strmFile
 
             if stream is not None:
-                if stream[0:9] == 'PlayMedia':
-                    stream = stream[11:-2]
-
-                print stream
                 self.player.play(item = stream, windowed = True)
+                if self.player.isPlaying():
+                    self.getControl(self.C_STREAM_ADDONS_PREVIEW).setLabel(strings(STOP_PREVIEW))
+                    self.getControl(self.C_STREAM_FAVOURITES_PREVIEW).setLabel(strings(STOP_PREVIEW))
+                    self.getControl(self.C_STREAM_STRM_PREVIEW).setLabel(strings(STOP_PREVIEW))
 
     @buggalo.buggalo_try_except({'method' : 'StreamSetupDialog.onFocus'})
     def onFocus(self, controlId):

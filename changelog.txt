@@ -1,4 +1,4 @@
-[B]Version 1.4.0 - 2012-xx-xx[/B]
+[B]Version 1.3.90 - 2012-06-20[/B]
 - Add new stream setup dialog
 
 [B]Version 1.3.5 - 2012-06-03[/B]

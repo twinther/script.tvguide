@@ -49,7 +49,7 @@
     <string id="30301">Remind</string>
     <string id="30302">Don't remind</string>
     <string id="30303">Cancel</string>
-    <string id="30304">Choose stream file</string>
+    <string id="30304">Choose stream</string>
     <string id="30305">You can choose your own .strm file to play, when you want to watch this channel.</string>
     <string id="30306">Remove stream file</string>
     <string id="30307">Channels</string>
@@ -75,6 +75,7 @@
     <string id="30604">Preview stream</string>
     <string id="30605">Save</string>
     <string id="30606">Cancel</string>
+    <string id="30607">Stop preview</string>
 
     <string id="30610">Browse...</string>
     <string id="30611">Click Browse... below and navigate to your stream file. When you have chosen your file you can preview the stream to test if it works in XBMC.</string>

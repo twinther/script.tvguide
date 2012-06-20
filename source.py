@@ -481,13 +481,9 @@ class Source(object):
     def playInThread(self, channel, playBackStoppedHandler):
         customStreamUrl = self.getCustomStreamUrl(channel)
         if customStreamUrl:
-            if customStreamUrl[0:9] == 'PlayMedia' or customStreamUrl[0:14] == 'ActivateWindow':
-                xbmc.log("Playing custom url using executebuiltin: %s" % customStreamUrl)
-                xbmc.executebuiltin(customStreamUrl)
-            else:
-                customStreamUrl = customStreamUrl.encode('utf-8', 'ignore')
-                xbmc.log("Playing custom stream url: %s" % customStreamUrl)
-                self.player.play(item = customStreamUrl, windowed=True)
+            customStreamUrl = customStreamUrl.encode('utf-8', 'ignore')
+            xbmc.log("Playing custom stream url: %s" % customStreamUrl)
+            self.player.play(item = customStreamUrl, windowed=True)
 
         elif channel.isPlayable():
             streamUrl = channel.streamUrl.encode('utf-8', 'ignore')
