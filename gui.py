@@ -227,6 +227,7 @@ class TVGuide(xbmcgui.WindowXML):
         self.mode = MODE_EPG
         self.currentChannel = None
 
+        self.osdEnabled = ADDON.getSetting('enable.osd') == 'true'
         self.osdChannel = None
         self.osdProgram = None
 
@@ -292,14 +293,17 @@ class TVGuide(xbmcgui.WindowXML):
             self.onActionEPGMode(action)
 
     def onActionTVMode(self, action):
-        if action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK, KEY_CONTEXT_MENU]:
-            self.onRedrawEPG(self.channelIdx, self.viewStartDate)
-
-        elif action.getId() == ACTION_PAGE_UP:
+        if action.getId() == ACTION_PAGE_UP:
             self._channelUp()
 
         elif action.getId() == ACTION_PAGE_DOWN:
             self._channelDown()
+
+        elif not self.osdEnabled:
+            pass # skip the rest of the actions
+
+        elif action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK, KEY_CONTEXT_MENU]:
+            self.onRedrawEPG(self.channelIdx, self.viewStartDate)
 
         elif action.getId() == ACTION_SHOW_INFO:
             self._showOsd()
@@ -523,6 +527,9 @@ class TVGuide(xbmcgui.WindowXML):
         if ADDON.getSetting('program.background.enabled') == 'true' and program.imageLarge is not None:
             self.setControlImage(self.C_MAIN_BACKGROUND, program.imageLarge)
 
+        if not self.osdEnabled and self.source.isPlaying():
+            self.source.stop()
+
     def _left(self, currentFocus):
         control = self._findControlOnLeft(currentFocus)
         if control is not None:
@@ -606,6 +613,9 @@ class TVGuide(xbmcgui.WindowXML):
         self.osdProgram = self.source.getCurrentProgram(self.currentChannel)
 
     def _showOsd(self):
+        if not self.osdEnabled:
+            return
+
         if self.mode != MODE_OSD:
             self.osdChannel = self.currentChannel
 

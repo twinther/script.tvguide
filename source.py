@@ -116,6 +116,7 @@ class Source(object):
         self.playbackUsingDanishLiveTV = False
         self.channelList = list()
         self.player = xbmc.Player()
+        self.osdEnabled = addon.getSetting('enable.osd') == 'true'
 
         databasePath = os.path.join(self.cachePath, self.SOURCE_DB)
         for retries in range(0, 3):
@@ -474,6 +475,9 @@ class Source(object):
     def isPlaying(self):
         return self.player.isPlaying()
 
+    def stop(self):
+        self.player.stop()
+
     def play(self, channel, playBackStoppedHandler):
         threading.Timer(0.5, self.playInThread, [channel, playBackStoppedHandler]).start()
 
@@ -483,12 +487,12 @@ class Source(object):
         if customStreamUrl:
             customStreamUrl = customStreamUrl.encode('utf-8', 'ignore')
             xbmc.log("Playing custom stream url: %s" % customStreamUrl)
-            self.player.play(item = customStreamUrl, windowed=True)
+            self.player.play(item = customStreamUrl, windowed = self.osdEnabled)
 
         elif channel.isPlayable():
             streamUrl = channel.streamUrl.encode('utf-8', 'ignore')
             xbmc.log("Playing : %s" % streamUrl)
-            self.player.play(item = streamUrl, windowed=True)
+            self.player.play(item = streamUrl, windowed = self.osdEnabled)
 
         while True:
             xbmc.sleep(250)
