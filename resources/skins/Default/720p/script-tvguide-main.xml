@@ -26,6 +26,7 @@
 			<height>720</height>
             <texture>tvguide-background-default.jpg</texture>
             <fadetime>500</fadetime>
+            <colordiffuse>77FFFFFF</colordiffuse>
             <animation type="Conditional" condition="Control.IsVisible(5000)">
                 <effect type="fade" start="100" end="0" time="500" />
             </animation>
@@ -140,6 +141,7 @@
                     <textcolor>ffffffff</textcolor>
                     <font>font13</font>
                     <align>center</align>
+                    <aligny>center</aligny>
                     <visible>StringCompare(Control.GetLabel(4110),)</visible>
                 </control>
                 <control type="label" id="4011">
@@ -151,6 +153,7 @@
                     <textcolor>ffffffff</textcolor>
                     <font>font13</font>
                     <align>center</align>
+                    <aligny>center</aligny>
                     <visible>StringCompare(Control.GetLabel(4111),)</visible>
                 </control>
                 <control type="label" id="4012">
@@ -162,6 +165,7 @@
                     <textcolor>ffffffff</textcolor>
                     <font>font13</font>
                     <align>center</align>
+                    <aligny>center</aligny>
                     <visible>StringCompare(Control.GetLabel(4112),)</visible>
                 </control>
                 <control type="label" id="4013">
@@ -173,6 +177,7 @@
                     <textcolor>ffffffff</textcolor>
                     <font>font13</font>
                     <align>center</align>
+                    <aligny>center</aligny>
                     <visible>StringCompare(Control.GetLabel(4113),)</visible>
                 </control>
                 <control type="label" id="4014">
@@ -184,6 +189,7 @@
                     <textcolor>ffffffff</textcolor>
                     <font>font13</font>
                     <align>center</align>
+                    <aligny>center</aligny>
                     <visible>StringCompare(Control.GetLabel(4114),)</visible>
                 </control>
                 <control type="label" id="4015">
@@ -195,6 +201,7 @@
                     <textcolor>ffffffff</textcolor>
                     <font>font13</font>
                     <align>center</align>
+                    <aligny>center</aligny>
                     <visible>StringCompare(Control.GetLabel(4115),)</visible>
                 </control>
                 <control type="label" id="4016">
@@ -206,6 +213,7 @@
                     <textcolor>ffffffff</textcolor>
                     <font>font13</font>
                     <align>center</align>
+                    <aligny>center</aligny>
                     <visible>StringCompare(Control.GetLabel(4116),)</visible>
                 </control>
                 <control type="label" id="4017">
@@ -217,6 +225,7 @@
                     <textcolor>ffffffff</textcolor>
                     <font>font13</font>
                     <align>center</align>
+                    <aligny>center</aligny>
                     <visible>StringCompare(Control.GetLabel(4117),)</visible>
                 </control>
                 <control type="label" id="4018">
@@ -228,6 +237,7 @@
                     <textcolor>ffffffff</textcolor>
                     <font>font13</font>
                     <align>center</align>
+                    <aligny>center</aligny>
                     <visible>StringCompare(Control.GetLabel(4118),)</visible>
                 </control>
 

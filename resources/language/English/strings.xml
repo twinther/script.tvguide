@@ -57,14 +57,6 @@
     <string id="30307">Channels</string>
     <string id="30308">Quit</string>
 
-    <string id="30400">The TV guide is configured to stream TV using YouSee</string>
-    <string id="30401">web-tv, but the addon is not installed.</string>
-    <string id="30402">Streaming using that addon is now disabled.</string>
-
-    <string id="30403">The TV guide is configured to stream TV using Danish</string>
-    <string id="30404">Live TV, but the addon i snot installed.</string>
-    <string id="30405">Streaming using that addon is now disabled.</string>
-
     <string id="30500">[B]Edit channel order and visibility[/B]</string>
     <string id="30501">Move up and down to change the position of[CR]the channel. Select or navigate left to accept[CR]the position.</string>
     <string id="30502">Save</string>

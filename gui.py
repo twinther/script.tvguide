@@ -19,7 +19,6 @@
 #
 import datetime
 import threading
-import os
 
 import xbmc
 import xbmcgui
@@ -29,9 +28,7 @@ from notification import Notification
 from strings import *
 import buggalo
 
-from xml.etree import ElementTree
-from xml.parsers.expat import ExpatError
-import ConfigParser
+import streaming
 
 DEBUG = False
 
@@ -68,34 +65,6 @@ ADDON = xbmcaddon.Addon(id = 'script.tvguide')
 
 def debug(s):
     if DEBUG: xbmc.log(str(s), xbmc.LOGDEBUG)
-
-def loadFavouritesXml():
-    entries = list()
-    path = xbmc.translatePath('special://userdata/favourites.xml')
-    if os.path.exists(path):
-        f = open(path)
-        xml = f.read()
-        f.close()
-
-        try:
-            doc = ElementTree.fromstring(xml)
-            for node in doc.findall('favourite'):
-                entries.append((node.get('name'), node.text))
-        except ExpatError:
-            pass
-
-    return entries
-
-def getAddonsParser():
-    """
-    @return ConfigParser.ConfigParser
-    """
-    path = os.path.join(ADDON.getAddonInfo('path'), 'resources', 'addons.ini')
-    parser = ConfigParser.ConfigParser()
-    parser.optionxform = lambda option: option
-    parser.read(path)
-    return parser
-
 
 class SourceInitializer(threading.Thread):
     def __init__(self, sourceInitializedHandler):
@@ -217,6 +186,7 @@ class TVGuide(xbmcgui.WindowXML):
         self.channelIdx = 0
         self.focusPoint = Point()
         self.epgView = EPGView()
+        self.streamingService = streaming.StreamsService()
 
         # add and removeControls were added post-eden
         self.hasAddControls = hasattr(self, 'addControls')
@@ -302,7 +272,7 @@ class TVGuide(xbmcgui.WindowXML):
         elif not self.osdEnabled:
             pass # skip the rest of the actions
 
-        elif action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK, KEY_CONTEXT_MENU]:
+        elif action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK, KEY_CONTEXT_MENU, ACTION_PREVIOUS_MENU]:
             self.onRedrawEPG(self.channelIdx, self.viewStartDate)
 
         elif action.getId() == ACTION_SHOW_INFO:
@@ -312,7 +282,7 @@ class TVGuide(xbmcgui.WindowXML):
         if action.getId() == ACTION_SHOW_INFO:
             self._hideOsd()
 
-        elif action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK, KEY_CONTEXT_MENU]:
+        elif action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK, KEY_CONTEXT_MENU, ACTION_PREVIOUS_MENU]:
             self._hideOsd()
             self.onRedrawEPG(self.channelIdx, self.viewStartDate)
 
@@ -352,7 +322,7 @@ class TVGuide(xbmcgui.WindowXML):
                 self._showOsd()
 
     def onActionEPGMode(self, action):
-        if action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK]:
+        if action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK, ACTION_PREVIOUS_MENU]:
             self.close()
             return
 
@@ -405,7 +375,7 @@ class TVGuide(xbmcgui.WindowXML):
             self.viewStartDate = datetime.datetime.today()
             self.viewStartDate -= datetime.timedelta(minutes = self.viewStartDate.minute % 30, seconds = self.viewStartDate.second)
             self.onRedrawEPG(self.channelIdx, self.viewStartDate)
-        elif action.getId() in [KEY_CONTEXT_MENU, ACTION_PREVIOUS_MENU] and controlInFocus is not None:
+        elif action.getId() in [KEY_CONTEXT_MENU] and controlInFocus is not None:
             program = self._getProgramFromControl(controlInFocus)
             if program is not None:
                 self._showContextMenu(program)
@@ -448,7 +418,25 @@ class TVGuide(xbmcgui.WindowXML):
         if self.source.isPlayable(program.channel):
             self._playChannel(program.channel)
         else:
-            self._showContextMenu(program)
+            result = self.streamingService.detectStream(program.channel)
+            if not result:
+                # could not detect stream, show context menu
+                self._showContextMenu(program)
+            elif type(result) == str:
+                # one single stream detected, save it and start streaming
+                self.source.setCustomStreamUrl(program.channel, result)
+                self._playChannel(program.channel)
+            else:
+                # multiple matches, let user decide
+                items = list()
+                for (addonId, label, url) in result:
+                    items.append('%s - %s' % (addonId, label))
+                ret = xbmcgui.Dialog().select("Setup stream", items)
+                if ret != -1:
+                    (id, label, url) = result[ret]
+                    self.source.setCustomStreamUrl(program.channel, url)
+                    self._playChannel(program.channel)
+
 
     def _showContextMenu(self, program):
         self._hideControl(self.C_MAIN_MOUSE_CONTROLS)
@@ -835,7 +823,7 @@ class TVGuide(xbmcgui.WindowXML):
 
     def onPlayBackStopped(self):
         xbmc.sleep(1000)
-        if not self.source.isPlaying():
+        if not self.source.isPlaying() and not self.isClosing:
             self._hideControl(self.C_MAIN_OSD)
             self.onRedrawEPG(self.channelIdx, self.viewStartDate)
 
@@ -1222,10 +1210,10 @@ class StreamSetupDialog(xbmcgui.WindowXMLDialog):
         self.source = source
         self.channel = channel
 
-        self.addonsParser = getAddonsParser()
         self.player = xbmc.Player()
         self.previousAddonId = None
         self.strmFile = None
+        self.streamingService = streaming.StreamsService()
 
     def close(self):
         if self.player.isPlaying():
@@ -1236,16 +1224,9 @@ class StreamSetupDialog(xbmcgui.WindowXMLDialog):
     def onInit(self):
         self.getControl(self.C_STREAM_VISIBILITY_MARKER).setLabel(self.VISIBLE_STRM)
 
-        favourites = loadFavouritesXml()
+        favourites = self.streamingService.loadFavourites()
         items = list()
         for label, value in favourites:
-            if value[0:11] == 'PlayMedia("':
-                value = value[11:-2]
-            elif value[0:10] == 'PlayMedia(':
-                value = value[10:-1]
-            else:
-                continue
-
             item = xbmcgui.ListItem(label)
             item.setProperty('stream', value)
             items.append(item)
@@ -1254,11 +1235,14 @@ class StreamSetupDialog(xbmcgui.WindowXMLDialog):
         listControl.addItems(items)
 
         items = list()
-        for id in self.addonsParser.sections():
-            addon = xbmcaddon.Addon(id)
-            item = xbmcgui.ListItem(addon.getAddonInfo('name'), iconImage=addon.getAddonInfo('icon'))
-            item.setProperty('addon_id', id)
-            items.append(item)
+        for id in self.streamingService.getAddons():
+            try:
+                addon = xbmcaddon.Addon(id) # raises Exception if addon is not installed
+                item = xbmcgui.ListItem(addon.getAddonInfo('name'), iconImage=addon.getAddonInfo('icon'))
+                item.setProperty('addon_id', id)
+                items.append(item)
+            except Exception:
+                pass
         listControl = self.getControl(StreamSetupDialog.C_STREAM_ADDONS)
         listControl.addItems(items)
         self.updateAddonInfo()
@@ -1356,7 +1340,7 @@ class StreamSetupDialog(xbmcgui.WindowXMLDialog):
         self.getControl(self.C_STREAM_ADDONS_NAME).setLabel('[B]%s[/B]' % addon.getAddonInfo('name'))
         self.getControl(self.C_STREAM_ADDONS_DESCRIPTION).setText(addon.getAddonInfo('description'))
 
-        streams = self.addonsParser.items(item.getProperty('addon_id'))
+        streams = self.streamingService.getAddonStreams(item.getProperty('addon_id'))
         items = list()
         for (label, stream) in streams:
             item = xbmcgui.ListItem(label)

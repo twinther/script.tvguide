@@ -33,16 +33,7 @@ import xbmcgui
 import xbmcvfs
 from sqlite3 import dbapi2 as sqlite3
 
-STREAM_DR1 = 'plugin://plugin.video.dr.dk.live/?playChannel=1'
-STREAM_DR2 = 'plugin://plugin.video.dr.dk.live/?playChannel=2'
-STREAM_DR_UPDATE = 'plugin://plugin.video.dr.dk.live/?playChannel=3'
-STREAM_DR_K = 'plugin://plugin.video.dr.dk.live/?playChannel=4'
-STREAM_DR_RAMASJANG = 'plugin://plugin.video.dr.dk.live/?playChannel=5'
-STREAM_DR_HD = 'plugin://plugin.video.dr.dk.live/?playChannel=6'
-STREAM_KANAL_SPORT = 'plugin://plugin.video.dr.dk.live/?playChannel=203'
-
-SETTINGS_TO_CHECK = ['source', 'youseetv.category', 'youseewebtv.playback', 'danishlivetv.playback', 'xmltv.file',
-                     'xmltv.logo.folder', 'ontv.url', 'json.url']
+SETTINGS_TO_CHECK = ['source', 'youseetv.category', 'xmltv.file', 'xmltv.logo.folder', 'ontv.url', 'json.url']
 
 class Channel(object):
     def __init__(self, id, title, logo = None, streamUrl = None, visible = True, weight = -1):
@@ -103,7 +94,6 @@ class DatabaseSchemaException(sqlite3.DatabaseError):
 
 class Source(object):
     KEY = "undefined"
-    STREAMS = {}
     SOURCE_DB = 'source.db'
 
     def __init__(self, addon, cachePath):
@@ -113,7 +103,6 @@ class Source(object):
         for key in SETTINGS_TO_CHECK:
             buggalo.addExtraData('setting: %s' % key, ADDON.getSetting(key))
 
-        self.playbackUsingDanishLiveTV = False
         self.channelList = list()
         self.player = xbmc.Player()
         self.osdEnabled = addon.getSetting('enable.osd') == 'true'
@@ -124,6 +113,12 @@ class Source(object):
                 self.conn = sqlite3.connect(databasePath, detect_types=sqlite3.PARSE_DECLTYPES, check_same_thread = False)
                 self.conn.execute('PRAGMA foreign_keys = ON')
                 self.conn.row_factory = sqlite3.Row
+
+                # create and drop dummy table to check if database is locked
+                c = self.conn.cursor()
+                c.execute('CREATE TABLE database_lock_check(id TEXT PRIMARY KEY)')
+                c.execute('DROP TABLE database_lock_check')
+                c.close()
 
                 self._createTables()
                 self.settingsChanged = self.wasSettingsChanged(addon)
@@ -143,15 +138,6 @@ class Source(object):
         if self.conn is None:
             raise SourceNotConfiguredException()
 
-        try:
-            if addon.getSetting('danishlivetv.playback') == 'true':
-                xbmcaddon.Addon(id = 'plugin.video.dr.dk.live') # raises Exception if addon is not installed
-                self.playbackUsingDanishLiveTV = True
-        except Exception:
-            ADDON.setSetting('danishlivetv.playback', 'false')
-            xbmcgui.Dialog().ok(ADDON.getAddonInfo('name'), strings(DANISH_LIVE_TV_MISSING_1),
-                strings(DANISH_LIVE_TV_MISSING_2), strings(DANISH_LIVE_TV_MISSING_3))
-
     def close(self):
         #self.conn.rollback() # rollback any non-commit'ed changes to avoid database lock
         if self.player.isPlaying():
@@ -166,11 +152,12 @@ class Source(object):
         c = self.conn.cursor()
         c.execute('SELECT * FROM settings')
         for row in c:
-            count += 1
             noRows = False
             key = row['key']
-            if SETTINGS_TO_CHECK.count(key) and row['value'] != addon.getSetting(key):
-                settingsChanged = True
+            if SETTINGS_TO_CHECK.count(key):
+                count += 1
+                if row['value'] != addon.getSetting(key):
+                    settingsChanged = True
 
         if count != len(SETTINGS_TO_CHECK):
             settingsChanged = True
@@ -236,8 +223,6 @@ class Source(object):
                 if isinstance(item, Channel):
                     imported_channels += 1
                     channel = item
-                    if not channel.streamUrl and self.playbackUsingDanishLiveTV and self.STREAMS.has_key(channel.id):
-                        channel.streamUrl = self.STREAMS[channel.id]
                     c.execute('INSERT OR IGNORE INTO channels(id, title, logo, stream_url, visible, weight, source) VALUES(?, ?, ?, ?, ?, (CASE ? WHEN -1 THEN (SELECT COALESCE(MAX(weight)+1, 0) FROM channels WHERE source=?) ELSE ? END), ?)', [channel.id, channel.title, channel.logo, channel.streamUrl, channel.visible, channel.weight, self.KEY, channel.weight, self.KEY])
                     if not c.rowcount:
                         c.execute('UPDATE channels SET title=?, logo=?, stream_url=?, visible=(CASE ? WHEN -1 THEN visible ELSE ? END), weight=(CASE ? WHEN -1 THEN weight ELSE ? END) WHERE id=? AND source=?',
@@ -557,15 +542,6 @@ class DrDkSource(Source):
     CHANNELS_URL = 'http://www.dr.dk/tjenester/programoversigt/dbservice.ashx/getChannels?type=tv'
     PROGRAMS_URL = 'http://www.dr.dk/tjenester/programoversigt/dbservice.ashx/getSchedule?channel_source_url=%s&broadcastDate=%s'
 
-    STREAMS = {
-        'dr.dk/mas/whatson/channel/DR1' : STREAM_DR1,
-        'dr.dk/mas/whatson/channel/DR2' : STREAM_DR2,
-        'dr.dk/external/ritzau/ channel/dru' : STREAM_DR_UPDATE,
-        'dr.dk/mas/whatson/channel/TVR' : STREAM_DR_RAMASJANG,
-        'dr.dk/mas/whatson/channel/TVK' : STREAM_DR_K,
-        'dr.dk/mas/whatson/channel/TVH' : STREAM_DR_HD
-    }
-
     def __init__(self, addon, cachePath):
         super(DrDkSource, self).__init__(addon, cachePath)
 
@@ -600,38 +576,16 @@ class DrDkSource(Source):
 class YouSeeTvSource(Source):
     KEY = 'youseetv'
 
-    STREAMS = {
-        1 : STREAM_DR1,
-        2 : STREAM_DR2,
-        889 : STREAM_DR_UPDATE,
-        505: STREAM_DR_RAMASJANG,
-        504 : STREAM_DR_K,
-        503 : STREAM_DR_HD,
-        67 : STREAM_KANAL_SPORT
-    }
-
     def __init__(self, addon, cachePath):
         super(YouSeeTvSource, self).__init__(addon, cachePath)
         self.date = datetime.datetime.today()
         self.channelCategory = addon.getSetting('youseetv.category')
         self.ysApi = ysapi.YouSeeTVGuideApi()
-        self.playbackUsingYouSeeWebTv = False
-
-        try:
-            if addon.getSetting('youseewebtv.playback') == 'true':
-                xbmcaddon.Addon(id = 'plugin.video.yousee.tv') # raises Exception if addon is not installed
-                self.playbackUsingYouSeeWebTv = True
-        except Exception:
-            ADDON.setSetting('youseewebtv.playback', 'false')
-            xbmcgui.Dialog().ok(ADDON.getAddonInfo('name'), strings(YOUSEE_WEBTV_MISSING_1),
-                strings(YOUSEE_WEBTV_MISSING_2), strings(YOUSEE_WEBTV_MISSING_3))
 
     def getDataFromExternal(self, date, progress_callback = None):
         channels = self.ysApi.channelsInCategory(self.channelCategory)
         for idx, channel in enumerate(channels):
             c = Channel(id = channel['id'], title = channel['name'], logo = channel['logo'])
-            if self.playbackUsingYouSeeWebTv:
-                c.streamUrl = 'plugin://plugin.video.yousee.tv/?channel=' + str(c.id)
             yield c
 
             for program in self.ysApi.programs(c.id, tvdate = date):
@@ -661,99 +615,38 @@ class YouSeeTvSource(Source):
         return datetime.datetime.fromtimestamp(dateString)
 
 
-class TvTidSource(Source):
-    KEY = 'tvtiddk'
-
-    BASE_URL = 'http://tvtid.tv2.dk%s'
-    CHANNELS_URL = BASE_URL % '/api/channels.php/'
-    PROGRAMS_URL = BASE_URL % '/api/programs.php/date-%s.json'
-
-    STREAMS = {
-        11825154 : STREAM_DR1,
-        11823606 : STREAM_DR2,
-        11841417 : STREAM_DR_UPDATE,
-        25995179 : STREAM_DR_RAMASJANG,
-        26000893 : STREAM_DR_K,
-        26005640 : STREAM_DR_HD
-    }
-
-    def __init__(self, addon, cachePath):
-        super(TvTidSource, self).__init__(addon, cachePath)
-
-    def getDataFromExternal(self, date, progress_callback = None):
-        response = self._downloadUrl(self.CHANNELS_URL)
-        channels = simplejson.loads(response)
-
-        response = self._downloadUrl(self.PROGRAMS_URL % date.strftime('%Y%m%d'))
-        programs = simplejson.loads(response)
-
-        for idx, channel in enumerate(channels):
-            logoFile = channel['images']['114x50']['url']
-
-            c = Channel(id = channel['id'], title = channel['name'], logo = logoFile)
-            yield c
-
-            for program in programs[str(c.id)]:
-                if program.has_key('review'):
-                    description = program['review']
-                else:
-                    description = strings(NO_DESCRIPTION)
-                p = Program(c, program['title'], datetime.datetime.fromtimestamp(program['sts']), datetime.datetime.fromtimestamp(program['ets']), description)
-                yield p
-
-            if progress_callback:
-                if not progress_callback(100.0 / len(channels) * idx):
-                    raise SourceUpdateCanceledException()
-
-
 class XMLTVSource(Source):
     KEY = 'xmltv'
-
-    STREAMS = {
-        'www.ontv.dk/tv/1' : STREAM_DR1,
-        'www.ontv.dk/tv/2' : STREAM_DR2,
-        'www.ontv.dk/tv/10153' : STREAM_DR_RAMASJANG,
-        'www.ontv.dk/tv/10154' : STREAM_DR_K,
-        'www.ontv.dk/tv/10155' : STREAM_DR_HD
-    }
 
     def __init__(self, addon, cachePath):
         super(XMLTVSource, self).__init__(addon, cachePath)
         self.logoFolder = addon.getSetting('xmltv.logo.folder')
-        self.xmlTvFileLastChecked = datetime.datetime.fromtimestamp(0)
+        self.xmltvFile = addon.getSetting('xmltv.file')
 
-        if not addon.getSetting('xmltv.file') or not xbmcvfs.exists(addon.getSetting('xmltv.file')):
+        if not self.xmltvFile or not xbmcvfs.exists(self.xmltvFile):
             raise SourceNotConfiguredException()
 
-        self.xmlTvFile = os.path.join(self.cachePath, '%s.xmltv' % self.KEY)
-        tempFile = os.path.join(self.cachePath, '%s.xmltv.tmp' % self.KEY)
-        xbmc.log('[script.tvguide] Caching XMLTV file...')
-        xbmcvfs.copy(addon.getSetting('xmltv.file'), tempFile)
-
-        if not os.path.exists(tempFile):
-            raise SourceException('XML TV file was not cached, does it exist?')
-
-        # if xmlTvFile doesn't exists or the file size is different from tempFile
-        # we copy the tempFile to xmlTvFile which in turn triggers a reload in self._isChannelListCacheExpired(..)
-        if not os.path.exists(self.xmlTvFile) or os.path.getsize(self.xmlTvFile) != os.path.getsize(tempFile):
-            if os.path.exists(self.xmlTvFile):
-                os.unlink(self.xmlTvFile)
-            os.rename(tempFile, self.xmlTvFile)
+        try:
+            #xbmcvfs.File() was added in Frodo
+            f = xbmcvfs.File(self.xmltvFile)
+            f.close()
+        except Exception:
+            print "xbmcvfs.File() raised an exception - perhaps you are running XBMC Eden?"
+            raise SourceNotConfiguredException()
 
     def getDataFromExternal(self, date, progress_callback = None):
-        size = os.path.getsize(self.xmlTvFile)
-        f = open(self.xmlTvFile, "rb")
+        f = FileWrapper(self.xmltvFile)
+        size = f.size()
         context = ElementTree.iterparse(f, events=("start", "end"))
         return parseXMLTV(context, f, size, self.logoFolder, progress_callback)
 
     def _isChannelListCacheExpired(self):
-        """
-        Check if xmlTvFile was modified, otherwise cache is not expired.
-        Only check filesystem once every 5 minutes
-        """
-        delta = datetime.datetime.now() - self.xmlTvFileLastChecked
-        if delta.seconds < 300:
+        if not hasattr(xbmcvfs, 'stat'):
+            # we cannot determine this without the stat function
+            # https://github.com/xbmc/xbmc/pull/1062
             return False
+
+        mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime = xbmcvfs.stat(self.xmltvFile)
 
         try:
             c = self.conn.cursor()
@@ -766,10 +659,9 @@ class XMLTVSource(Source):
         except TypeError:
             return True
 
-        fileModified = datetime.datetime.fromtimestamp(os.path.getmtime(self.xmlTvFile))
-        return fileModified > lastUpdated
+        return mtime > lastUpdated
 
-    def _isProgramListCacheExpired(self, startTime):
+    def _isProgramListCacheExpired(self, date = datetime.datetime.now()):
         return self._isChannelListCacheExpired()
 
 class ONTVSource(Source):
@@ -785,7 +677,7 @@ class ONTVSource(Source):
         context = ElementTree.iterparse(io)
         return parseXMLTV(context, io, len(xml), None, progress_callback)
 
-    def _isProgramListCacheExpired(self, startTime):
+    def _isProgramListCacheExpired(self, date = datetime.datetime.now()):
         return self._isChannelListCacheExpired()
 
 
@@ -928,13 +820,32 @@ def parseXMLTV(context, f, size, logoFolder, progress_callback):
                 yield result
 
         root.clear()
+    f.close()
+
+class FileWrapper(object):
+    def __init__(self, filename):
+        self.vfsfile = xbmcvfs.File(filename)
+        self.bytesRead = 0
+
+    def close(self):
+        self.vfsfile.close()
+
+    def read(self, bytes):
+        self.bytesRead += bytes
+        return self.vfsfile.read(bytes)
+
+    def size(self):
+        return self.vfsfile.size()
+
+    def tell(self):
+        return self.bytesRead
+
 
 
 def instantiateSource(addon):
     SOURCES = {
         'YouSee.tv' : YouSeeTvSource,
         'DR.dk' : DrDkSource,
-        'TVTID.dk' : TvTidSource,
         'XMLTV' : XMLTVSource,
         'ONTV.dk' : ONTVSource,
         'JSON-URL' : JSONSource
