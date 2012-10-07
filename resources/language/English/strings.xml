@@ -76,6 +76,8 @@
 
     <string id="30620">Choose a favourite below. Only [I]PlayMedia[/I] favourites are supported.</string>
 
+    <string id="30700">Multiple addons provide this channels.[CR]Choose one to watch the stream.</string>
+
     <!-- weeb.tv mod -->
     <string id="30800">JSON-EPG URL</string>
     <string id="30801">Play channels using the Weeb.Tv addon</string>

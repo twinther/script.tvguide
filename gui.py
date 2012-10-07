@@ -428,13 +428,11 @@ class TVGuide(xbmcgui.WindowXML):
                 self._playChannel(program.channel)
             else:
                 # multiple matches, let user decide
-                items = list()
-                for (addonId, label, url) in result:
-                    items.append('%s - %s' % (addonId, label))
-                ret = xbmcgui.Dialog().select("Setup stream", items)
-                if ret != -1:
-                    (id, label, url) = result[ret]
-                    self.source.setCustomStreamUrl(program.channel, url)
+
+                d = ChooseStreamAddonDialog(result)
+                d.doModal()
+                if d.stream is not None:
+                    self.source.setCustomStreamUrl(program.channel, d.stream)
                     self._playChannel(program.channel)
 
 
@@ -1352,3 +1350,46 @@ class StreamSetupDialog(xbmcgui.WindowXMLDialog):
 
 
 
+
+
+class ChooseStreamAddonDialog(xbmcgui.WindowXMLDialog):
+    C_SELECTION_LIST = 1000
+
+    def __new__(cls, addons):
+        return super(ChooseStreamAddonDialog, cls).__new__(cls, 'script-tvguide-streamaddon.xml', ADDON.getAddonInfo('path'))
+
+    def __init__(self, addons):
+        super(ChooseStreamAddonDialog, self).__init__()
+        self.addons = addons
+        self.stream = None
+
+    @buggalo.buggalo_try_except({'method' : 'ChooseStreamAddonDialog.onInit'})
+    def onInit(self):
+        items = list()
+        for id, label, url in self.addons:
+            addon = xbmcaddon.Addon(id)
+
+            item = xbmcgui.ListItem(label, addon.getAddonInfo('name'), addon.getAddonInfo('icon'))
+            item.setProperty('stream', url)
+            items.append(item)
+
+        listControl = self.getControl(ChooseStreamAddonDialog.C_SELECTION_LIST)
+        listControl.addItems(items)
+
+        self.setFocus(listControl)
+
+    @buggalo.buggalo_try_except({'method' : 'ChooseStreamAddonDialog.onAction'})
+    def onAction(self, action):
+        if action.getId() in [ACTION_PARENT_DIR, ACTION_PREVIOUS_MENU, KEY_NAV_BACK]:
+            self.close()
+
+    @buggalo.buggalo_try_except({'method' : 'ChooseStreamAddonDialog.onClick'})
+    def onClick(self, controlId):
+        if controlId == ChooseStreamAddonDialog.C_SELECTION_LIST:
+            listControl = self.getControl(ChooseStreamAddonDialog.C_SELECTION_LIST)
+            self.stream = listControl.getSelectedItem().getProperty('stream')
+            self.close()
+
+    @buggalo.buggalo_try_except({'method' : 'ChooseStreamAddonDialog.onFocus'})
+    def onFocus(self, controlId):
+        pass

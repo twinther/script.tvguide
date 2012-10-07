@@ -84,6 +84,7 @@
 
     <string id="30620">Vælg en fortrukken stream herunder. Kun [I]PlayMedia[/I] foretrukne er understøttet.</string>
 
+    <string id="30700">Flere addons har denne kanal.[CR]Vælg en for at se kanalen.</string>
 
     <!-- weeb.tv mod -->
     <string id="30800">JSON-EPG URL</string>
