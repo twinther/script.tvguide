@@ -626,27 +626,18 @@ class XMLTVSource(Source):
         if not self.xmltvFile or not xbmcvfs.exists(self.xmltvFile):
             raise SourceNotConfiguredException()
 
-        try:
-            #xbmcvfs.File() was added in Frodo
-            f = xbmcvfs.File(self.xmltvFile)
-            f.close()
-        except Exception:
-            print "xbmcvfs.File() raised an exception - perhaps you are running XBMC Eden?"
-            raise SourceNotConfiguredException()
-
     def getDataFromExternal(self, date, progress_callback = None):
         f = FileWrapper(self.xmltvFile)
-        size = f.size()
         context = ElementTree.iterparse(f, events=("start", "end"))
-        return parseXMLTV(context, f, size, self.logoFolder, progress_callback)
+        return parseXMLTV(context, f, f.size, self.logoFolder, progress_callback)
 
     def _isChannelListCacheExpired(self):
-        if not hasattr(xbmcvfs, 'stat'):
+        if hasattr(xbmcvfs, 'stat'):
             # we cannot determine this without the stat function
             # https://github.com/xbmc/xbmc/pull/1062
-            return False
-
-        mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime = xbmcvfs.stat(self.xmltvFile)
+            mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime = xbmcvfs.stat(self.xmltvFile)
+        else:
+            mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime = os.stat(self.xmltvFile)
 
         try:
             c = self.conn.cursor()
@@ -659,7 +650,8 @@ class XMLTVSource(Source):
         except TypeError:
             return True
 
-        return mtime > lastUpdated
+        fileUpdated = datetime.datetime.fromtimestamp(mtime)
+        return fileUpdated > lastUpdated
 
     def _isProgramListCacheExpired(self, date = datetime.datetime.now()):
         return self._isChannelListCacheExpired()
@@ -824,7 +816,14 @@ def parseXMLTV(context, f, size, logoFolder, progress_callback):
 
 class FileWrapper(object):
     def __init__(self, filename):
-        self.vfsfile = xbmcvfs.File(filename)
+        if hasattr(xbmcvfs, 'File'):
+            #xbmcvfs.File() was added in Frodo
+            self.vfsfile = xbmcvfs.File(filename)
+            self.size = self.vfsfile.size()
+        else:
+            print "xbmcvfs.File() is missing - perhaps you are running XBMC Eden? - retrying with python file opener"
+            self.vfsfile = open(filename)
+            self.size = os.path.getsize(filename)
         self.bytesRead = 0
 
     def close(self):
@@ -833,9 +832,6 @@ class FileWrapper(object):
     def read(self, bytes):
         self.bytesRead += bytes
         return self.vfsfile.read(bytes)
-
-    def size(self):
-        return self.vfsfile.size()
 
     def tell(self):
         return self.bytesRead
