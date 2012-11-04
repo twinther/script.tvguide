@@ -22,20 +22,17 @@ import notification
 import xbmc
 import source as src
 
-ADDON = xbmcaddon.Addon(id = 'script.tvguide')
-source = src.instantiateSource(ADDON)
-if ADDON.getSetting('cache.data.on.xbmc.startup') == 'true':
-    try:
+try:
+    ADDON = xbmcaddon.Addon(id = 'script.tvguide')
+    source = src.instantiateSource(ADDON)
+    if ADDON.getSetting('cache.data.on.xbmc.startup') == 'true':
         channelList = None
         if source._isChannelListCacheExpired():
             channelList = source.updateChannelAndProgramListCaches()
 
-    except Exception, ex:
-        xbmc.log('[script.tvguide] Unable to update caches: %s' % str(ex) , xbmc.LOGDEBUG)
-
-if ADDON.getSetting('notifications.enabled') == 'true':
-    try:
+    if ADDON.getSetting('notifications.enabled') == 'true':
         n = notification.Notification(source, ADDON.getAddonInfo('path'))
         n.scheduleNotifications()
-    except Exception, ex:
-        xbmc.log('[script.tvguide] Unable to schedules notifications: %s' % str(ex), xbmc.LOGDEBUG)
+
+except Exception, ex:
+    xbmc.log('[script.tvguide] Uncaugt exception in service.py: %s' % str(ex) , xbmc.LOGDEBUG)

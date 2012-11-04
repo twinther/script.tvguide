@@ -28,6 +28,8 @@ from notification import Notification
 from strings import *
 import buggalo
 
+import streaming
+
 DEBUG = False
 
 MODE_EPG = 'EPG'
@@ -77,6 +79,9 @@ class SourceInitializer(threading.Thread):
                 xbmc.log("[script.tvguide] Using source: %s" % str(type(source)), xbmc.LOGDEBUG)
                 self.sourceInitializedHandler.onSourceInitialized(source)
                 break
+            except src.SourceNotConfiguredException:
+                self.sourceInitializedHandler.onSourceNotConfigured()
+                break
             except src.SourceUpdateInProgressException, ex:
                 xbmc.log('[script.tvguide] database update in progress...: %s' % str(ex), xbmc.LOGDEBUG)
                 xbmc.sleep(1000)
@@ -105,6 +110,22 @@ class SourceUpdater(threading.Thread):
         except src.SourceException:
             self.sourceUpdatedHandler.onEPGLoadError()
 
+
+class TimeBarMover(threading.Thread):
+    def __init__(self, gui):
+        """
+
+        @param gui:
+        @type gui: TVGuide
+        """
+        super(TimeBarMover, self).__init__()
+        self.gui = gui
+
+    @buggalo.buggalo_try_except({'method' : 'TimeBarMover.run'})
+    def run(self):
+        while not xbmc.abortRequested and not self.gui.isClosing:
+            self.gui.updateTimeBar()
+            xbmc.sleep(500)
 
 class Point(object):
     def __init__(self):
@@ -161,9 +182,11 @@ class TVGuide(xbmcgui.WindowXML):
         self.redrawingEPG = False
         self.isClosing = False
         self.controlAndProgramList = list()
+        self.ignoreMissingControlIds = list()
         self.channelIdx = 0
         self.focusPoint = Point()
         self.epgView = EPGView()
+        self.streamingService = streaming.StreamsService()
 
         # add and removeControls were added post-eden
         self.hasAddControls = hasattr(self, 'addControls')
@@ -174,12 +197,24 @@ class TVGuide(xbmcgui.WindowXML):
         self.mode = MODE_EPG
         self.currentChannel = None
 
+        self.osdEnabled = ADDON.getSetting('enable.osd') == 'true'
         self.osdChannel = None
         self.osdProgram = None
 
         # find nearest half hour
         self.viewStartDate = datetime.datetime.today()
         self.viewStartDate -= datetime.timedelta(minutes = self.viewStartDate.minute % 30, seconds = self.viewStartDate.second)
+
+    def getControl(self, controlId):
+        try:
+            return super(TVGuide, self).getControl(controlId)
+        except TypeError:
+            if controlId in self.ignoreMissingControlIds:
+                return None
+            if not self.isClosing:
+                xbmcgui.Dialog().ok(buggalo.getRandomHeading(), strings(SKIN_ERROR_LINE1), strings(SKIN_ERROR_LINE2), strings(SKIN_ERROR_LINE3))
+                self.close()
+            return None
 
     def close(self):
         if not self.isClosing:
@@ -194,21 +229,23 @@ class TVGuide(xbmcgui.WindowXML):
     def onInit(self):
         self._hideControl(self.C_MAIN_MOUSE_CONTROLS, self.C_MAIN_OSD)
         self._showControl(self.C_MAIN_EPG, self.C_MAIN_LOADING)
-        self.getControl(self.C_MAIN_LOADING_TIME_LEFT).setLabel(strings(BACKGROUND_UPDATE_IN_PROGRESS))
-        self.setFocus(self.getControl(self.C_MAIN_LOADING_CANCEL))
+        self.setControlLabel(self.C_MAIN_LOADING_TIME_LEFT, strings(BACKGROUND_UPDATE_IN_PROGRESS))
+        self.setFocusId(self.C_MAIN_LOADING_CANCEL)
 
         control = self.getControl(self.C_MAIN_EPG_VIEW_MARKER)
-        left, top = control.getPosition()
-        self.focusPoint.x = left
-        self.focusPoint.y = top
-        self.epgView.left = left
-        self.epgView.top = top
-        self.epgView.right = left + control.getWidth()
-        self.epgView.bottom = top + control.getHeight()
-        self.epgView.width = control.getWidth()
-        self.epgView.cellHeight = control.getHeight() / CHANNELS_PER_PAGE
+        if control:
+            left, top = control.getPosition()
+            self.focusPoint.x = left
+            self.focusPoint.y = top
+            self.epgView.left = left
+            self.epgView.top = top
+            self.epgView.right = left + control.getWidth()
+            self.epgView.bottom = top + control.getHeight()
+            self.epgView.width = control.getWidth()
+            self.epgView.cellHeight = control.getHeight() / CHANNELS_PER_PAGE
 
         SourceInitializer(self).start()
+        TimeBarMover(self).start()
 
     @buggalo.buggalo_try_except({'method' : 'TVGuide.onAction'})
     def onAction(self, action):
@@ -226,14 +263,17 @@ class TVGuide(xbmcgui.WindowXML):
             self.onActionEPGMode(action)
 
     def onActionTVMode(self, action):
-        if action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK, KEY_CONTEXT_MENU]:
-            self.onRedrawEPG(self.channelIdx, self.viewStartDate)
-
-        elif action.getId() == ACTION_PAGE_UP:
+        if action.getId() == ACTION_PAGE_UP:
             self._channelUp()
 
         elif action.getId() == ACTION_PAGE_DOWN:
             self._channelDown()
+
+        elif not self.osdEnabled:
+            pass # skip the rest of the actions
+
+        elif action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK, KEY_CONTEXT_MENU, ACTION_PREVIOUS_MENU]:
+            self.onRedrawEPG(self.channelIdx, self.viewStartDate)
 
         elif action.getId() == ACTION_SHOW_INFO:
             self._showOsd()
@@ -242,7 +282,7 @@ class TVGuide(xbmcgui.WindowXML):
         if action.getId() == ACTION_SHOW_INFO:
             self._hideOsd()
 
-        elif action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK, KEY_CONTEXT_MENU]:
+        elif action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK, KEY_CONTEXT_MENU, ACTION_PREVIOUS_MENU]:
             self._hideOsd()
             self.onRedrawEPG(self.channelIdx, self.viewStartDate)
 
@@ -282,7 +322,7 @@ class TVGuide(xbmcgui.WindowXML):
                 self._showOsd()
 
     def onActionEPGMode(self, action):
-        if action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK]:
+        if action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK, ACTION_PREVIOUS_MENU]:
             self.close()
             return
 
@@ -335,7 +375,7 @@ class TVGuide(xbmcgui.WindowXML):
             self.viewStartDate = datetime.datetime.today()
             self.viewStartDate -= datetime.timedelta(minutes = self.viewStartDate.minute % 30, seconds = self.viewStartDate.second)
             self.onRedrawEPG(self.channelIdx, self.viewStartDate)
-        elif action.getId() in [KEY_CONTEXT_MENU, ACTION_PREVIOUS_MENU] and controlInFocus is not None:
+        elif action.getId() in [KEY_CONTEXT_MENU] and controlInFocus is not None:
             program = self._getProgramFromControl(controlInFocus)
             if program is not None:
                 self._showContextMenu(program)
@@ -378,7 +418,23 @@ class TVGuide(xbmcgui.WindowXML):
         if self.source.isPlayable(program.channel):
             self._playChannel(program.channel)
         else:
-            self._showContextMenu(program)
+            result = self.streamingService.detectStream(program.channel)
+            if not result:
+                # could not detect stream, show context menu
+                self._showContextMenu(program)
+            elif type(result) == str:
+                # one single stream detected, save it and start streaming
+                self.source.setCustomStreamUrl(program.channel, result)
+                self._playChannel(program.channel)
+            else:
+                # multiple matches, let user decide
+
+                d = ChooseStreamAddonDialog(result)
+                d.doModal()
+                if d.stream is not None:
+                    self.source.setCustomStreamUrl(program.channel, d.stream)
+                    self._playChannel(program.channel)
+
 
     def _showContextMenu(self, program):
         self._hideControl(self.C_MAIN_MOUSE_CONTROLS)
@@ -395,10 +451,10 @@ class TVGuide(xbmcgui.WindowXML):
 
             self.onRedrawEPG(self.channelIdx, self.viewStartDate)
 
-        elif buttonClicked == PopupMenu.C_POPUP_CHOOSE_STRM:
-            filename = xbmcgui.Dialog().browse(1, ADDON.getLocalizedString(30304), 'video', '.strm')
-            if filename:
-                self.source.setCustomStreamUrl(program.channel, filename)
+        elif buttonClicked == PopupMenu.C_POPUP_CHOOSE_STREAM:
+            d = StreamSetupDialog(self.source, program.channel)
+            d.doModal()
+            del d
 
         elif buttonClicked == PopupMenu.C_POPUP_PLAY:
             if self.source.isPlayable(program.channel):
@@ -412,6 +468,11 @@ class TVGuide(xbmcgui.WindowXML):
 
         elif buttonClicked == PopupMenu.C_POPUP_QUIT:
             self.close()
+
+    def setFocusId(self, controlId):
+        control = self.getControl(controlId)
+        if control:
+            self.setFocus(control)
 
     def setFocus(self, control):
         debug('setFocus %d' % control.getId())
@@ -436,18 +497,24 @@ class TVGuide(xbmcgui.WindowXML):
         if program is None:
             return
 
-        self.getControl(self.C_MAIN_TITLE).setLabel('[B]%s[/B]' % program.title)
-        self.getControl(self.C_MAIN_TIME).setLabel('[B]%s - %s[/B]' % (program.startDate.strftime(xbmc.getRegion('time')), program.endDate.strftime(xbmc.getRegion('time'))))
-        self.getControl(self.C_MAIN_DESCRIPTION).setText(program.description)
+        self.setControlLabel(self.C_MAIN_TITLE, '[B]%s[/B]' % program.title)
+        self.setControlLabel(self.C_MAIN_TIME, '[B]%s - %s[/B]' % (self.formatTime(program.startDate), self.formatTime(program.endDate)))
+        if program.description:
+            description = program.description
+        else:
+            description = strings(NO_DESCRIPTION)
+        self.setControlText(self.C_MAIN_DESCRIPTION, description)
 
         if program.channel.logo is not None:
-            self.getControl(self.C_MAIN_LOGO).setImage(program.channel.logo)
-
+            self.setControlImage(self.C_MAIN_LOGO, program.channel.logo)
         if program.imageSmall is not None:
-            self.getControl(self.C_MAIN_IMAGE).setImage(program.imageSmall)
+            self.setControlImage(self.C_MAIN_IMAGE, program.imageSmall)
 
         if ADDON.getSetting('program.background.enabled') == 'true' and program.imageLarge is not None:
-            self.getControl(self.C_MAIN_BACKGROUND).setImage(program.imageLarge)
+            self.setControlImage(self.C_MAIN_BACKGROUND, program.imageLarge)
+
+        if not self.osdEnabled and self.source.isPlaying():
+            self.source.stop()
 
     def _left(self, currentFocus):
         control = self._findControlOnLeft(currentFocus)
@@ -468,7 +535,6 @@ class TVGuide(xbmcgui.WindowXML):
             self.onRedrawEPG(self.channelIdx, self.viewStartDate, focusFunction=self._findControlOnRight)
 
     def _up(self, currentFocus):
-        debug('_up')
         currentFocus.x = self.focusPoint.x
         control = self._findControlAbove(currentFocus)
         if control is not None:
@@ -533,18 +599,21 @@ class TVGuide(xbmcgui.WindowXML):
         self.osdProgram = self.source.getCurrentProgram(self.currentChannel)
 
     def _showOsd(self):
+        if not self.osdEnabled:
+            return
+
         if self.mode != MODE_OSD:
             self.osdChannel = self.currentChannel
 
         if self.osdProgram is not None:
-            self.getControl(self.C_MAIN_OSD_TITLE).setLabel('[B]%s[/B]' % self.osdProgram.title)
-            self.getControl(self.C_MAIN_OSD_TIME).setLabel('[B]%s - %s[/B]' % (self.osdProgram.startDate.strftime(xbmc.getRegion('time')), self.osdProgram.endDate.strftime(xbmc.getRegion('time'))))
-            self.getControl(self.C_MAIN_OSD_DESCRIPTION).setText(self.osdProgram.description)
-            self.getControl(self.C_MAIN_OSD_CHANNEL_TITLE).setLabel(self.osdChannel.title)
+            self.setControlLabel(self.C_MAIN_OSD_TITLE, '[B]%s[/B]' % self.osdProgram.title)
+            self.setControlLabel(self.C_MAIN_OSD_TIME, '[B]%s - %s[/B]' % (self.formatTime(self.osdProgram.startDate), self.formatTime(self.osdProgram.endDate)))
+            self.setControlText(self.C_MAIN_OSD_DESCRIPTION, self.osdProgram.description)
+            self.setControlLabel(self.C_MAIN_OSD_CHANNEL_TITLE, self.osdChannel.title)
             if self.osdProgram.channel.logo is not None:
-                self.getControl(self.C_MAIN_OSD_CHANNEL_LOGO).setImage(self.osdProgram.channel.logo)
+                self.setControlImage(self.C_MAIN_OSD_CHANNEL_LOGO, self.osdProgram.channel.logo)
             else:
-                self.getControl(self.C_MAIN_OSD_CHANNEL_LOGO).setImage('')
+                self.setControlImage(self.C_MAIN_OSD_CHANNEL_LOGO, '')
 
         self.mode = MODE_OSD
         self._showControl(self.C_MAIN_OSD)
@@ -567,18 +636,12 @@ class TVGuide(xbmcgui.WindowXML):
         self.redrawingEPG = True
         self.mode = MODE_EPG
         self._showControl(self.C_MAIN_EPG)
-
-        # move timebar to current time
-        timeDelta = datetime.datetime.today() - self.viewStartDate
-        c = self.getControl(self.C_MAIN_TIMEBAR)
-        (x, y) = c.getPosition()
-        c.setVisible(timeDelta.days == 0)
-        c.setPosition(self._secondsToXposition(timeDelta.seconds), y)
+        self.updateTimeBar()
 
         # show Loading screen
-        self.getControl(self.C_MAIN_LOADING_TIME_LEFT).setLabel(strings(CALCULATING_REMAINING_TIME))
+        self.setControlLabel(self.C_MAIN_LOADING_TIME_LEFT, strings(CALCULATING_REMAINING_TIME))
         self._showControl(self.C_MAIN_LOADING)
-        self.setFocus(self.getControl(self.C_MAIN_LOADING_CANCEL))
+        self.setFocusId(self.C_MAIN_LOADING_CANCEL)
 
         # remove existing controls
         self._clearEpg()
@@ -588,18 +651,13 @@ class TVGuide(xbmcgui.WindowXML):
             return
 
         # date and time row
-        self.getControl(self.C_MAIN_DATE).setLabel(self.viewStartDate.strftime(xbmc.getRegion('dateshort')))
+        self.setControlLabel(self.C_MAIN_DATE, self.formatDate(self.viewStartDate))
         for col in range(1, 5):
-            self.getControl(4000 + col).setLabel(startTime.strftime(xbmc.getRegion('time')))
+            self.setControlLabel(4000 + col, self.formatTime(startTime))
             startTime += HALF_HOUR
 
         # channels
-        try:
-            channels = self.source.getChannelList()
-        except src.SourceException:
-            self.onEPGLoadError()
-            return
-
+        channels = self.source.getChannelList()
         if channelStart < 0:
             channelStart = len(channels) - 1
         elif channelStart > len(channels) - 1:
@@ -608,33 +666,28 @@ class TVGuide(xbmcgui.WindowXML):
         channelEnd = channelStart + CHANNELS_PER_PAGE
         self.channelIdx = channelStart
 
-        viewChannels = channels[channelStart : channelEnd]
-        try:
-            programs = self.source.getProgramList(viewChannels, self.viewStartDate)
-        except src.SourceException:
-            self.onEPGLoadError()
-            return
+        channelsToShow = channels[channelStart : channelEnd]
+        programs = self.source.getProgramList(channelsToShow, self.viewStartDate)
 
         if programs is None:
             self.onEPGLoadError()
             return
 
         # set channel logo or text
-        channelsToShow = channels[channelStart : channelEnd]
         for idx in range(0, CHANNELS_PER_PAGE):
             if idx >= len(channelsToShow):
-                self.getControl(4110 + idx).setImage('')
-                self.getControl(4010 + idx).setLabel('')
+                self.setControlImage(4110 + idx, '')
+                self.setControlLabel(4010 + idx, '')
             else:
                 channel = channelsToShow[idx]
-                self.getControl(4010 + idx).setLabel(channel.title)
+                self.setControlLabel(4010 + idx, channel.title)
                 if channel.logo is not None:
-                    self.getControl(4110 + idx).setImage(channel.logo)
+                    self.setControlImage(4110 + idx, channel.logo)
                 else:
-                    self.getControl(4110 + idx).setImage('')
+                    self.setControlImage(4110 + idx, '')
 
         for program in programs:
-            idx = viewChannels.index(program.channel)
+            idx = channelsToShow.index(program.channel)
 
             startDelta = program.startDate - self.viewStartDate
             stopDelta = program.endDate - self.viewStartDate
@@ -688,6 +741,7 @@ class TVGuide(xbmcgui.WindowXML):
                     debug('onRedrawEPG - setFocus %d' % focusControl.getId())
                     self.setFocus(focusControl)
 
+        self.ignoreMissingControlIds.extend([elem.control.getId() for elem in self.controlAndProgramList])
 
         if focusControl is None and len(self.controlAndProgramList) > 0:
             self.setFocus(self.controlAndProgramList[0].control)
@@ -714,6 +768,14 @@ class TVGuide(xbmcgui.WindowXML):
                     pass # happens if we try to remove a control that doesn't exist
         del self.controlAndProgramList[:]
 
+    def updateTimeBar(self):
+        # move timebar to current time
+        timeDelta = datetime.datetime.today() - self.viewStartDate
+        control = self.getControl(self.C_MAIN_TIMEBAR)
+        if control:
+            (x, y) = control.getPosition()
+            control.setVisible(timeDelta.days == 0)
+            control.setPosition(self._secondsToXposition(timeDelta.seconds), y)
 
     def onEPGLoadError(self):
         self.redrawingEPG = False
@@ -721,38 +783,45 @@ class TVGuide(xbmcgui.WindowXML):
         xbmcgui.Dialog().ok(strings(LOAD_ERROR_TITLE), strings(LOAD_ERROR_LINE1), strings(LOAD_ERROR_LINE2))
         self.close()
 
+    def onSourceNotConfigured(self):
+        self.redrawingEPG = False
+        self._hideControl(self.C_MAIN_LOADING)
+        xbmcgui.Dialog().ok(strings(LOAD_ERROR_TITLE), strings(LOAD_ERROR_LINE1), strings(CONFIGURATION_ERROR_LINE2))
+        self.close()
+
     def onSourceInitialized(self, source):
         self.source = source
         self.notification = Notification(self.source, ADDON.getAddonInfo('path'))
 
-        self.getControl(self.C_MAIN_IMAGE).setImage('tvguide-logo-%s.png' % self.source.KEY)
+        self.setControlImage(self.C_MAIN_IMAGE, 'tvguide-logo-%s.png' % self.source.KEY)
         self.onRedrawEPG(0, self.viewStartDate)
 
     def onSourceProgressUpdate(self, percentageComplete):
-        progressControl = self.getControl(self.C_MAIN_LOADING_PROGRESS)
-        timeLeftControl = self.getControl(self.C_MAIN_LOADING_TIME_LEFT)
+        control = self.getControl(self.C_MAIN_LOADING_PROGRESS)
         if percentageComplete < 1:
-            progressControl.setPercent(1)
+            if control:
+                control.setPercent(1)
             self.progressStartTime = datetime.datetime.now()
             self.progressPreviousPercentage = percentageComplete
         elif percentageComplete != self.progressPreviousPercentage:
-            progressControl.setPercent(percentageComplete)
+            if control:
+                control.setPercent(percentageComplete)
             self.progressPreviousPercentage = percentageComplete
             delta = datetime.datetime.now() - self.progressStartTime
 
             if percentageComplete < 20:
-                timeLeftControl.setLabel(strings(CALCULATING_REMAINING_TIME))
+                self.setControlLabel(self.C_MAIN_LOADING_TIME_LEFT, strings(CALCULATING_REMAINING_TIME))
             else:
                 secondsLeft = int(delta.seconds) / float(percentageComplete) * (100.0 - percentageComplete)
                 if secondsLeft > 30:
                     secondsLeft -= secondsLeft % 10
-                timeLeftControl.setLabel(strings(TIME_LEFT) % secondsLeft)
+                self.setControlLabel(self.C_MAIN_LOADING_TIME_LEFT, strings(TIME_LEFT) % secondsLeft)
 
         return not xbmc.abortRequested and not self.isClosing
 
     def onPlayBackStopped(self):
         xbmc.sleep(1000)
-        if not self.source.isPlaying():
+        if not self.source.isPlaying() and not self.isClosing:
             self._hideControl(self.C_MAIN_OSD)
             self.onRedrawEPG(self.channelIdx, self.viewStartDate)
 
@@ -851,18 +920,48 @@ class TVGuide(xbmcgui.WindowXML):
         Visibility is inverted in skin
         """
         for controlId in controlIds:
-            self.getControl(controlId).setVisible(True)
+            control = self.getControl(controlId)
+            if control:
+                control.setVisible(True)
 
     def _showControl(self, *controlIds):
         """
         Visibility is inverted in skin
         """
         for controlId in controlIds:
-            self.getControl(controlId).setVisible(False)
+            control = self.getControl(controlId)
+            if control:
+                control.setVisible(False)
+
+    def formatTime(self, timestamp):
+        format = xbmc.getRegion('time').replace(':%S', '')
+        return timestamp.strftime(format)
+
+    def formatDate(self, timestamp):
+        format = xbmc.getRegion('dateshort')
+        return timestamp.strftime(format)
+
+    def setControlImage(self, controlId, image):
+        control = self.getControl(controlId)
+        if control:
+            control.setImage(image)
+
+    def setControlLabel(self, controlId, label):
+        control = self.getControl(controlId)
+        if control:
+            control.setLabel(label)
+
+    def setControlText(self, controlId, text):
+        control = self.getControl(controlId)
+        if control:
+            control.setText(text)
+
+
+
 
 class PopupMenu(xbmcgui.WindowXMLDialog):
     C_POPUP_PLAY = 4000
-    C_POPUP_CHOOSE_STRM = 4001
+    C_POPUP_CHOOSE_STREAM = 4001
     C_POPUP_REMIND = 4002
     C_POPUP_CHANNELS = 4003
     C_POPUP_QUIT = 4004
@@ -898,9 +997,9 @@ class PopupMenu(xbmcgui.WindowXMLDialog):
         playControl.setLabel(strings(WATCH_CHANNEL, self.program.channel.title))
         if not self.source.isPlayable(self.program.channel):
             playControl.setEnabled(False)
-            self.setFocusId(self.C_POPUP_CHOOSE_STRM)
+            self.setFocusId(self.C_POPUP_CHOOSE_STREAM)
         if self.source.getCustomStreamUrl(self.program.channel):
-            chooseStrmControl = self.getControl(self.C_POPUP_CHOOSE_STRM)
+            chooseStrmControl = self.getControl(self.C_POPUP_CHOOSE_STREAM)
             chooseStrmControl.setLabel(strings(REMOVE_STRM_FILE))
 
         if self.program.channel.logo is not None:
@@ -925,9 +1024,9 @@ class PopupMenu(xbmcgui.WindowXMLDialog):
 
     @buggalo.buggalo_try_except({'method' : 'PopupMenu.onClick'})
     def onClick(self, controlId):
-        if controlId == self.C_POPUP_CHOOSE_STRM and self.source.getCustomStreamUrl(self.program.channel):
+        if controlId == self.C_POPUP_CHOOSE_STREAM and self.source.getCustomStreamUrl(self.program.channel):
             self.source.deleteCustomStreamUrl(self.program.channel)
-            chooseStrmControl = self.getControl(self.C_POPUP_CHOOSE_STRM)
+            chooseStrmControl = self.getControl(self.C_POPUP_CHOOSE_STREAM)
             chooseStrmControl.setLabel(strings(CHOOSE_STRM_FILE))
 
             if not self.source.isPlayable(self.program.channel):
@@ -940,7 +1039,6 @@ class PopupMenu(xbmcgui.WindowXMLDialog):
 
     def onFocus(self, controlId):
         pass
-
 
 class ChannelsMenu(xbmcgui.WindowXMLDialog):
     C_CHANNELS_LIST = 6000
@@ -960,6 +1058,7 @@ class ChannelsMenu(xbmcgui.WindowXMLDialog):
         super(ChannelsMenu, self).__init__()
         self.source = source
         self.channelList = source._retrieveChannelListFromDatabase(False)
+        self.swapInProgress = False
 
     @buggalo.buggalo_try_except({'method' : 'ChannelsMenu.onInit'})
     def onInit(self):
@@ -989,14 +1088,14 @@ class ChannelsMenu(xbmcgui.WindowXMLDialog):
         elif self.getFocusId() == self.C_CHANNELS_SELECTION and action.getId() == ACTION_UP:
             listControl = self.getControl(self.C_CHANNELS_LIST)
             idx = listControl.getSelectedPosition()
-            self.swapChannels(idx, idx - 1)
-            listControl.selectItem(idx - 1)
+            if idx > 0:
+                self.swapChannels(idx, idx - 1)
 
         elif self.getFocusId() == self.C_CHANNELS_SELECTION and action.getId() == ACTION_DOWN:
             listControl = self.getControl(self.C_CHANNELS_LIST)
             idx = listControl.getSelectedPosition()
-            self.swapChannels(idx, idx + 1)
-            listControl.selectItem(idx + 1)
+            if idx < listControl.size() - 1:
+                self.swapChannels(idx, idx + 1)
 
     @buggalo.buggalo_try_except({'method' : 'ChannelsMenu.onClick'})
     def onClick(self, controlId):
@@ -1036,9 +1135,7 @@ class ChannelsMenu(xbmcgui.WindowXMLDialog):
             item.setProperty('idx', str(idx))
             listControl.addItem(item)
 
-    def updateListItem(self, idx, item = None):
-        if item is None:
-            item = xbmcgui.ListItem()
+    def updateListItem(self, idx, item):
         channel = self.channelList[idx]
         item.setLabel('%3d. %s' % (idx+1, channel.title))
 
@@ -1050,6 +1147,10 @@ class ChannelsMenu(xbmcgui.WindowXMLDialog):
         item.setProperty('idx', str(idx))
 
     def swapChannels(self, fromIdx, toIdx):
+        if self.swapInProgress:
+            return
+        self.swapInProgress = True
+
         c = self.channelList[fromIdx]
         self.channelList[fromIdx] = self.channelList[toIdx]
         self.channelList[toIdx] = c
@@ -1062,5 +1163,233 @@ class ChannelsMenu(xbmcgui.WindowXMLDialog):
         self.updateListItem(fromIdx, listControl.getListItem(fromIdx))
         self.updateListItem(toIdx, listControl.getListItem(toIdx))
 
+        listControl.selectItem(toIdx)
+        xbmc.sleep(50)
+        self.swapInProgress = False
 
 
+
+class StreamSetupDialog(xbmcgui.WindowXMLDialog):
+    C_STREAM_STRM_TAB = 101
+    C_STREAM_FAVOURITES_TAB = 102
+    C_STREAM_ADDONS_TAB = 103
+    C_STREAM_STRM_BROWSE = 1001
+    C_STREAM_STRM_FILE_LABEL = 1005
+    C_STREAM_STRM_PREVIEW = 1002
+    C_STREAM_STRM_OK = 1003
+    C_STREAM_STRM_CANCEL = 1004
+    C_STREAM_FAVOURITES = 2001
+    C_STREAM_FAVOURITES_PREVIEW = 2002
+    C_STREAM_FAVOURITES_OK = 2003
+    C_STREAM_FAVOURITES_CANCEL = 2004
+    C_STREAM_ADDONS = 3001
+    C_STREAM_ADDONS_STREAMS = 3002
+    C_STREAM_ADDONS_NAME = 3003
+    C_STREAM_ADDONS_DESCRIPTION = 3004
+    C_STREAM_ADDONS_PREVIEW = 3005
+    C_STREAM_ADDONS_OK = 3006
+    C_STREAM_ADDONS_CANCEL = 3007
+
+    C_STREAM_VISIBILITY_MARKER = 100
+
+    VISIBLE_STRM = 'strm'
+    VISIBLE_FAVOURITES = 'favourites'
+    VISIBLE_ADDONS = 'addons'
+
+    def __new__(cls, source, channel):
+        return super(StreamSetupDialog, cls).__new__(cls, 'script-tvguide-streamsetup.xml', ADDON.getAddonInfo('path'))
+
+    def __init__(self, source, channel):
+        """
+        @type source: source.Source
+        @type channel:source.Channel
+        """
+        super(StreamSetupDialog, self).__init__()
+        self.source = source
+        self.channel = channel
+
+        self.player = xbmc.Player()
+        self.previousAddonId = None
+        self.strmFile = None
+        self.streamingService = streaming.StreamsService()
+
+    def close(self):
+        if self.player.isPlaying():
+            self.player.stop()
+        super(StreamSetupDialog, self).close()
+
+    @buggalo.buggalo_try_except({'method' : 'StreamSetupDialog.onInit'})
+    def onInit(self):
+        self.getControl(self.C_STREAM_VISIBILITY_MARKER).setLabel(self.VISIBLE_STRM)
+
+        favourites = self.streamingService.loadFavourites()
+        items = list()
+        for label, value in favourites:
+            item = xbmcgui.ListItem(label)
+            item.setProperty('stream', value)
+            items.append(item)
+
+        listControl = self.getControl(StreamSetupDialog.C_STREAM_FAVOURITES)
+        listControl.addItems(items)
+
+        items = list()
+        for id in self.streamingService.getAddons():
+            try:
+                addon = xbmcaddon.Addon(id) # raises Exception if addon is not installed
+                item = xbmcgui.ListItem(addon.getAddonInfo('name'), iconImage=addon.getAddonInfo('icon'))
+                item.setProperty('addon_id', id)
+                items.append(item)
+            except Exception:
+                pass
+        listControl = self.getControl(StreamSetupDialog.C_STREAM_ADDONS)
+        listControl.addItems(items)
+        self.updateAddonInfo()
+
+
+    @buggalo.buggalo_try_except({'method' : 'StreamSetupDialog.onAction'})
+    def onAction(self, action):
+        if action.getId() in [ACTION_PARENT_DIR, ACTION_PREVIOUS_MENU, KEY_NAV_BACK, KEY_CONTEXT_MENU]:
+            self.close()
+            return
+
+        elif self.getFocusId() == self.C_STREAM_ADDONS:
+            self.updateAddonInfo()
+
+
+    @buggalo.buggalo_try_except({'method' : 'StreamSetupDialog.onClick'})
+    def onClick(self, controlId):
+        if controlId == self.C_STREAM_STRM_BROWSE:
+            stream = xbmcgui.Dialog().browse(1, ADDON.getLocalizedString(30304), 'video', '.strm')
+            if stream:
+                self.source.setCustomStreamUrl(self.channel, stream)
+                self.getControl(self.C_STREAM_STRM_FILE_LABEL).setText(stream)
+                self.strmFile = stream
+
+        elif controlId == self.C_STREAM_ADDONS_OK:
+            listControl = self.getControl(self.C_STREAM_ADDONS_STREAMS)
+            item = listControl.getSelectedItem()
+            stream = item.getProperty('stream')
+            self.source.setCustomStreamUrl(self.channel, stream)
+            self.close()
+
+        elif controlId == self.C_STREAM_FAVOURITES_OK:
+            listControl = self.getControl(self.C_STREAM_FAVOURITES)
+            item = listControl.getSelectedItem()
+            stream = item.getProperty('stream')
+            self.source.setCustomStreamUrl(self.channel, stream)
+            self.close()
+
+        elif controlId == self.C_STREAM_STRM_OK:
+            self.source.setCustomStreamUrl(self.channel, self.strmFile)
+            self.close()
+
+        elif controlId in [self.C_STREAM_ADDONS_CANCEL, self.C_STREAM_FAVOURITES_CANCEL, self.C_STREAM_STRM_CANCEL]:
+            self.close()
+
+        elif controlId in [self.C_STREAM_ADDONS_PREVIEW, self.C_STREAM_FAVOURITES_PREVIEW, self.C_STREAM_STRM_PREVIEW]:
+            if self.player.isPlaying():
+                self.player.stop()
+                self.getControl(self.C_STREAM_ADDONS_PREVIEW).setLabel(strings(PREVIEW_STREAM))
+                self.getControl(self.C_STREAM_FAVOURITES_PREVIEW).setLabel(strings(PREVIEW_STREAM))
+                self.getControl(self.C_STREAM_STRM_PREVIEW).setLabel(strings(PREVIEW_STREAM))
+                return
+
+            stream = None
+            visible = self.getControl(self.C_STREAM_VISIBILITY_MARKER).getLabel()
+            if visible == self.VISIBLE_ADDONS:
+                listControl = self.getControl(self.C_STREAM_ADDONS_STREAMS)
+                item = listControl.getSelectedItem()
+                stream = item.getProperty('stream')
+            elif visible == self.VISIBLE_FAVOURITES:
+                listControl = self.getControl(self.C_STREAM_FAVOURITES)
+                item = listControl.getSelectedItem()
+                stream = item.getProperty('stream')
+            elif visible == self.VISIBLE_STRM:
+                stream = self.strmFile
+
+            if stream is not None:
+                self.player.play(item = stream, windowed = True)
+                if self.player.isPlaying():
+                    self.getControl(self.C_STREAM_ADDONS_PREVIEW).setLabel(strings(STOP_PREVIEW))
+                    self.getControl(self.C_STREAM_FAVOURITES_PREVIEW).setLabel(strings(STOP_PREVIEW))
+                    self.getControl(self.C_STREAM_STRM_PREVIEW).setLabel(strings(STOP_PREVIEW))
+
+    @buggalo.buggalo_try_except({'method' : 'StreamSetupDialog.onFocus'})
+    def onFocus(self, controlId):
+        if controlId == self.C_STREAM_STRM_TAB:
+            self.getControl(self.C_STREAM_VISIBILITY_MARKER).setLabel(self.VISIBLE_STRM)
+        elif controlId == self.C_STREAM_FAVOURITES_TAB:
+            self.getControl(self.C_STREAM_VISIBILITY_MARKER).setLabel(self.VISIBLE_FAVOURITES)
+        elif controlId == self.C_STREAM_ADDONS_TAB:
+            self.getControl(self.C_STREAM_VISIBILITY_MARKER).setLabel(self.VISIBLE_ADDONS)
+
+
+    def updateAddonInfo(self):
+        listControl = self.getControl(self.C_STREAM_ADDONS)
+        item = listControl.getSelectedItem()
+        if item is None:
+            return
+
+        if item.getProperty('addon_id') == self.previousAddonId:
+            return
+
+        self.previousAddonId = item.getProperty('addon_id')
+        addon = xbmcaddon.Addon(id = item.getProperty('addon_id'))
+        self.getControl(self.C_STREAM_ADDONS_NAME).setLabel('[B]%s[/B]' % addon.getAddonInfo('name'))
+        self.getControl(self.C_STREAM_ADDONS_DESCRIPTION).setText(addon.getAddonInfo('description'))
+
+        streams = self.streamingService.getAddonStreams(item.getProperty('addon_id'))
+        items = list()
+        for (label, stream) in streams:
+            item = xbmcgui.ListItem(label)
+            item.setProperty('stream', stream)
+            items.append(item)
+        listControl = self.getControl(StreamSetupDialog.C_STREAM_ADDONS_STREAMS)
+        listControl.reset()
+        listControl.addItems(items)
+
+
+
+
+
+class ChooseStreamAddonDialog(xbmcgui.WindowXMLDialog):
+    C_SELECTION_LIST = 1000
+
+    def __new__(cls, addons):
+        return super(ChooseStreamAddonDialog, cls).__new__(cls, 'script-tvguide-streamaddon.xml', ADDON.getAddonInfo('path'))
+
+    def __init__(self, addons):
+        super(ChooseStreamAddonDialog, self).__init__()
+        self.addons = addons
+        self.stream = None
+
+    @buggalo.buggalo_try_except({'method' : 'ChooseStreamAddonDialog.onInit'})
+    def onInit(self):
+        items = list()
+        for id, label, url in self.addons:
+            addon = xbmcaddon.Addon(id)
+
+            item = xbmcgui.ListItem(label, addon.getAddonInfo('name'), addon.getAddonInfo('icon'))
+            item.setProperty('stream', url)
+            items.append(item)
+
+        listControl = self.getControl(ChooseStreamAddonDialog.C_SELECTION_LIST)
+        listControl.addItems(items)
+
+        self.setFocus(listControl)
+
+    @buggalo.buggalo_try_except({'method' : 'ChooseStreamAddonDialog.onAction'})
+    def onAction(self, action):
+        if action.getId() in [ACTION_PARENT_DIR, ACTION_PREVIOUS_MENU, KEY_NAV_BACK]:
+            self.close()
+
+    @buggalo.buggalo_try_except({'method' : 'ChooseStreamAddonDialog.onClick'})
+    def onClick(self, controlId):
+        if controlId == ChooseStreamAddonDialog.C_SELECTION_LIST:
+            listControl = self.getControl(ChooseStreamAddonDialog.C_SELECTION_LIST)
+            self.stream = listControl.getSelectedItem().getProperty('stream')
+            self.close()
+
+    @buggalo.buggalo_try_except({'method' : 'ChooseStreamAddonDialog.onFocus'})
+    def onFocus(self, controlId):
+        pass
