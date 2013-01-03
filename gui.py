@@ -66,67 +66,6 @@ ADDON = xbmcaddon.Addon(id = 'script.tvguide')
 def debug(s):
     if DEBUG: xbmc.log(str(s), xbmc.LOGDEBUG)
 
-class SourceInitializer(threading.Thread):
-    def __init__(self, sourceInitializedHandler):
-        super(SourceInitializer, self).__init__()
-        self.sourceInitializedHandler = sourceInitializedHandler
-
-    @buggalo.buggalo_try_except({'method' : 'SourceInitializer.run'})
-    def run(self):
-        while not xbmc.abortRequested and not self.sourceInitializedHandler.isClosing:
-            try:
-                source = src.instantiateSource(ADDON)
-                xbmc.log("[script.tvguide] Using source: %s" % str(type(source)), xbmc.LOGDEBUG)
-                self.sourceInitializedHandler.onSourceInitialized(source)
-                break
-            except src.SourceNotConfiguredException:
-                self.sourceInitializedHandler.onSourceNotConfigured()
-                break
-            except src.SourceUpdateInProgressException, ex:
-                xbmc.log('[script.tvguide] database update in progress...: %s' % str(ex), xbmc.LOGDEBUG)
-                xbmc.sleep(1000)
-
-
-class SourceUpdater(threading.Thread):
-    def __init__(self, sourceUpdatedHandler, source, channelStart, startTime, scrollEvent, progressCallback):
-        """
-
-        @param sourceUpdatedHandler:
-        @type sourceUpdatedHandler: TVGuide
-        """
-        super(SourceUpdater, self).__init__()
-        self.sourceUpdatedHandler = sourceUpdatedHandler
-        self.source = source
-        self.channelStart = channelStart
-        self.startTime = startTime
-        self.scrollEvent = scrollEvent
-        self.progressCallback = progressCallback
-
-    @buggalo.buggalo_try_except({'method' : 'SourceUpdater.run'})
-    def run(self):
-        try:
-            self.source.updateChannelAndProgramListCaches(self.startTime, self.progressCallback, clearExistingProgramList = False)
-            self.sourceUpdatedHandler.onRedrawEPG(self.channelStart, self.startTime, self.scrollEvent)
-        except src.SourceException:
-            self.sourceUpdatedHandler.onEPGLoadError()
-
-
-class TimeBarMover(threading.Thread):
-    def __init__(self, gui):
-        """
-
-        @param gui:
-        @type gui: TVGuide
-        """
-        super(TimeBarMover, self).__init__()
-        self.gui = gui
-
-    @buggalo.buggalo_try_except({'method' : 'TimeBarMover.run'})
-    def run(self):
-        while not xbmc.abortRequested and not self.gui.isClosing:
-            self.gui.updateTimeBar()
-            xbmc.sleep(500)
-
 class Point(object):
     def __init__(self):
         self.x = self.y = 0
@@ -244,8 +183,8 @@ class TVGuide(xbmcgui.WindowXML):
             self.epgView.width = control.getWidth()
             self.epgView.cellHeight = control.getHeight() / CHANNELS_PER_PAGE
 
-        SourceInitializer(self).start()
-        TimeBarMover(self).start()
+        threading.Thread(target=self.initializeSourceInThread).start()
+        self.updateTimebar()
 
     @buggalo.buggalo_try_except({'method' : 'TVGuide.onAction'})
     def onAction(self, action):
@@ -636,7 +575,7 @@ class TVGuide(xbmcgui.WindowXML):
         self.redrawingEPG = True
         self.mode = MODE_EPG
         self._showControl(self.C_MAIN_EPG)
-        self.updateTimeBar()
+        self.updateTimebar(scheduleTimer = False)
 
         # show Loading screen
         self.setControlLabel(self.C_MAIN_LOADING_TIME_LEFT, strings(CALCULATING_REMAINING_TIME))
@@ -647,7 +586,7 @@ class TVGuide(xbmcgui.WindowXML):
         self._clearEpg()
         if self.source.isCacheExpired(startTime):
             self.redrawingEPG = False
-            SourceUpdater(self, self.source, channelStart, startTime, scrollEvent, self.onSourceProgressUpdate).start()
+            threading.Thread(target=self.updateSourceInThread, args=[channelStart, startTime, scrollEvent]).start()
             return
 
         # date and time row
@@ -767,15 +706,6 @@ class TVGuide(xbmcgui.WindowXML):
                 except RuntimeError:
                     pass # happens if we try to remove a control that doesn't exist
         del self.controlAndProgramList[:]
-
-    def updateTimeBar(self):
-        # move timebar to current time
-        timeDelta = datetime.datetime.today() - self.viewStartDate
-        control = self.getControl(self.C_MAIN_TIMEBAR)
-        if control:
-            (x, y) = control.getPosition()
-            control.setVisible(timeDelta.days == 0)
-            control.setPosition(self._secondsToXposition(timeDelta.seconds), y)
 
     def onEPGLoadError(self):
         self.redrawingEPG = False
@@ -956,6 +886,43 @@ class TVGuide(xbmcgui.WindowXML):
         if control:
             control.setText(text)
 
+
+    # todo @buggalo.buggalo_try_except
+    def initializeSourceInThread(self):
+        while not xbmc.abortRequested and not self.isClosing:
+            try:
+                source = src.instantiateSource(ADDON)
+                xbmc.log("[script.tvguide] Using source: %s" % str(type(source)), xbmc.LOGDEBUG)
+                self.onSourceInitialized(source)
+                break
+            except src.SourceNotConfiguredException:
+                self.onSourceNotConfigured()
+                break
+            except src.SourceUpdateInProgressException, ex:
+                xbmc.log('[script.tvguide] database update in progress...: %s' % str(ex), xbmc.LOGDEBUG)
+                xbmc.sleep(1000)
+
+    # todo @buggalo.buggalo_try_except
+    def updateSourceInThread(self, channelStart, startTime, scrollEvent):
+        try:
+            self.source.updateChannelAndProgramListCaches(startTime, self.onSourceProgressUpdate, clearExistingProgramList = False)
+            self.onRedrawEPG(channelStart, startTime, scrollEvent)
+        except src.SourceException:
+            self.onEPGLoadError()
+
+
+    # todo @buggalo.buggalo_try_except
+    def updateTimebar(self, scheduleTimer = True):
+        # move timebar to current time
+        timeDelta = datetime.datetime.today() - self.viewStartDate
+        control = self.getControl(self.C_MAIN_TIMEBAR)
+        if control:
+            (x, y) = control.getPosition()
+            control.setVisible(timeDelta.days == 0)
+            control.setPosition(self._secondsToXposition(timeDelta.seconds), y)
+
+        if scheduleTimer and not xbmc.abortRequested and not self.isClosing:
+            threading.Timer(5, self.updateTimebar).start()
 
 
 
