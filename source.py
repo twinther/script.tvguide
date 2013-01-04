@@ -464,10 +464,6 @@ class Source(object):
         self.player.stop()
 
     def play(self, channel, playBackStoppedHandler):
-        threading.Timer(0.5, self.playInThread, [channel, playBackStoppedHandler]).start()
-
-    @buggalo.buggalo_try_except({'method' : 'source.playThread'})
-    def playInThread(self, channel, playBackStoppedHandler):
         customStreamUrl = self.getCustomStreamUrl(channel)
         if customStreamUrl:
             customStreamUrl = customStreamUrl.encode('utf-8', 'ignore')
@@ -479,7 +475,11 @@ class Source(object):
             xbmc.log("Playing : %s" % streamUrl)
             self.player.play(item = streamUrl, windowed = self.osdEnabled)
 
-        while True:
+        threading.Timer(0.5, self.waitForPlayBackStopped, [playBackStoppedHandler]).start()
+
+    @buggalo.buggalo_try_except({'method' : 'source.playThread'})
+    def waitForPlayBackStopped(self, playBackStoppedHandler):
+        while not xbmc.abortRequested:
             xbmc.sleep(250)
             if not self.player.isPlaying():
                 break

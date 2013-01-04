@@ -1,3 +1,6 @@
+[B]Version 1.3.94 - 2013-01-04[/B]
+- Fixed threading issue on Frodo when starting stream playback
+
 [B]Version 1.3.93 - 2013-01-03[/B]
 - Fixed threading issues on Frodo causing the TV Guide to hang XBMC on startup
 
