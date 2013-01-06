@@ -19,9 +19,9 @@
 #
 import StringIO
 import os
+import threading
 import simplejson
 import datetime
-import threading
 import time
 import urllib2
 from xml.etree import ElementTree
@@ -475,15 +475,12 @@ class Source(object):
             xbmc.log("Playing : %s" % streamUrl)
             self.player.play(item = streamUrl, windowed = self.osdEnabled)
 
-        threading.Timer(0.5, self.waitForPlayBackStopped, [playBackStoppedHandler]).start()
+        threading.Timer(1, self.waitForPlayBackStopped, [playBackStoppedHandler]).start()
 
-    @buggalo.buggalo_try_except({'method' : 'source.playThread'})
+    @buggalo.buggalo_try_except
     def waitForPlayBackStopped(self, playBackStoppedHandler):
-        while not xbmc.abortRequested:
-            xbmc.sleep(250)
-            if not self.player.isPlaying():
-                break
-
+        while self.player.isPlaying():
+            time.sleep(0.5)
         playBackStoppedHandler.onPlayBackStopped()
 
     def _createTables(self):

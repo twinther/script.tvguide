@@ -750,7 +750,6 @@ class TVGuide(xbmcgui.WindowXML):
         return not xbmc.abortRequested and not self.isClosing
 
     def onPlayBackStopped(self):
-        xbmc.sleep(1000)
         if not self.source.isPlaying() and not self.isClosing:
             self._hideControl(self.C_MAIN_OSD)
             self.onRedrawEPG(self.channelIdx, self.viewStartDate)
@@ -887,7 +886,6 @@ class TVGuide(xbmcgui.WindowXML):
             control.setText(text)
 
 
-    # todo @buggalo.buggalo_try_except
     def initializeSourceInThread(self):
         while not xbmc.abortRequested and not self.isClosing:
             try:
@@ -901,29 +899,33 @@ class TVGuide(xbmcgui.WindowXML):
             except src.SourceUpdateInProgressException, ex:
                 xbmc.log('[script.tvguide] database update in progress...: %s' % str(ex), xbmc.LOGDEBUG)
                 xbmc.sleep(1000)
+            except Exception:
+                buggalo.onExceptionRaised()
 
-    # todo @buggalo.buggalo_try_except
     def updateSourceInThread(self, channelStart, startTime, scrollEvent):
         try:
             self.source.updateChannelAndProgramListCaches(startTime, self.onSourceProgressUpdate, clearExistingProgramList = False)
             self.onRedrawEPG(channelStart, startTime, scrollEvent)
         except src.SourceException:
             self.onEPGLoadError()
+        except Exception:
+            buggalo.onExceptionRaised()
 
 
-    # todo @buggalo.buggalo_try_except
     def updateTimebar(self, scheduleTimer = True):
-        # move timebar to current time
-        timeDelta = datetime.datetime.today() - self.viewStartDate
-        control = self.getControl(self.C_MAIN_TIMEBAR)
-        if control:
-            (x, y) = control.getPosition()
-            control.setVisible(timeDelta.days == 0)
-            control.setPosition(self._secondsToXposition(timeDelta.seconds), y)
+        try:
+            # move timebar to current time
+            timeDelta = datetime.datetime.today() - self.viewStartDate
+            control = self.getControl(self.C_MAIN_TIMEBAR)
+            if control:
+                (x, y) = control.getPosition()
+                control.setVisible(timeDelta.days == 0)
+                control.setPosition(self._secondsToXposition(timeDelta.seconds), y)
 
-        if scheduleTimer and not xbmc.abortRequested and not self.isClosing:
-            threading.Timer(5, self.updateTimebar).start()
-
+            if scheduleTimer and not xbmc.abortRequested and not self.isClosing:
+                threading.Timer(1, self.updateTimebar).start()
+        except Exception:
+            buggalo.onExceptionRaised()
 
 
 class PopupMenu(xbmcgui.WindowXMLDialog):

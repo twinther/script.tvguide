@@ -1,3 +1,7 @@
+[B]Version 1.3.95 - 2013-01-06[/B]
+- Updated Aeon Nox skin (thanks Lunatixz)
+- Additional threading fixes for Frodo when invoking OSD/EPG while stream is playing
+
 [B]Version 1.3.94 - 2013-01-04[/B]
 - Fixed threading issue on Frodo when starting stream playback
 
