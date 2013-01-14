@@ -526,6 +526,42 @@ class Database(object):
 
         return previousProgram
 
+    def _getProgramList(self, channels, startTime):
+        """
+
+        @param channels:
+        @type channels: list of source.Channel
+        @param startTime:
+        @type startTime: datetime.datetime
+        @return:
+        """
+        endTime = startTime + datetime.timedelta(hours = 2)
+        programList = list()
+
+        channelMap = dict()
+        for c in channels:
+            channelMap[c.id] = c
+
+        c = self.conn.cursor()
+        c.execute('SELECT p.*, (SELECT 1 FROM notifications n WHERE n.channel=p.channel AND n.program_title=p.title AND n.source=p.source) AS notification_scheduled FROM programs p WHERE p.channel IN (\'' + ('\',\''.join(channelMap.keys())) + '\') AND p.source=? AND p.end_date >= ? AND p.start_date <= ?', [self.source.KEY, startTime, endTime])
+        for row in c:
+            program = Program(channelMap[row['channel']], row['title'], row['start_date'], row['end_date'], row['description'], row['image_large'], row['image_small'], row['notification_scheduled'])
+            programList.append(program)
+
+
+        return programList
+
+    def _isProgramListCacheExpired(self, date = datetime.datetime.now()):
+        # check if data is up-to-date in database
+        dateStr = date.strftime('%Y-%m-%d')
+        c = self.conn.cursor()
+        c.execute('SELECT programs_updated FROM updates WHERE source=? AND date=?', [self.source.KEY, dateStr])
+        row = c.fetchone()
+        today = datetime.datetime.now()
+        expired = row is None or row['programs_updated'].day != today.day
+        c.close()
+        return expired
+
 
     def setCustomStreamUrl(self, callback, channel, stream_url):
         self.eventQueue.append([self._setCustomStreamUrl, callback, None, channel, stream_url])
@@ -558,6 +594,10 @@ class Database(object):
             return None
 
     def deleteCustomStreamUrl(self, channel):
+        self.eventQueue.append([self._deleteCustomStreamUrl, None, None, channel])
+        self.event.set()
+
+    def _deleteCustomStreamUrl(self, channel):
         c = self.conn.cursor()
         c.execute("DELETE FROM custom_stream_url WHERE channel=?", [channel.id])
         self.conn.commit()
