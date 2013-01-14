@@ -195,10 +195,6 @@ class TVGuide(xbmcgui.WindowXML):
 
     @buggalo.buggalo_try_except({'method' : 'TVGuide.onAction'})
     def onAction(self, action):
-#        if not self.source:
-#            if action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK]:
-#                self.close()
-#            return
         debug('Mode is: %s' % self.mode)
 
         if self.mode == MODE_TV:
@@ -723,10 +719,8 @@ class TVGuide(xbmcgui.WindowXML):
         return xbmc.abortRequested or self.isClosing
 
     def onSourceInitialized(self):
-        self.source = self.database.source # todo
         self.notification = Notification(self.database, ADDON.getAddonInfo('path'))
-
-        self.setControlImage(self.C_MAIN_IMAGE, 'tvguide-logo-%s.png' % self.source.KEY)
+        self.setControlImage(self.C_MAIN_IMAGE, 'tvguide-logo-%s.png' % self.database.source.KEY)
         self.onRedrawEPG(0, self.viewStartDate)
 
     def onSourceProgressUpdate(self, percentageComplete):

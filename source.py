@@ -95,6 +95,7 @@ class DatabaseSchemaException(sqlite3.DatabaseError):
 
 class Database(object):
     SOURCE_DB = 'source.db'
+    CHANNELS_PER_PAGE = 9
 
     def __init__(self):
         self.conn = None
@@ -251,7 +252,7 @@ class Database(object):
         # check if channel data is up-to-date in database
         try:
             c = self.conn.cursor()
-            c.execute('SELECT channels_updated FROM sources WHERE id=?', [self.source.KEY])  # todo always fails with TypeError ??
+            c.execute('SELECT channels_updated FROM sources WHERE id=?', [self.source.KEY])
             row = c.fetchone()
             if not row:
                 return True
@@ -395,22 +396,13 @@ class Database(object):
             channelStart = len(channels) - 1
         elif channelStart > len(channels) - 1:
             channelStart = 0
-        channelEnd = channelStart + 9 # TODO constant
+        channelEnd = channelStart + Database.CHANNELS_PER_PAGE
         channelsOnPage = channels[channelStart : channelEnd]
 
         programs = self._getProgramList(channelsOnPage, date)
 
         return [channelStart, channelsOnPage, programs]
 
-
-    def getChannel(self, id):
-        c = self.conn.cursor()
-        c.execute('SELECT * FROM channels WHERE source=? AND id=?', [self.source.KEY, id])
-        row = c.fetchone()
-        channel = Channel(row['id'], row['title'],row['logo'], row['stream_url'], row['visible'], row['weight'])
-        c.close()
-
-        return channel
 
     def getNextChannel(self, currentChannel):
         channels = self.getChannelList()
@@ -469,21 +461,6 @@ class Database(object):
             channelList.append(channel)
         c.close()
         return channelList
-
-    def _isChannelListCacheExpired(self):
-        try:
-            c = self.conn.cursor()
-            c.execute('SELECT channels_updated FROM sources WHERE id=?', [self.source.KEY])
-            row = c.fetchone()
-            if not row:
-                return True
-            lastUpdated = row['channels_updated']
-            c.close()
-
-            today = datetime.datetime.now()
-            return lastUpdated.day != today.day
-        except TypeError:
-            return True
 
     def getCurrentProgram(self, channel):
         resultReady = threading.Event()
@@ -548,50 +525,6 @@ class Database(object):
         c.close()
 
         return previousProgram
-
-    def getProgramList(self, channels, startTime):
-        resultReady = threading.Event()
-        self.eventQueue.append([self._getProgramList, None, resultReady, channels, startTime])
-        self.event.set()
-
-        resultReady.wait()
-        return self.eventResults.get(self._getProgramList.__name__)
-
-    def _getProgramList(self, channels, startTime):
-        """
-
-        @param channels:
-        @type channels: list of source.Channel
-        @param startTime:
-        @type startTime: datetime.datetime
-        @return:
-        """
-        endTime = startTime + datetime.timedelta(hours = 2)
-        programList = list()
-
-        channelMap = dict()
-        for c in channels:
-            channelMap[c.id] = c
-
-        c = self.conn.cursor()
-        c.execute('SELECT p.*, (SELECT 1 FROM notifications n WHERE n.channel=p.channel AND n.program_title=p.title AND n.source=p.source) AS notification_scheduled FROM programs p WHERE p.channel IN (\'' + ('\',\''.join(channelMap.keys())) + '\') AND p.source=? AND p.end_date >= ? AND p.start_date <= ?', [self.source.KEY, startTime, endTime])
-        for row in c:
-            program = Program(channelMap[row['channel']], row['title'], row['start_date'], row['end_date'], row['description'], row['image_large'], row['image_small'], row['notification_scheduled'])
-            programList.append(program)
-
-
-        return programList
-
-    def _isProgramListCacheExpired(self, date = datetime.datetime.now()):
-        # check if data is up-to-date in database
-        dateStr = date.strftime('%Y-%m-%d')
-        c = self.conn.cursor()
-        c.execute('SELECT programs_updated FROM updates WHERE source=? AND date=?', [self.source.KEY, dateStr])
-        row = c.fetchone()
-        today = datetime.datetime.now()
-        expired = row is None or row['programs_updated'].day != today.day
-        c.close()
-        return expired
 
 
     def setCustomStreamUrl(self, callback, channel, stream_url):
