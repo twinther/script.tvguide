@@ -163,6 +163,9 @@ class Database(object):
         self.event.set()
 
     def _initialize(self, cancel_requested_callback):
+        sqlite3.register_adapter(datetime.datetime, self.adapt_datetime)
+        sqlite3.register_converter('timestamp', self.convert_datetime)
+
         self.sourceNotConfigured = False
         while True:
             if cancel_requested_callback is not None and cancel_requested_callback():
@@ -260,7 +263,7 @@ class Database(object):
             c.close()
 
             today = datetime.datetime.now()
-            if lastUpdated.day != today.day:
+            if lastUpdated is None or lastUpdated.day != today.day:
                 return True
         except TypeError:
             return True
@@ -286,6 +289,10 @@ class Database(object):
         self.event.set()
 
     def _updateChannelAndProgramListCaches(self, date, progress_callback, clearExistingProgramList):
+        # todo workaround service.py 'forgets' the adapter and convert set in _initialize.. wtf?!
+        sqlite3.register_adapter(datetime.datetime, self.adapt_datetime)
+        sqlite3.register_converter('timestamp', self.convert_datetime)
+
         if not self._isCacheExpired(date):
             return
 
@@ -543,7 +550,7 @@ class Database(object):
             channelMap[c.id] = c
 
         c = self.conn.cursor()
-        c.execute('SELECT p.*, (SELECT 1 FROM notifications n WHERE n.channel=p.channel AND n.program_title=p.title AND n.source=p.source) AS notification_scheduled FROM programs p WHERE p.channel IN (\'' + ('\',\''.join(channelMap.keys())) + '\') AND p.source=? AND p.end_date >= ? AND p.start_date <= ?', [self.source.KEY, startTime, endTime])
+        c.execute('SELECT p.*, (SELECT 1 FROM notifications n WHERE n.channel=p.channel AND n.program_title=p.title AND n.source=p.source) AS notification_scheduled FROM programs p WHERE p.channel IN (\'' + ('\',\''.join(channelMap.keys())) + '\') AND p.source=? AND p.end_date > ? AND p.start_date < ?', [self.source.KEY, startTime, endTime])
         for row in c:
             program = Program(channelMap[row['channel']], row['title'], row['start_date'], row['end_date'], row['description'], row['image_large'], row['image_small'], row['notification_scheduled'])
             programList.append(program)
@@ -615,6 +622,16 @@ class Database(object):
 
         return None
 
+    def adapt_datetime(self, ts):
+        # http://docs.python.org/2/library/sqlite3.html#registering-an-adapter-callable
+        return time.mktime(ts.timetuple())
+
+    def convert_datetime(self, ts):
+        try:
+            return datetime.datetime.fromtimestamp(float(ts))
+        except ValueError:
+            return None
+
     def _createTables(self):
         c = self.conn.cursor()
 
@@ -646,7 +663,7 @@ class Database(object):
                 # For notifications
                 c.execute("CREATE TABLE notifications(channel TEXT, program_title TEXT, source TEXT, FOREIGN KEY(channel, source) REFERENCES channels(id, source) ON DELETE CASCADE)")
 
-            if version < [1,3, 1]:
+            if version < [1, 3, 1]:
                 # Recreate tables with FOREIGN KEYS as DEFERRABLE INITIALLY DEFERRED
                 c.execute('UPDATE version SET major=1, minor=3, patch=1')
                 c.execute('DROP TABLE channels')
