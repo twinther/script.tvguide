@@ -720,7 +720,6 @@ class TVGuide(xbmcgui.WindowXML):
 
     def onSourceInitialized(self):
         self.notification = Notification(self.database, ADDON.getAddonInfo('path'))
-        self.setControlImage(self.C_MAIN_IMAGE, 'tvguide-logo-%s.png' % self.database.source.KEY)
         self.onRedrawEPG(0, self.viewStartDate)
 
     def onSourceProgressUpdate(self, percentageComplete):

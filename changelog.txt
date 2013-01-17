@@ -1,4 +1,5 @@
 [B]Version 1.3.96 - 2013-01-xx[/B]
+- New default skin [I]Blue EPG[/I] (thanks maly95)
 - Rewrote database layer so database is only access through a single thread.
   This will hopefully solve some sporadic behaviour and 'Database is closed' errors.
 - Removed JSON-URL and DR.dk sources as they weren't working anymore.

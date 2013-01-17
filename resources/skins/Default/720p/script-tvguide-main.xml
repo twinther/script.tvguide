@@ -375,6 +375,7 @@
                 <height>160</height>
                 <aspectratio>keep</aspectratio>
                 <fadetime>500</fadetime>
+                <texture>tvguide-logo-epg.png</texture>
             </control>
 
             <control type="image" id="4100">
