@@ -1,5 +1,5 @@
 #
-#      Copyright (C) 2012 Tommy Winther
+#      Copyright (C) 2013 Tommy Winther
 #      http://tommy.winther.nu
 #
 #  This Program is free software; you can redistribute it and/or modify
@@ -147,7 +147,7 @@ class TVGuide(xbmcgui.WindowXML):
     def getControl(self, controlId):
         try:
             return super(TVGuide, self).getControl(controlId)
-        except TypeError:
+        except:
             if controlId in self.ignoreMissingControlIds:
                 return None
             if not self.isClosing:
@@ -528,23 +528,32 @@ class TVGuide(xbmcgui.WindowXML):
         wasPlaying = self.player.isPlaying()
         url = self.database.getStreamUrl(channel)
         if url:
-            self.player.play(item = url, windowed = self.osdEnabled)
-            for retry in range(0, 10):
-                xbmc.sleep(100)
-                if self.player.isPlaying():
-                    break
+            if url[0:9] == 'plugin://':
+                if self.osdEnabled:
+                    xbmc.executebuiltin('PlayMedia(%s,1)' % url)
+                else:
+                    xbmc.executebuiltin('PlayMedia(%s)' % url)
+                if not wasPlaying:
+                    self._hideEpg()
+            else:
+                self.player.play(item = url, windowed = self.osdEnabled)
 
-            threading.Timer(1, self.waitForPlayBackStopped).start()
+                for retry in range(0, 10):
+                    xbmc.sleep(100)
+                    if self.player.isPlaying():
+                        break
 
-        if not wasPlaying and self.player.isPlaying():
-            self._hideEpg()
 
+            if not wasPlaying and self.player.isPlaying():
+                self._hideEpg()
+
+        threading.Timer(1, self.waitForPlayBackStopped).start()
         self.osdProgram = self.database.getCurrentProgram(self.currentChannel)
 
-        return self.player.isPlaying()
+        return url is not None
 
     def waitForPlayBackStopped(self):
-        while self.player.isPlaying():
+        while self.player.isPlaying() and not xbmc.abortRequested and not self.isClosing:
             time.sleep(0.5)
         self.onPlayBackStopped()
 
