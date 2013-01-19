@@ -1,5 +1,5 @@
 #
-#      Copyright (C) 2012 Tommy Winther
+#      Copyright (C) 2013 Tommy Winther
 #      http://tommy.winther.nu
 #
 #  This Program is free software; you can redistribute it and/or modify
@@ -32,7 +32,7 @@ import ysapi
 import xbmc
 import xbmcgui
 import xbmcvfs
-from sqlite3 import dbapi2 as sqlite3
+import sqlite3
 
 SETTINGS_TO_CHECK = ['source', 'youseetv.category', 'xmltv.file', 'xmltv.logo.folder', 'ontv.url']
 
@@ -132,20 +132,15 @@ class Database(object):
 
             command = event[0]
             callback = event[1]
-            resultReady = event[2]
-
 
             print 'Database.eventLoop() >>>>>>>>>> processing command: ' + command.__name__
 
             try:
-                result = command(*event[3:])
+                result = command(*event[2:])
                 self.eventResults[command.__name__] = result
 
                 if callback:
                     threading.Thread(name = 'Database callback', target = callback).start()
-
-                if resultReady:
-                    resultReady.set()
 
                 if self._close == command:
                     del self.eventQueue[:]
@@ -158,8 +153,21 @@ class Database(object):
 
         print 'Database.eventLoop() >>>>>>>>>> exiting...'
 
+    def _invokeAndBlockForResult(self, method, *args):
+        event = [method, None]
+        event.extend(args)
+        self.eventQueue.append(event)
+        self.event.set()
+
+        while not self.eventResults.has_key(method.__name__):
+            time.sleep(0.1)
+
+        result = self.eventResults.get(method.__name__)
+        del self.eventResults[method.__name__]
+        return result
+
     def initialize(self, callback, cancel_requested_callback):
-        self.eventQueue.append([self._initialize, callback, None, cancel_requested_callback])
+        self.eventQueue.append([self._initialize, callback, cancel_requested_callback])
         self.event.set()
 
     def _initialize(self, cancel_requested_callback):
@@ -206,7 +214,7 @@ class Database(object):
             self.sourceNotConfigured = True
 
     def close(self, callback):
-        self.eventQueue.append([self._close, callback, None])
+        self.eventQueue.append([self._close, callback])
         self.event.set()
 
     def _close(self):
@@ -285,7 +293,7 @@ class Database(object):
 
 
     def updateChannelAndProgramListCaches(self, callback, date = datetime.datetime.now(), progress_callback = None, clearExistingProgramList = True):
-        self.eventQueue.append([self._updateChannelAndProgramListCaches, callback, None, date, progress_callback, clearExistingProgramList])
+        self.eventQueue.append([self._updateChannelAndProgramListCaches, callback, date, progress_callback, clearExistingProgramList])
         self.event.set()
 
     def _updateChannelAndProgramListCaches(self, date, progress_callback, clearExistingProgramList):
@@ -355,7 +363,7 @@ class Database(object):
 
         except SourceUpdateCanceledException:
             # force source update on next load
-            c.execute('UPDATE sources SET channels_updated=? WHERE id=?', [datetime.datetime.fromtimestamp(0), self.source.KEY])
+            c.execute('UPDATE sources SET channels_updated=? WHERE id=?', [0, self.source.KEY])
             c.execute("DELETE FROM updates WHERE source=?", [self.source.KEY]) # cascades and deletes associated programs records
             self.conn.commit()
 
@@ -383,15 +391,12 @@ class Database(object):
             c.close()
 
     def getEPGView(self, channelStart, date = datetime.datetime.now(), progress_callback = None, clearExistingProgramList = True):
-        resultReady = threading.Event()
-        self.eventQueue.append([self._getEPGView, None, resultReady, channelStart, date, progress_callback, clearExistingProgramList])
-        self.event.set()
+        result = self._invokeAndBlockForResult(self._getEPGView, channelStart, date, progress_callback, clearExistingProgramList)
 
-        resultReady.wait()
         if self.updateFailed:
             raise SourceException('No channels or programs imported')
 
-        return self.eventResults.get(self._getEPGView.__name__)
+        return result
 
 
     def _getEPGView(self, channelStart, date, progress_callback, clearExistingProgramList):
@@ -428,7 +433,7 @@ class Database(object):
         return channels[idx]
 
     def saveChannelList(self, callback, channelList):
-        self.eventQueue.append([self._saveChannelList, callback, None, channelList])
+        self.eventQueue.append([self._saveChannelList, callback, channelList])
         self.event.set()
 
     def _saveChannelList(self, channelList):
@@ -444,15 +449,12 @@ class Database(object):
 
     def getChannelList(self, onlyVisible = True):
         if not self.channelList or not onlyVisible:
-            resultReady = threading.Event()
-            self.eventQueue.append([self._getChannelList, None, resultReady, onlyVisible])
-            self.event.set()
+            result = self._invokeAndBlockForResult(self._getChannelList, onlyVisible)
 
-            resultReady.wait()
             if not onlyVisible:
-                return self.eventResults.get(self._getChannelList.__name__)
+                return result
 
-            self.channelList = self.eventResults.get(self._getChannelList.__name__)
+            self.channelList = result
         return self.channelList
 
 
@@ -470,12 +472,7 @@ class Database(object):
         return channelList
 
     def getCurrentProgram(self, channel):
-        resultReady = threading.Event()
-        self.eventQueue.append([self._getCurrentProgram, None, resultReady, channel])
-        self.event.set()
-
-        resultReady.wait()
-        return self.eventResults.get(self._getCurrentProgram.__name__)
+        return self._invokeAndBlockForResult(self._getCurrentProgram, channel)
 
     def _getCurrentProgram(self, channel):
         """
@@ -496,12 +493,7 @@ class Database(object):
         return program
 
     def getNextProgram(self, channel):
-        resultReady = threading.Event()
-        self.eventQueue.append([self._getNextProgram, None, resultReady, channel])
-        self.event.set()
-
-        resultReady.wait()
-        return self.eventResults.get(self._getNextProgram.__name__)
+        return self._invokeAndBlockForResult(self._getNextProgram, channel)
 
     def _getNextProgram(self, program):
         nextProgram = None
@@ -515,12 +507,7 @@ class Database(object):
         return nextProgram
 
     def getPreviousProgram(self, channel):
-        resultReady = threading.Event()
-        self.eventQueue.append([self._getPreviousProgram, None, resultReady, channel])
-        self.event.set()
-
-        resultReady.wait()
-        return self.eventResults.get(self._getPreviousProgram.__name__)
+        return self._invokeAndBlockForResult(self._getPreviousProgram, channel)
 
     def _getPreviousProgram(self, program):
         previousProgram = None
@@ -571,7 +558,7 @@ class Database(object):
 
 
     def setCustomStreamUrl(self, callback, channel, stream_url):
-        self.eventQueue.append([self._setCustomStreamUrl, callback, None, channel, stream_url])
+        self.eventQueue.append([self._setCustomStreamUrl, callback, channel, stream_url])
         self.event.set()
 
     def _setCustomStreamUrl(self, channel, stream_url):
@@ -582,12 +569,7 @@ class Database(object):
         c.close()
 
     def getCustomStreamUrl(self, channel):
-        resultReady = threading.Event()
-        self.eventQueue.append([self._getCustomStreamUrl, None, resultReady, channel])
-        self.event.set()
-
-        resultReady.wait()
-        return self.eventResults.get(self._getCustomStreamUrl.__name__)
+        return self._invokeAndBlockForResult(self._getCustomStreamUrl, channel)
 
     def _getCustomStreamUrl(self, channel):
         c = self.conn.cursor()
@@ -601,7 +583,7 @@ class Database(object):
             return None
 
     def deleteCustomStreamUrl(self, channel):
-        self.eventQueue.append([self._deleteCustomStreamUrl, None, None, channel])
+        self.eventQueue.append([self._deleteCustomStreamUrl, None, channel])
         self.event.set()
 
     def _deleteCustomStreamUrl(self, channel):
@@ -675,7 +657,7 @@ class Database(object):
                 c.execute('CREATE INDEX end_date_idx ON programs(end_date)')
 
             # make sure we have a record in sources for this Source
-            c.execute("INSERT OR IGNORE INTO sources(id, channels_updated) VALUES(?, ?)", [self.source.KEY, datetime.datetime.fromtimestamp(0)])
+            c.execute("INSERT OR IGNORE INTO sources(id, channels_updated) VALUES(?, ?)", [self.source.KEY, 0])
 
             self.conn.commit()
             c.close()
