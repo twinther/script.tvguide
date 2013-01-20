@@ -533,18 +533,10 @@ class TVGuide(xbmcgui.WindowXML):
                     xbmc.executebuiltin('PlayMedia(%s,1)' % url)
                 else:
                     xbmc.executebuiltin('PlayMedia(%s)' % url)
-                if not wasPlaying:
-                    self._hideEpg()
             else:
                 self.player.play(item = url, windowed = self.osdEnabled)
 
-                for retry in range(0, 10):
-                    xbmc.sleep(100)
-                    if self.player.isPlaying():
-                        break
-
-
-            if not wasPlaying and self.player.isPlaying():
+            if not wasPlaying:
                 self._hideEpg()
 
         threading.Timer(1, self.waitForPlayBackStopped).start()
@@ -553,8 +545,14 @@ class TVGuide(xbmcgui.WindowXML):
         return url is not None
 
     def waitForPlayBackStopped(self):
+        for retry in range(0, 100):
+            time.sleep(0.1)
+            if self.player.isPlaying():
+                break
+
         while self.player.isPlaying() and not xbmc.abortRequested and not self.isClosing:
             time.sleep(0.5)
+
         self.onPlayBackStopped()
 
     def _showOsd(self):

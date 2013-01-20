@@ -667,11 +667,7 @@ class Database(object):
 
 
     def addNotification(self, program):
-        resultReady = threading.Event()
-        self.eventQueue.append([self._addNotification, None, resultReady, program])
-        self.event.set()
-
-        resultReady.wait()
+        self._invokeAndBlockForResult(self._addNotification, program)
         # no result, but block until operation is done
 
     def _addNotification(self, program):
@@ -684,11 +680,7 @@ class Database(object):
         c.close()
 
     def removeNotification(self, program):
-        resultReady = threading.Event()
-        self.eventQueue.append([self._removeNotification, None, resultReady, program])
-        self.event.set()
-
-        resultReady.wait()
+        self._invokeAndBlockForResult(self._removeNotification, program)
         # no result, but block until operation is done
 
     def _removeNotification(self, program):
@@ -702,12 +694,7 @@ class Database(object):
 
 
     def getNotifications(self, daysLimit = 2):
-        resultReady = threading.Event()
-        self.eventQueue.append([self._getNotifications, None, resultReady, daysLimit])
-        self.event.set()
-
-        resultReady.wait()
-        return self.eventResults.get(self._getNotifications.__name__)
+        return self._invokeAndBlockForResult(self._getNotifications, daysLimit)
 
     def _getNotifications(self, daysLimit):
         start = datetime.datetime.now()
@@ -720,12 +707,7 @@ class Database(object):
         return programs
 
     def isNotificationRequiredForProgram(self, program):
-        resultReady = threading.Event()
-        self.eventQueue.append([self._isNotificationRequiredForProgram, None, resultReady, program])
-        self.event.set()
-
-        resultReady.wait()
-        return self.eventResults.get(self._isNotificationRequiredForProgram.__name__)
+        return self._invokeAndBlockForResult(self._isNotificationRequiredForProgram, program)
 
     def _isNotificationRequiredForProgram(self, program):
         """
@@ -739,11 +721,7 @@ class Database(object):
         return result
 
     def clearAllNotifications(self):
-        resultReady = threading.Event()
-        self.eventQueue.append([self._clearAllNotifications, None, resultReady])
-        self.event.set()
-
-        resultReady.wait()
+        self._invokeAndBlockForResult(self._clearAllNotifications)
         # no result, but block until operation is done
 
     def _clearAllNotifications(self):
