@@ -812,10 +812,9 @@ class XMLTVSource(Source):
         return parseXMLTV(context, f, f.size, self.logoFolder, progress_callback)
 
     def isUpdated(self, lastUpdated):
-        if hasattr(xbmcvfs, 'stat'):
-            # we cannot determine this without the stat function
-            # https://github.com/xbmc/xbmc/pull/1062
-            mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime = xbmcvfs.stat(self.xmltvFile)
+        if hasattr(xbmcvfs, 'Stat'):
+            stat = xbmcvfs.Stat(self.xmltvFile)
+            mtime = stat.st_mtime()
         else:
             mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime = os.stat(self.xmltvFile)
 
