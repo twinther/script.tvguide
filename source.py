@@ -380,7 +380,7 @@ class Database(object):
 
             try:
                 # invalidate cached data
-                c.execute('UPDATE sources SET channels_updated=? WHERE id=?', [datetime.datetime.fromtimestamp(0), self.source.KEY])
+                c.execute('UPDATE sources SET channels_updated=? WHERE id=?', [0, self.source.KEY])
                 self.conn.commit()
             except sqlite3.OperationalError:
                 pass # database is locked
