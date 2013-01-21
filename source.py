@@ -282,7 +282,7 @@ class Database(object):
         c.execute('SELECT programs_updated FROM updates WHERE source=? AND date=?', [self.source.KEY, dateStr])
         row = c.fetchone()
         today = datetime.datetime.now()
-        expired = row is None or row['programs_updated'].day != today.day
+        expired = row is None or row['programs_updated'] is None or row['programs_updated'].day != today.day
         c.close()
 
         if not self.source.isUpdated(date):
