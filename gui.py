@@ -603,7 +603,11 @@ class TVGuide(xbmcgui.WindowXML):
         # remove existing controls
         self._clearEpg()
 
-        self.channelIdx, channels, programs = self.database.getEPGView(channelStart, startTime, self.onSourceProgressUpdate, clearExistingProgramList = False)
+        try:
+            self.channelIdx, channels, programs = self.database.getEPGView(channelStart, startTime, self.onSourceProgressUpdate, clearExistingProgramList = False)
+        except src.SourceException:
+            self.onEPGLoadError()
+            return
 
         # date and time row
         self.setControlLabel(self.C_MAIN_DATE, self.formatDate(self.viewStartDate))

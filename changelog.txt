@@ -1,5 +1,6 @@
 [B]Version 1.3.98 - 2012-01-xx[/B]
 - Fixed use of xbmcvfs.Stat()
+- Improve feedback on EPG load errors
 
 [B]Version 1.3.97 - 2013-01-20[/B]
 - Fixed problem with notifications introduced in 1.3.96

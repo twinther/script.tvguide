@@ -751,7 +751,7 @@ class Source(object):
         u = urllib2.urlopen(url, timeout=30)
         content = u.read()
         u.close()
-            
+
         return content
 
 
@@ -895,7 +895,10 @@ class FileWrapper(object):
             self.size = self.vfsfile.size()
         else:
             print "xbmcvfs.File() is missing - perhaps you are running XBMC Eden? - retrying with python file opener"
-            self.vfsfile = open(filename)
+            try:
+                self.vfsfile = open(filename)
+            except IOError:
+                xbmcgui.Dialog().ok(strings(LOAD_ERROR_TITLE), 'smb://, nfs://, etc. is not support in Eden', 'Mount these on a system level instead. Filename:', filename)
             self.size = os.path.getsize(filename)
         self.bytesRead = 0
 
