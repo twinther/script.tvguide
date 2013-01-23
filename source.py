@@ -557,9 +557,9 @@ class Database(object):
         return expired
 
 
-    def setCustomStreamUrl(self, callback, channel, stream_url):
-        self.eventQueue.append([self._setCustomStreamUrl, callback, channel, stream_url])
-        self.event.set()
+    def setCustomStreamUrl(self, channel, stream_url):
+        self._invokeAndBlockForResult(self._setCustomStreamUrl, channel, stream_url)
+        # no result, but block until operation is done
 
     def _setCustomStreamUrl(self, channel, stream_url):
         c = self.conn.cursor()

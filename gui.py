@@ -363,9 +363,8 @@ class TVGuide(xbmcgui.WindowXML):
                 self._showContextMenu(program)
             elif type(result) == str:
                 # one single stream detected, save it and start streaming
-                def callback():
-                    self.playChannel(program.channel)
-                self.database.setCustomStreamUrl(callback, program.channel, result)
+                self.database.setCustomStreamUrl(program.channel, result)
+                self.playChannel(program.channel)
 
             else:
                 # multiple matches, let user decide
@@ -373,9 +372,8 @@ class TVGuide(xbmcgui.WindowXML):
                 d = ChooseStreamAddonDialog(result)
                 d.doModal()
                 if d.stream is not None:
-                    def callback():
-                        self.playChannel(program.channel)
-                    self.database.setCustomStreamUrl(callback, program.channel, d.stream)
+                    self.database.setCustomStreamUrl(program.channel, d.stream)
+                    self.playChannel(program.channel)
 
 
     def _showContextMenu(self, program):
@@ -528,6 +526,17 @@ class TVGuide(xbmcgui.WindowXML):
         wasPlaying = self.player.isPlaying()
         url = self.database.getStreamUrl(channel)
         if url:
+            if url[-5:] == '.strm':
+                try:
+                    f = open(url)
+                    content = f.read()
+                    f.close()
+
+                    if content[0:9] == 'plugin://':
+                        url = content.strip()
+                except:
+                    pass
+
             if url[0:9] == 'plugin://':
                 if self.osdEnabled:
                     xbmc.executebuiltin('PlayMedia(%s,1)' % url)
@@ -585,7 +594,7 @@ class TVGuide(xbmcgui.WindowXML):
         self._clearEpg()
 
     def onRedrawEPG(self, channelStart, startTime, focusFunction = None):
-        if self.redrawingEPG or self.database.updateInProgress or self.isClosing:
+        if self.redrawingEPG or (self.database is not None and self.database.updateInProgress) or self.isClosing:
             debug('onRedrawEPG - already redrawing')
             return # ignore redraw request while redrawing
         debug('onRedrawEPG')
@@ -1210,7 +1219,7 @@ class StreamSetupDialog(xbmcgui.WindowXMLDialog):
         if controlId == self.C_STREAM_STRM_BROWSE:
             stream = xbmcgui.Dialog().browse(1, ADDON.getLocalizedString(30304), 'video', '.strm')
             if stream:
-                self.database.setCustomStreamUrl(None, self.channel, stream)
+                self.database.setCustomStreamUrl(self.channel, stream)
                 self.getControl(self.C_STREAM_STRM_FILE_LABEL).setText(stream)
                 self.strmFile = stream
 
@@ -1218,16 +1227,19 @@ class StreamSetupDialog(xbmcgui.WindowXMLDialog):
             listControl = self.getControl(self.C_STREAM_ADDONS_STREAMS)
             item = listControl.getSelectedItem()
             stream = item.getProperty('stream')
-            self.database.setCustomStreamUrl(self.close, self.channel, stream)
+            self.database.setCustomStreamUrl(self.channel, stream)
+            self.close()
 
         elif controlId == self.C_STREAM_FAVOURITES_OK:
             listControl = self.getControl(self.C_STREAM_FAVOURITES)
             item = listControl.getSelectedItem()
             stream = item.getProperty('stream')
-            self.database.setCustomStreamUrl(self.close, self.channel, stream)
+            self.database.setCustomStreamUrl(self.channel, stream)
+            self.close()
 
         elif controlId == self.C_STREAM_STRM_OK:
-            self.database.setCustomStreamUrl(self.close, self.channel, self.strmFile)
+            self.database.setCustomStreamUrl(self.channel, self.strmFile)
+            self.close()
 
         elif controlId in [self.C_STREAM_ADDONS_CANCEL, self.C_STREAM_FAVOURITES_CANCEL, self.C_STREAM_STRM_CANCEL]:
             self.close()
