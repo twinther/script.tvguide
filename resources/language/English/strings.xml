@@ -30,6 +30,8 @@
     <string id="30117">ONTV Pro URL</string>
     <string id="30118">Enable OSD menu</string>
     <string id="30119">Disabling the OSD menu may fix video stuttering.</string>
+    <string id="30120">Use alternate streaming method (required for some addons)</string>
+    <string id="30121">Alternative streaming is not compatible with OSD menu</string>
 
     <string id="30150">Oops, sorry about that!</string>
     <string id="30151">It was not possible to load program data,</string>

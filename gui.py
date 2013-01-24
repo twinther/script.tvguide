@@ -136,7 +136,8 @@ class TVGuide(xbmcgui.WindowXML):
         self.mode = MODE_EPG
         self.currentChannel = None
 
-        self.osdEnabled = ADDON.getSetting('enable.osd') == 'true'
+        self.osdEnabled = ADDON.getSetting('enable.osd') == 'true' and ADDON.getSetting('alternative.playback') != 'true'
+        self.alternativePlayback = ADDON.getSetting('alternative.playback') == 'true'
         self.osdChannel = None
         self.osdProgram = None
 
@@ -526,19 +527,10 @@ class TVGuide(xbmcgui.WindowXML):
         wasPlaying = self.player.isPlaying()
         url = self.database.getStreamUrl(channel)
         if url:
-            if url[-5:] == '.strm':
-                try:
-                    f = open(url)
-                    content = f.read()
-                    f.close()
-
-                    if content[0:9] == 'plugin://':
-                        url = content.strip()
-                except:
-                    pass
-
             if url[0:9] == 'plugin://':
-                if self.osdEnabled:
+                if self.alternativePlayback:
+                    xbmc.executebuiltin('XBMC.RunPlugin(%s)' % url)
+                elif self.osdEnabled:
                     xbmc.executebuiltin('PlayMedia(%s,1)' % url)
                 else:
                     xbmc.executebuiltin('PlayMedia(%s)' % url)
