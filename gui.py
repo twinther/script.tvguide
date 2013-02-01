@@ -115,6 +115,7 @@ class TVGuide(xbmcgui.WindowXML):
 
     def __init__(self):
         super(TVGuide, self).__init__()
+        self.initialized = False
         self.notification = None
         self.redrawingEPG = False
         self.isClosing = False
@@ -168,6 +169,11 @@ class TVGuide(xbmcgui.WindowXML):
 
     @buggalo.buggalo_try_except({'method' : 'TVGuide.onInit'})
     def onInit(self):
+        if self.initialized:
+            # onInit(..) is invoked again by XBMC after a video addon exits after being invoked by XBMC.RunPlugin(..)
+            xbmc.log("[script.tvguide] TVGuide.onInit(..) invoked, but we're already initialized!")
+            return
+        self.initialized = True
         self._hideControl(self.C_MAIN_MOUSE_CONTROLS, self.C_MAIN_OSD)
         self._showControl(self.C_MAIN_EPG, self.C_MAIN_LOADING)
         self.setControlLabel(self.C_MAIN_LOADING_TIME_LEFT, strings(BACKGROUND_UPDATE_IN_PROGRESS))
