@@ -415,10 +415,10 @@
             </control>
             <control type="image" id="4024">
                 <description>Channel logo</description>
-                <posx>0</posx>
-                <posy>500</posy>
-                <width>200</width>
-                <height>200</height>
+                <posx>10</posx>
+                <posy>560</posy>
+                <width>160</width>
+                <height>160</height>
                 <aspectratio>keep</aspectratio>
                 <fadetime>500</fadetime>
                 <visible>true</visible><!-- unused in default skin -->
@@ -438,7 +438,7 @@
                 <description>Program description</description>
                 <posx>190</posx>
                 <posy>600</posy>
-                <width>850</width>
+                <width>710</width>
                 <height>149</height>
                 <textcolor>ffffffff</textcolor>
                 <font>font13</font>
@@ -678,7 +678,7 @@
             <width>1280</width>
             <height>720</height>
             <animation type="Conditional" condition="!Control.IsVisible(5000)">
-                <effect type="zoom" end="25" center="1250,690" time="500" />
+                <effect type="zoom" end="24" center="1230,720" time="500" />
             </animation>
         </control>
 
