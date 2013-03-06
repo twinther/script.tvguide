@@ -36,6 +36,10 @@ msgctxt "#30503"
 msgid "Cancel"
 msgstr "Nuligi"
 
+msgctxt "#30605"
+msgid "Save"
+msgstr "Konservi"
+
 msgctxt "#30606"
 msgid "Cancel"
 msgstr "Nuligi"

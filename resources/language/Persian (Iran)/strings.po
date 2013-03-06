@@ -32,9 +32,17 @@ msgctxt "#30308"
 msgid "Quit"
 msgstr "خروج"
 
+msgctxt "#30502"
+msgid "Save"
+msgstr "ذخیره"
+
 msgctxt "#30503"
 msgid "Cancel"
 msgstr "لغو"
+
+msgctxt "#30605"
+msgid "Save"
+msgstr "ذخیره"
 
 msgctxt "#30606"
 msgid "Cancel"

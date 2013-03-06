@@ -48,6 +48,10 @@ msgctxt "#30602"
 msgid "Favourites"
 msgstr "प्रिय"
 
+msgctxt "#30605"
+msgid "Save"
+msgstr "बचाना"
+
 msgctxt "#30606"
 msgid "Cancel"
 msgstr "कटना"

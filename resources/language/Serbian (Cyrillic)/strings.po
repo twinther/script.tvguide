@@ -48,6 +48,10 @@ msgctxt "#30602"
 msgid "Favourites"
 msgstr "Омиљено"
 
+msgctxt "#30605"
+msgid "Save"
+msgstr "Сачувај"
+
 msgctxt "#30606"
 msgid "Cancel"
 msgstr "Откажи"

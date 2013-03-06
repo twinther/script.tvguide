@@ -60,6 +60,10 @@ msgctxt "#30602"
 msgid "Favourites"
 msgstr "收藏夹"
 
+msgctxt "#30605"
+msgid "Save"
+msgstr "保存"
+
 msgctxt "#30606"
 msgid "Cancel"
 msgstr "取消"

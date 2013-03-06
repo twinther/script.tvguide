@@ -60,6 +60,10 @@ msgctxt "#30602"
 msgid "Favourites"
 msgstr "즐겨찾기"
 
+msgctxt "#30605"
+msgid "Save"
+msgstr "저장"
+
 msgctxt "#30606"
 msgid "Cancel"
 msgstr "취소"

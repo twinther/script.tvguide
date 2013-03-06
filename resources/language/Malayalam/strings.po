@@ -23,3 +23,7 @@ msgstr "പോതുവായത്"
 msgctxt "#30502"
 msgid "Save"
 msgstr "സൂക്ഷിക്കുക"
+
+msgctxt "#30605"
+msgid "Save"
+msgstr "സൂക്ഷിക്കുക"

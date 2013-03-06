@@ -60,6 +60,10 @@ msgctxt "#30602"
 msgid "Favourites"
 msgstr "Favoritter"
 
+msgctxt "#30605"
+msgid "Save"
+msgstr "Lagre"
+
 msgctxt "#30606"
 msgid "Cancel"
 msgstr "Avbryt"

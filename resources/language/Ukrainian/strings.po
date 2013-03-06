@@ -60,6 +60,10 @@ msgctxt "#30602"
 msgid "Favourites"
 msgstr "Обране"
 
+msgctxt "#30605"
+msgid "Save"
+msgstr "Зберегти"
+
 msgctxt "#30606"
 msgid "Cancel"
 msgstr "Скасувати"

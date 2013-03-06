@@ -24,9 +24,17 @@ msgctxt "#30303"
 msgid "Cancel"
 msgstr "Batal"
 
+msgctxt "#30502"
+msgid "Save"
+msgstr "Simpan"
+
 msgctxt "#30503"
 msgid "Cancel"
 msgstr "Batal"
+
+msgctxt "#30605"
+msgid "Save"
+msgstr "Simpan"
 
 msgctxt "#30606"
 msgid "Cancel"

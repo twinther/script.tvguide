@@ -36,6 +36,10 @@ msgctxt "#30112"
 msgid "Notifications"
 msgstr "Mededelingen"
 
+msgctxt "#30114"
+msgid "Startup"
+msgstr "Gebruik Scrollbar"
+
 msgctxt "#30303"
 msgid "Cancel"
 msgstr "Afbreken"
@@ -59,6 +63,10 @@ msgstr "Afbreken"
 msgctxt "#30602"
 msgid "Favourites"
 msgstr "Favorieten"
+
+msgctxt "#30605"
+msgid "Save"
+msgstr "Opslaan"
 
 msgctxt "#30606"
 msgid "Cancel"

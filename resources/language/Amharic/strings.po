@@ -44,6 +44,10 @@ msgctxt "#30602"
 msgid "Favourites"
 msgstr "የምወዳቸው"
 
+msgctxt "#30605"
+msgid "Save"
+msgstr "ማስቀመጫ"
+
 msgctxt "#30606"
 msgid "Cancel"
 msgstr "መሰረዣ"

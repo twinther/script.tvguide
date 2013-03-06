@@ -32,6 +32,10 @@ msgctxt "#30503"
 msgid "Cancel"
 msgstr "Anule"
 
+msgctxt "#30605"
+msgid "Save"
+msgstr "Enregistre"
+
 msgctxt "#30606"
 msgid "Cancel"
 msgstr "Anule"

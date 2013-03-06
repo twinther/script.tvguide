@@ -60,6 +60,10 @@ msgctxt "#30602"
 msgid "Favourites"
 msgstr "מועדפים"
 
+msgctxt "#30605"
+msgid "Save"
+msgstr "שמור"
+
 msgctxt "#30606"
 msgid "Cancel"
 msgstr "בטל"

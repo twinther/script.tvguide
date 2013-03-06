@@ -60,6 +60,10 @@ msgctxt "#30602"
 msgid "Favourites"
 msgstr "Favoriti"
 
+msgctxt "#30605"
+msgid "Save"
+msgstr "Sačuvaj"
+
 msgctxt "#30606"
 msgid "Cancel"
 msgstr "Poništi"
