@@ -813,13 +813,8 @@ class XMLTVSource(Source):
         return parseXMLTV(context, f, f.size, self.logoFolder, progress_callback)
 
     def isUpdated(self, lastUpdated):
-        if hasattr(xbmcvfs, 'Stat'):
-            stat = xbmcvfs.Stat(self.xmltvFile)
-            mtime = stat.st_mtime()
-        else:
-            mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime = os.stat(self.xmltvFile)
-
-        fileUpdated = datetime.datetime.fromtimestamp(mtime)
+        stat = xbmcvfs.Stat(self.xmltvFile)
+        fileUpdated = datetime.datetime.fromtimestamp(stat.st_mtime())
         return fileUpdated > lastUpdated
 
 
@@ -888,19 +883,11 @@ def parseXMLTV(context, f, size, logoFolder, progress_callback):
         root.clear()
     f.close()
 
+
 class FileWrapper(object):
     def __init__(self, filename):
-        if hasattr(xbmcvfs, 'File'):
-            #xbmcvfs.File() was added in Frodo
-            self.vfsfile = xbmcvfs.File(filename)
-            self.size = self.vfsfile.size()
-        else:
-            print "xbmcvfs.File() is missing - perhaps you are running XBMC Eden? - retrying with python file opener"
-            try:
-                self.vfsfile = open(filename)
-            except IOError:
-                xbmcgui.Dialog().ok(strings(LOAD_ERROR_TITLE), 'smb://, nfs://, etc. is not support in Eden', 'Mount these on a system level instead. Filename:', filename)
-            self.size = os.path.getsize(filename)
+        self.vfsfile = xbmcvfs.File(filename)
+        self.size = self.vfsfile.size()
         self.bytesRead = 0
 
     def close(self):
@@ -912,6 +899,7 @@ class FileWrapper(object):
 
     def tell(self):
         return self.bytesRead
+
 
 def instantiateSource():
     SOURCES = {
