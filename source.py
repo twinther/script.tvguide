@@ -108,6 +108,7 @@ class Database(object):
         self.updateInProgress = False
         self.updateFailed = False
         self.sourceNotConfigured = False
+        self.settingsChanged = None
 
         #buggalo.addExtraData('source', self.source.KEY)
         #for key in SETTINGS_TO_CHECK:
@@ -220,7 +221,8 @@ class Database(object):
     def _close(self):
         try:
             # rollback any non-commit'ed changes to avoid database lock
-            self.conn.rollback()
+            if self.conn:
+                self.conn.rollback()
         except sqlite3.OperationalError:
             pass # no transaction is active
         self.conn.close()
