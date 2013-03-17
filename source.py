@@ -873,7 +873,16 @@ def parseXMLTV(context, f, size, logoFolder, progress_callback):
                     iconElement = elem.find("icon")
                     if iconElement is not None:
                         logo = iconElement.get("src")
-                result = Channel(id, title, logo)
+                streamElement = elem.find("stream")
+                streamUrl = None
+                if streamElement is not None:
+                    streamUrl = streamElement.get("url")
+                visible = elem.get("visible")
+                if visible == "0":
+                    visible = False
+                else:
+                    visible = True
+                result = Channel(id, title, logo, streamUrl, visible)
 
             if result:
                 elements_parsed += 1
