@@ -876,7 +876,7 @@ def parseXMLTV(context, f, size, logoFolder, progress_callback):
                 streamElement = elem.find("stream")
                 streamUrl = None
                 if streamElement is not None:
-                    streamUrl = streamElement.get("url")
+                    streamUrl = streamElement.text
                 visible = elem.get("visible")
                 if visible == "0":
                     visible = False
