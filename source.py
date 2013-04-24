@@ -84,14 +84,18 @@ class Program(object):
 class SourceException(Exception):
     pass
 
+
 class SourceUpdateCanceledException(SourceException):
     pass
+
 
 class SourceNotConfiguredException(SourceException):
     pass
 
+
 class DatabaseSchemaException(sqlite3.DatabaseError):
     pass
+
 
 class Database(object):
     SOURCE_DB = 'source.db'
@@ -199,7 +203,7 @@ class Database(object):
                 if cancel_requested_callback is None:
                     xbmc.log('[script.tvguide] Database is locked, bailing out...', xbmc.LOGDEBUG)
                     break
-                else: # ignore 'database is locked'
+                else:  # ignore 'database is locked'
                     xbmc.log('[script.tvguide] Database is locked, retrying...', xbmc.LOGDEBUG)
 
             except sqlite3.DatabaseError:
@@ -209,7 +213,7 @@ class Database(object):
                 except OSError:
                     pass
                 xbmcgui.Dialog().ok(ADDON.getAddonInfo('name'), strings(DATABASE_SCHEMA_ERROR_1),
-                    strings(DATABASE_SCHEMA_ERROR_2), strings(DATABASE_SCHEMA_ERROR_3))
+                                    strings(DATABASE_SCHEMA_ERROR_2), strings(DATABASE_SCHEMA_ERROR_3))
 
         if self.conn is None:
             self.sourceNotConfigured = True
@@ -224,8 +228,9 @@ class Database(object):
             if self.conn:
                 self.conn.rollback()
         except sqlite3.OperationalError:
-            pass # no transaction is active
-        self.conn.close()
+            pass  # no transaction is active
+        if self.conn:
+            self.conn.close()
 
     def _wasSettingsChanged(self, addon):
         settingsChanged = False
