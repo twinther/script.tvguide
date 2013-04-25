@@ -111,7 +111,6 @@ class Database(object):
 
         self.updateInProgress = False
         self.updateFailed = False
-        self.sourceNotConfigured = False
         self.settingsChanged = None
 
         #buggalo.addExtraData('source', self.source.KEY)
@@ -145,7 +144,10 @@ class Database(object):
                 self.eventResults[command.__name__] = result
 
                 if callback:
-                    threading.Thread(name = 'Database callback', target = callback).start()
+                    if self._initialize == command:
+                        threading.Thread(name='Database callback', target=callback, args=[result]).start()
+                    else:
+                        threading.Thread(name='Database callback', target=callback).start()
 
                 if self._close == command:
                     del self.eventQueue[:]
@@ -171,7 +173,7 @@ class Database(object):
         del self.eventResults[method.__name__]
         return result
 
-    def initialize(self, callback, cancel_requested_callback):
+    def initialize(self, callback, cancel_requested_callback=None):
         self.eventQueue.append([self._initialize, callback, cancel_requested_callback])
         self.event.set()
 
@@ -179,7 +181,7 @@ class Database(object):
         sqlite3.register_adapter(datetime.datetime, self.adapt_datetime)
         sqlite3.register_converter('timestamp', self.convert_datetime)
 
-        self.sourceNotConfigured = False
+        self.alreadyTriedUnlinking = False
         while True:
             if cancel_requested_callback is not None and cancel_requested_callback():
                 break
@@ -208,17 +210,21 @@ class Database(object):
 
             except sqlite3.DatabaseError:
                 self.conn = None
-                try:
-                    os.unlink(self.databasePath)
-                except OSError:
-                    pass
-                xbmcgui.Dialog().ok(ADDON.getAddonInfo('name'), strings(DATABASE_SCHEMA_ERROR_1),
-                                    strings(DATABASE_SCHEMA_ERROR_2), strings(DATABASE_SCHEMA_ERROR_3))
+                if self.alreadyTriedUnlinking:
+                    xbmc.log('[script.tvguide] Database is broken and unlink() failed', xbmc.LOGDEBUG)
+                    break
+                else:
+                    try:
+                        os.unlink(self.databasePath)
+                    except OSError:
+                        pass
+                    self.alreadyTriedUnlinking = True
+                    xbmcgui.Dialog().ok(ADDON.getAddonInfo('name'), strings(DATABASE_SCHEMA_ERROR_1),
+                                        strings(DATABASE_SCHEMA_ERROR_2), strings(DATABASE_SCHEMA_ERROR_3))
 
-        if self.conn is None:
-            self.sourceNotConfigured = True
+        return self.conn is not None
 
-    def close(self, callback):
+    def close(self, callback=None):
         self.eventQueue.append([self._close, callback])
         self.event.set()
 
@@ -262,7 +268,6 @@ class Database(object):
         print 'Settings changed: ' + str(settingsChanged)
         return settingsChanged
 
-
     def _isCacheExpired(self, date):
         if self.settingsChanged:
             return True
@@ -297,7 +302,6 @@ class Database(object):
             return False
 
         return expired
-
 
     def updateChannelAndProgramListCaches(self, callback, date = datetime.datetime.now(), progress_callback = None, clearExistingProgramList = True):
         self.eventQueue.append([self._updateChannelAndProgramListCaches, callback, date, progress_callback, clearExistingProgramList])
