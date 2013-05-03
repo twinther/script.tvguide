@@ -872,14 +872,13 @@ class TVGuide(xbmcgui.WindowXML):
 
     def setControlLabel(self, controlId, label):
         control = self.getControl(controlId)
-        if control:
+        if control and label:
             control.setLabel(label)
 
     def setControlText(self, controlId, text):
         control = self.getControl(controlId)
         if control:
             control.setText(text)
-
 
     def updateTimebar(self, scheduleTimer = True):
         try:
@@ -1243,11 +1242,13 @@ class StreamSetupDialog(xbmcgui.WindowXMLDialog):
             if visible == self.VISIBLE_ADDONS:
                 listControl = self.getControl(self.C_STREAM_ADDONS_STREAMS)
                 item = listControl.getSelectedItem()
-                stream = item.getProperty('stream')
+                if item:
+                    stream = item.getProperty('stream')
             elif visible == self.VISIBLE_FAVOURITES:
                 listControl = self.getControl(self.C_STREAM_FAVOURITES)
                 item = listControl.getSelectedItem()
-                stream = item.getProperty('stream')
+                if item:
+                    stream = item.getProperty('stream')
             elif visible == self.VISIBLE_STRM:
                 stream = self.strmFile
 
