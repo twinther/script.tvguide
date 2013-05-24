@@ -828,6 +828,9 @@ class XMLTVSource(Source):
         return parseXMLTV(context, f, f.size, self.logoFolder, progress_callback)
 
     def isUpdated(self, channelsLastUpdated, programLastUpdate):
+        if channelsLastUpdated is None or not xbmcvfs.exists(self.xmltvFile):
+            return True
+
         stat = xbmcvfs.Stat(self.xmltvFile)
         fileUpdated = datetime.datetime.fromtimestamp(stat.st_mtime())
         return fileUpdated > channelsLastUpdated
