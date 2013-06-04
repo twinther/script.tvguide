@@ -623,15 +623,15 @@ class TVGuide(xbmcgui.WindowXML):
         # set channel logo or text
         for idx in range(0, CHANNELS_PER_PAGE):
             if idx >= len(channels):
-                self.setControlImage(4110 + idx, '')
-                self.setControlLabel(4010 + idx, '')
+                self.setControlImage(4110 + idx, ' ')
+                self.setControlLabel(4010 + idx, ' ')
             else:
                 channel = channels[idx]
                 self.setControlLabel(4010 + idx, channel.title)
                 if channel.logo is not None:
                     self.setControlImage(4110 + idx, channel.logo)
                 else:
-                    self.setControlImage(4110 + idx, '')
+                    self.setControlImage(4110 + idx, ' ')
 
         for program in programs:
             idx = channels.index(program.channel)
@@ -868,7 +868,7 @@ class TVGuide(xbmcgui.WindowXML):
     def setControlImage(self, controlId, image):
         control = self.getControl(controlId)
         if control:
-            control.setImage(image)
+            control.setImage(image.encode('utf-8'))
 
     def setControlLabel(self, controlId, label):
         control = self.getControl(controlId)

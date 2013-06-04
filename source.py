@@ -126,7 +126,7 @@ class Database(object):
             os.makedirs(profilePath)
         self.databasePath = os.path.join(profilePath, Database.SOURCE_DB)
 
-        threading.Thread(name = 'Database Event Loop', target = self.eventLoop).start()
+        threading.Thread(name='Database Event Loop', target=self.eventLoop).start()
 
     def eventLoop(self):
         print 'Database.eventLoop() >>>>>>>>>> starting...'
@@ -377,8 +377,8 @@ class Database(object):
         except Exception:
             import traceback as tb
             import sys
-            (type, value, traceback) = sys.exc_info()
-            tb.print_exception(type, value, traceback)
+            (etype, value, traceback) = sys.exc_info()
+            tb.print_exception(etype, value, traceback)
 
             try:
                 self.conn.rollback()
@@ -882,7 +882,7 @@ def parseXMLTV(context, f, size, logoFolder, progress_callback):
                 title = elem.findtext("display-name")
                 logo = None
                 if logoFolder:
-                    logoFile = os.path.join(logoFolder.encode('utf-8', 'ignore'), title.encode('utf-8', 'ignore') + '.png')
+                    logoFile = os.path.join(logoFolder, title + '.png')
                     if xbmcvfs.exists(logoFile):
                         logo = logoFile
                 if not logo:
