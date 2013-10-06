@@ -700,7 +700,7 @@ class TVGuide(xbmcgui.WindowXML):
                 self.epgView.top + self.epgView.cellHeight * idx,
                 (self.epgView.right - self.epgView.left) - 2,
                 self.epgView.cellHeight - 2,
-                'no program',
+                strings(NO_PROGRAM_AVAILABLE),
                 noFocusTexture='tvguide-program-grey.png',
                 focusTexture='tvguide-program-grey-focus.png'
             )

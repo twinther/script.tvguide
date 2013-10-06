@@ -1,6 +1,7 @@
 [B]Version 2.0.6 - 2013-xx-xx[/B[
 - Merged ONTV source into XMLTV
   It's not possible to loa XMLTV either from a local file or from a URL
+- Display a 'No program available' for channels without programs to be able to stream
 
 [B]Version 2.0.5 - 2013-06-04[/B]
 - Fixed encoding problem with XMLTV logo images

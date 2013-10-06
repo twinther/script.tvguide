@@ -52,6 +52,10 @@ msgctxt "#30008"
 msgid "Cancel"
 msgstr ""
 
+msgctxt "#30009"
+msgid "No program available"
+msgstr ""
+
 #empty strings from id 30009 to 30099
 
 msgctxt "#30100"
