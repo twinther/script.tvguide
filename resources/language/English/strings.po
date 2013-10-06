@@ -122,10 +122,6 @@ msgctxt "#30116"
 msgid "Search for channel logos in"
 msgstr ""
 
-msgctxt "#30117"
-msgid "ONTV Pro URL"
-msgstr ""
-
 msgctxt "#30118"
 msgid "Enable OSD menu"
 msgstr ""
@@ -140,6 +136,22 @@ msgstr ""
 
 msgctxt "#30121"
 msgid "Alternative streaming is not compatible with OSD menu"
+msgstr ""
+
+msgctxt "#30122"
+msgid "XMLTV URL"
+msgstr ""
+
+msgctxt "#30123"
+msgid "XMLTV type"
+msgstr ""
+
+msgctxt "#30124"
+msgid "Local file"
+msgstr ""
+
+msgctxt "#30125"
+msgid "URL"
 msgstr ""
 
 #empty strings from id 30122 to 30149
