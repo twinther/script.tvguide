@@ -1,5 +1,5 @@
 #
-#      Copyright (C) 2013 Tommy Winther
+#      Copyright (C) 2014 Tommy Winther
 #      http://tommy.winther.nu
 #
 #  This Program is free software; you can redistribute it and/or modify
@@ -122,7 +122,6 @@ class TVGuide(xbmcgui.WindowXML):
         super(TVGuide, self).__init__()
         self.migrateSettings()
 
-        self.initialized = False
         self.notification = None
         self.redrawingEPG = False
         self.isClosing = False
@@ -178,11 +177,6 @@ class TVGuide(xbmcgui.WindowXML):
 
     @buggalo.buggalo_try_except({'method': 'TVGuide.onInit'})
     def onInit(self):
-        if self.initialized:
-            # onInit(..) is invoked again by XBMC after a video addon exits after being invoked by XBMC.RunPlugin(..)
-            xbmc.log("[script.tvguide] TVGuide.onInit(..) invoked, but we're already initialized!")
-            return
-        self.initialized = True
         self._hideControl(self.C_MAIN_MOUSE_CONTROLS, self.C_MAIN_OSD)
         self._showControl(self.C_MAIN_EPG, self.C_MAIN_LOADING)
         self.setControlLabel(self.C_MAIN_LOADING_TIME_LEFT, strings(BACKGROUND_UPDATE_IN_PROGRESS))
@@ -451,8 +445,11 @@ class TVGuide(xbmcgui.WindowXML):
             return
 
         self.setControlLabel(self.C_MAIN_TITLE, '[B]%s[/B]' % program.title)
-        self.setControlLabel(self.C_MAIN_TIME,
-                             '[B]%s - %s[/B]' % (self.formatTime(program.startDate), self.formatTime(program.endDate)))
+        if program.startDate or program.endDate:
+            self.setControlLabel(self.C_MAIN_TIME,
+                                 '[B]%s - %s[/B]' % (self.formatTime(program.startDate), self.formatTime(program.endDate)))
+        else:
+            self.setControlLabel(self.C_MAIN_TIME, '')
         if program.description:
             description = program.description
         else:
@@ -581,8 +578,11 @@ class TVGuide(xbmcgui.WindowXML):
 
         if self.osdProgram is not None:
             self.setControlLabel(self.C_MAIN_OSD_TITLE, '[B]%s[/B]' % self.osdProgram.title)
-            self.setControlLabel(self.C_MAIN_OSD_TIME, '[B]%s - %s[/B]' % (
-                self.formatTime(self.osdProgram.startDate), self.formatTime(self.osdProgram.endDate)))
+            if self.osdProgram.startDate or self.osdProgram.endDate:
+                self.setControlLabel(self.C_MAIN_OSD_TIME, '[B]%s - %s[/B]' % (
+                    self.formatTime(self.osdProgram.startDate), self.formatTime(self.osdProgram.endDate)))
+            else:
+                self.setControlLabel(self.C_MAIN_OSD_TIME, '')
             self.setControlText(self.C_MAIN_OSD_DESCRIPTION, self.osdProgram.description)
             self.setControlLabel(self.C_MAIN_OSD_CHANNEL_TITLE, self.osdChannel.title)
             if self.osdProgram.channel.logo is not None:
@@ -705,7 +705,8 @@ class TVGuide(xbmcgui.WindowXML):
                 focusTexture='tvguide-program-grey-focus.png'
             )
 
-            self.controlAndProgramList.append(ControlAndProgram(control, None))
+            program = src.Program(channel, strings(NO_PROGRAM_AVAILABLE), None, None, None)
+            self.controlAndProgramList.append(ControlAndProgram(control, program))
 
         # add program controls
         if focusFunction is None:
@@ -890,12 +891,18 @@ class TVGuide(xbmcgui.WindowXML):
                 control.setVisible(False)
 
     def formatTime(self, timestamp):
-        format = xbmc.getRegion('time').replace(':%S', '').replace('%H%H', '%H')
-        return timestamp.strftime(format)
+        if timestamp:
+            format = xbmc.getRegion('time').replace(':%S', '').replace('%H%H', '%H')
+            return timestamp.strftime(format)
+        else:
+            return ''
 
     def formatDate(self, timestamp):
-        format = xbmc.getRegion('dateshort')
-        return timestamp.strftime(format)
+        if timestamp:
+            format = xbmc.getRegion('dateshort')
+            return timestamp.strftime(format)
+        else:
+            return ''
 
     def setControlImage(self, controlId, image):
         control = self.getControl(controlId)
@@ -985,10 +992,14 @@ class PopupMenu(xbmcgui.WindowXMLDialog):
 
         programTitleControl.setLabel(self.program.title)
 
-        if self.showRemind:
-            remindControl.setLabel(strings(REMIND_PROGRAM))
+        if self.program.startDate:
+            remindControl.setEnabled(True)
+            if self.showRemind:
+                remindControl.setLabel(strings(REMIND_PROGRAM))
+            else:
+                remindControl.setLabel(strings(DONT_REMIND_PROGRAM))
         else:
-            remindControl.setLabel(strings(DONT_REMIND_PROGRAM))
+            remindControl.setEnabled(False)
 
     @buggalo.buggalo_try_except({'method': 'PopupMenu.onAction'})
     def onAction(self, action):
