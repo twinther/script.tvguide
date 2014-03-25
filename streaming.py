@@ -19,8 +19,6 @@
 #
 import xbmc
 from xml.etree import ElementTree
-from xml.etree.ElementTree import ParseError
-from xml.parsers.expat import ExpatError
 import ConfigParser
 import os
 import xbmcaddon
@@ -56,9 +54,7 @@ class StreamsService(object):
                         continue
 
                     entries.append((node.get('name'), value))
-            except ExpatError:
-                pass
-            except ParseError:
+            except:
                 pass
 
         return entries

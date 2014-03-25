@@ -1,3 +1,6 @@
+[B]Version 2.1.1 - 2014-03-25[/B]
+- Fixed python 2.6 compatibility
+
 [B]Version 2.1.0 - 2014-03-24[/B]
 - Fixed 'red tint' problem and other minor problems on Gotham
 - Update language files from Transifex
