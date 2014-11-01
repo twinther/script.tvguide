@@ -273,7 +273,7 @@ class TVGuide(xbmcgui.WindowXML):
                 self._showOsd()
 
     def onActionEPGMode(self, action):
-        if action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK, ACTION_PREVIOUS_MENU]:
+        if action.getId() in [ACTION_PARENT_DIR, KEY_NAV_BACK]:
             self.close()
             return
 
@@ -327,10 +327,12 @@ class TVGuide(xbmcgui.WindowXML):
             self.viewStartDate -= datetime.timedelta(minutes=self.viewStartDate.minute % 30,
                                                      seconds=self.viewStartDate.second)
             self.onRedrawEPG(self.channelIdx, self.viewStartDate)
-        elif action.getId() in [KEY_CONTEXT_MENU] and controlInFocus is not None:
+        elif action.getId() in [KEY_CONTEXT_MENU, ACTION_PREVIOUS_MENU] and controlInFocus is not None:
             program = self._getProgramFromControl(controlInFocus)
             if program is not None:
                 self._showContextMenu(program)
+        else:
+            xbmc.log('[script.tvguide] Unhandled ActionId: ' + str(action.getId()), xbmc.LOGDEBUG)
 
     @buggalo.buggalo_try_except({'method': 'TVGuide.onClick'})
     def onClick(self, controlId):
