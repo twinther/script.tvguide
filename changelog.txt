@@ -1,3 +1,7 @@
+[B]Versions 2.1.2 - 2015-12-18[/B]
+- Removed channel category selection from YouSee source
+  as it's no longer applicable. All channels will be loaded instead.
+
 [B]Version 2.1.1 - 2014-03-25[/B]
 - Fixed python 2.6 compatibility
 

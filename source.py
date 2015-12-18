@@ -34,7 +34,7 @@ import xbmcgui
 import xbmcvfs
 import sqlite3
 
-SETTINGS_TO_CHECK = ['source', 'youseetv.category', 'xmltv.type', 'xmltv.file', 'xmltv.url', 'xmltv.logo.folder']
+SETTINGS_TO_CHECK = ['source', 'xmltv.type', 'xmltv.file', 'xmltv.url', 'xmltv.logo.folder']
 
 
 class Channel(object):
@@ -133,7 +133,7 @@ class Database(object):
 
     def eventLoop(self):
         print 'Database.eventLoop() >>>>>>>>>> starting...'
-        while True:
+        while not xbmc.abortRequested:
             self.event.wait()
             self.event.clear()
 
@@ -170,8 +170,10 @@ class Database(object):
         self.eventQueue.append(event)
         self.event.set()
 
-        while not method.__name__ in self.eventResults:
+        while not method.__name__ in self.eventResults and not xbmc.abortRequested:
             time.sleep(0.1)
+        if xbmc.abortRequested:
+            return None
 
         result = self.eventResults.get(method.__name__)
         del self.eventResults[method.__name__]
@@ -186,7 +188,7 @@ class Database(object):
         sqlite3.register_converter('timestamp', self.convert_datetime)
 
         self.alreadyTriedUnlinking = False
-        while True:
+        while not xbmc.abortRequested:
             if cancel_requested_callback is not None and cancel_requested_callback():
                 break
 
@@ -810,11 +812,10 @@ class YouSeeTvSource(Source):
 
     def __init__(self, addon):
         self.date = datetime.datetime.today()
-        self.channelCategory = addon.getSetting('youseetv.category')
         self.ysApi = ysapi.YouSeeTVGuideApi()
 
     def getDataFromExternal(self, date, progress_callback=None):
-        channels = self.ysApi.channelsInCategory(self.channelCategory)
+        channels = self.ysApi.channelsInCategory('All')
         for idx, channel in enumerate(channels):
             c = Channel(id=channel['id'], title=channel['name'], logo=channel['logo'])
             yield c
